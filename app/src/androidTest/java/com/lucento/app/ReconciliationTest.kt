@@ -139,11 +139,11 @@ class ReconciliationTest {
         val mismatches = mutableListOf<String>()
         fun expect(what: String, check: () -> Unit) = runCatching(check).onFailure { mismatches += "$what: ${it.message}" }
 
-        // Home: the budget card's Spent (the same word as the Budget page).
+        // Home: the budget card's spent figure, "spent of" the budget (owner's redesign, 2026-11-18).
         waitForText("Monthly budget")
         compose.onNodeWithText("Monthly budget").performScrollTo()
         shot("01-home-budget")
-        expect("Home Spent") { compose.onNode(hasText("Spent") and hasText(spent)).assertExists() }
+        expect("Home Spent") { compose.onNode(hasText("spent of", substring = true) and hasText(spent)).assertExists() }
 
         // Transactions: This month's Expenses (the page opens on this month).
         compose.onNodeWithContentDescription("Transactions").performClick()
@@ -155,7 +155,7 @@ class ReconciliationTest {
         compose.onNodeWithContentDescription("Budget").performClick()
         waitForDescription("Spent")
         shot("03-budget")
-        expect("Budget Spent") { compose.onNode(hasContentDescription("Spent $spent")).assertExists() }
+        expect("Budget Spent") { compose.onNode(hasContentDescription("Spent $spent", substring = true)).assertExists() }
 
         check(mismatches.isEmpty()) { "This month's spending should read $spent everywhere; " + mismatches.joinToString("; ") }
 
@@ -169,7 +169,7 @@ class ReconciliationTest {
         shot("04-home-hidden")
         check(compose.onAllNodes(hasText(spent, substring = true)).fetchSemanticsNodes().isEmpty()) { "Hidden amounts still show $spent" }
         // On screen "PHP••••"; TalkBack hears "Amount hidden", never the figure.
-        compose.onNode(hasText("Spent") and hasContentDescription("Amount hidden")).assertExists()
+        compose.onNode(hasText("spent of", substring = true) and hasContentDescription("Amount hidden")).assertExists()
         // Round 7: every page that shows money hides it too — no figure as text, none in what TalkBack reads.
         fun noFigures(page: String) {
             val leaks = compose.onAllNodes(hasText(spent, substring = true) or hasContentDescription(spent, substring = true))
@@ -195,6 +195,6 @@ class ReconciliationTest {
         shot("05-show-no-screen-lock")
         click("Show amounts")
         waitForText(spent)
-        compose.onNode(hasText("Spent") and hasText(spent)).assertExists()
+        compose.onNode(hasText("spent of", substring = true) and hasText(spent)).assertExists()
     }
 }

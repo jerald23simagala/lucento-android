@@ -25,8 +25,11 @@ app/src/main/java/com/lucento/app/
   domain/              Pure Kotlin models and calculators (unit-tested, no Android deps)
   feature/<name>/      Screen + ViewModel per feature
   navigation/          LucentoRoot, routes, NavigationDock (Home · Transactions · (+) · Budget · Wallets; the centre +
-                       opens the transaction composer in feature/capture; Insights, goals, scheduled and debts open from
-                       Home's Quick links, categories from Budget), profile menu (Settings lives there); a new user's
+                       opens the transaction composer in feature/capture; Insights, goals, Milestones (feature/progress:
+                       the budget year; a month's square opens its recap page; its Awards card opens
+                       feature/awards), scheduled and debts open from Home's Quick links, categories from Budget; the
+                       monthly check-in card opens the plan page), profile menu (Settings and Follow
+                       Lucento live there); a new user's
                        guided setup (feature/guide) follows onboarding; Lucento Pro's welcome (feature/pro/welcome:
                        a tour over the real screens via Modifier.spotlightTarget) plays after a confirmed plan
 ```
@@ -48,8 +51,9 @@ a better user-facing structure while preserving sound engineering boundaries.
 - Transfers are a single atomic DB transaction producing two linked legs (`transfer_group`); never double-count.
 - Financial definitions (budget, burn rate, net flow, goals, net worth, debts) live in `docs/CALCULATIONS.md`.
 - **The overall budget is always the sum of category allocations** (`BudgetPlanner`), per currency and calendar month.
-  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home, Budget and Insights read
-  the same `BudgetPlan`.
+  Never add a separately editable overall amount; legacy "everything" rows are ignored. Home (and its widget), Budget
+  and Ask Lucento read the same `BudgetPlan`, built from the translated ledger (`FxTranslation.translate`): every budget
+  figure on a screen is computed from that ledger, never from the raw transaction or wallet lists.
 - Guard against duplicate submissions (in-flight flags, idempotency keys for imports).
 - New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
   → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The full-page editor (`TransactionEditorScreen`, opened from
@@ -62,23 +66,31 @@ a better user-facing structure while preserving sound engineering boundaries.
 - Fresh installs seed income categories only; expense categories come from the mandatory onboarding step
   (`CategoryPresets` + `CategorySelection`). `DefaultCategories.all` is frozen (MIGRATION_1_2 depends on it).
 - Every version bump needs an explicit `Migration` plus a migration test. Never enable destructive fallback.
+- Budget periods other than calendar months (planned Pro) go in new tables, never new scope columns on `budgets`:
+  older app versions ignore unknown columns, would read such rows as every-month amounts, and their duplicate fold
+  would delete them (`docs/handover/NEXT_TASKS.md` › "Custom budget periods").
 
 ## Privacy & cost
 - Core features work fully offline. No mandatory paid APIs, accounts, cloud, or bank integrations.
-- Network use is only what the person turns on, plus two defaults. The in-app Privacy Policy
+- Network use is only what the person turns on or confirms, plus the defaults below. The in-app Privacy Policy
   (`feature/legal/LegalDocuments.kt`, published at the website's /privacy) must list every path, and any summary of it
   (website, onboarding, store listing) must either list them all or be scoped (for example "your entries") and link to it.
   - **Opt-ins, each off until chosen:** cloud sync (docs/SYNC.md): nothing leaves the device until the user signs in
-    (Google, or an email account) and keeps sync on; Room stays the source of truth. A signed-in account also gets account emails (verify, welcome, password reset code on request, Pro confirmation; docs/EMAILS.md); the app's only part is one welcome request with the account's token. The Gemini features through
-    Lucento's proxy: Smarter reading sends the typed or spoken message (docs/CAPTURE.md); Ask Lucento's AI answers send
-    the question with a summary of the person's finances, including recent transactions, under their own consent
-    (docs/ASK.md). Anonymous usage counts (event names and timings with a random install id, kept 90 days). Crash
+    (Google, or an email account) and keeps sync on; Room stays the source of truth. Sync also carries the settings that
+    follow the account (docs/SYNC.md "Settings"); consents to send data and the app lock never sync. A signed-in account also gets account emails (verify, welcome, password reset code on request, Pro confirmation; docs/EMAILS.md); the app's only part is one welcome request with the account's token. Smarter
+    reading (Lucento Pro), Gemini through Lucento's proxy, sends the typed or spoken message (docs/CAPTURE.md). Anonymous
+    usage counts (event names and timings with a random install id, kept 90 days). Crash
     reports via Firebase Crashlytics, stacks without amounts or notes (docs/QUALITY.md); production releases include
     it (owner decision 2026-11-08; CI writes `app/google-services.json` from the `GOOGLE_SERVICES_JSON` secret).
     Online voice (owner decision 2026-11-13; docs/CAPTURE.md): the mic asks the phone's speech service for offline
     only; after a failed try, and only with consent, it may go online, so the recording may reach Google. Lucento gets
     only the text. Lucento holds `RECORD_AUDIO` (asked on first use) only for the composer's own listening sheet; it
     keeps no recording, and without the permission the speech service's own window is used.
+  - **On by default, confirmed once:** Ask Lucento's AI answers (owner decision 2026-11-17; docs/ASK.md), on every plan
+    for a signed-in account (Free 5 questions a month, Pro 45 a month). Nothing is sent until the person confirms what
+    is sent: the first question shows a card ("Ask Gemini" / "Keep answers on this phone"), or they accept Ask's sheet or
+    Settings' dialog. Then the question goes with a summary of their finances, including the last 60 days of
+    transactions. Sign-out and account resets return it to unconfirmed; turning it off withdraws the agreement.
   - **On by default:** exchange rates (docs/MULTICURRENCY.md, owner decision 2026-11-06): fetched only when something
     is recorded in another currency, sending two currency codes and a date (never an amount); off in Settings › Money.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,
@@ -185,6 +197,18 @@ For substantial development sessions, maintain concise documentation in `docs/ha
 
 Record completed changes, relevant file paths, actual test results, important decisions, unfinished work, and the next recommended action.
 Avoid copying entire conversations or generating unnecessarily large reports.
+
+**The owner's to-dos live in Mission Control › Tasks** (`docs/mission-control/v1/OWNER_TASKS.md`), not in NEXT_TASKS.md
+(its owner table is history once DEPLOYMENT.md part K is done, OT-42). Before reporting or relying on an owner task's
+state, read the list: `node mission-control/tasks.mjs status` in `../lucento-studio`. A new or changed owner task is a
+file in `lucento-studio/mission-control/owner-tasks/` (complete click-by-click steps, the owner's standing preference),
+sent with `tasks.mjs push`; answer the owner's questions there with `tasks.mjs set <code> answer --note "…"`. Mark an owner
+task done only with a note saying how you know.
+
+**Mission Control is used on a laptop** (owner, 2026-11-20: it "need not be mobile friendly"). Design and review its pages
+for laptop windows, 1280–1920 px and a snapped half-screen window, at text sizes up to 200 %. A narrower window gets one
+column and must not break, but phones are not a target: no phone-only work, and no phone sizes in a critic's brief. The
+Android app's rules are unchanged.
 
 
 ## UI/UX Creative Authority

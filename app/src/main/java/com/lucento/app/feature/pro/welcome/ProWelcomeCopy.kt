@@ -144,13 +144,13 @@ object ProWelcomeCopy {
             title = "Smarter reading, with Gemini",
             body = when {
                 online == OnlineStatus.SIGN_IN_NEEDED ->
-                    "Gemini fills in the details from what you type or say in the composer. It uses your Lucento account: " +
+                    "Gemini fills in the details from what you type or say in the composer; each message uses one of your AI questions. It uses your Lucento account: " +
                         "sign in from $accountPath, then turn it on in $privacyPath."
                 online == OnlineStatus.CONFIRMING ->
-                    "Gemini fills in the details from what you type or say in the composer. It starts as soon as your " +
+                    "Gemini fills in the details from what you type or say in the composer; each message uses one of your AI questions. It starts as soon as your " +
                         "Lucento account confirms Pro."
-                smartReadingOn -> "Smarter reading is on: Gemini fills in the details from what you type or say in the composer."
-                else -> "Gemini fills in the details from what you type or say in the composer. Turn it on in " +
+                smartReadingOn -> "Smarter reading is on: Gemini fills in the details from what you type or say in the composer; each message uses one of your AI questions."
+                else -> "Gemini fills in the details from what you type or say in the composer; each message uses one of your AI questions. Turn it on in " +
                     "$privacyPath; nothing is sent until you do."
             },
             where = "The composer opens from + in the middle of the bar.",
@@ -189,11 +189,11 @@ object ProWelcomeCopy {
                 body = when {
                     online == OnlineStatus.SIGN_IN_NEEDED ->
                         "Gemini answers your questions about your money. It uses your Lucento account: sign in from " +
-                            "$accountPath, then turn AI answers on in Ask Lucento."
+                            "$accountPath, then ask in Ask Lucento."
                     online == OnlineStatus.CONFIRMING ->
-                        "Gemini answers your questions about your money. Your daily allowance starts as soon as your " +
+                        "Gemini answers your questions about your money. Your monthly allowance starts as soon as your " +
                             "Lucento account confirms Pro."
-                    aiAnswersOn -> "AI answers from Gemini are on. Smarter reading shares the same daily allowance."
+                    aiAnswersOn -> "AI answers from Gemini are on. Smarter reading uses the same monthly allowance."
                     else -> "Gemini answers your questions about your money. Turn it on in Ask Lucento; nothing is sent until you do."
                 },
                 where = "Ask Lucento is at the top of Insights.",
@@ -204,8 +204,8 @@ object ProWelcomeCopy {
                 },
                 short = "AI answers",
                 gain = if (confirmed) allowance else null,
-                // Until the server confirms, the same term as the other services: the allowance is the server's to give.
-                term = term?.let { if (confirmed) aiTermText(it) else serviceTermText(it) },
+                // Until the server confirms, no allowance figure (it is the server's to give), only when the Pro allowance ends.
+                term = term?.let { if (confirmed) aiTermText(it) else aiPendingTermText(it) },
                 status = serviceState(online, aiAnswersOn),
             )
         }
@@ -253,16 +253,26 @@ object ProWelcomeCopy {
 
     /**
      * The AI adviser's term: after a Lifetime's included year the allowance falls back to the free plan's, it doesn't
-     * stop ("50 a day until Nov 12, 2027, then 10 a month", as the Lucento Pro page's comparison says it).
+     * stop ("45 a month until Nov 12, 2027, then 5 a month", as the Lucento Pro page's comparison says it).
      */
     fun aiTermText(term: ProCopy.ServiceTerm): String = when (term) {
         is ProCopy.ServiceTerm.Until ->
-            "${PlanCatalog.PRO_AI_QUESTIONS_PER_DAY}\u00A0a\u00A0day until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month"
+            "${PlanCatalog.PRO_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month until ${term.date}, then ${PlanCatalog.FREE_AI_QUESTIONS_PER_MONTH}\u00A0a\u00A0month"
         else -> serviceTermText(term)
     }
 
     /**
-     * What the collection shows beside a card's name: its gain ("No limit", "50 a day"), or for an online service with an
+     * The AI card's term before the server confirms the plan (owner, 2026-11-22, OT-48 call 4 B): "Pro allowance until
+     * Nov 12, 2027", not "Included until", because AI answers carry on after that date at the free plan's allowance; only
+     * the Pro allowance ends.
+     */
+    fun aiPendingTermText(term: ProCopy.ServiceTerm): String = when (term) {
+        is ProCopy.ServiceTerm.Until -> "Pro allowance until ${term.date}"
+        else -> serviceTermText(term)
+    }
+
+    /**
+     * What the collection shows beside a card's name: its gain ("No limit", "45 a month"), or for an online service with an
      * end date, that date ("Until Nov 12, 2027"). The AI adviser shows its allowance, never a date (it carries on after).
      */
     fun collectionTag(stop: ProTourStop, copy: StopCopy, term: ProCopy.ServiceTerm?): String? = when {
@@ -292,7 +302,7 @@ object ProWelcomeCopy {
     /** The Lucento Pro page's word for a limit that is gone (its comparison table says the same). */
     const val NO_LIMIT = "No limit"
 
-    /** A limit in words: "3", "No limit", "10 a month", "50 a day", "1 Partner", "Included". */
+    /** A limit in words: "3", "No limit", "5 a month", "1 Partner", "Included". */
     fun limitText(feature: ProFeature, limit: Limit): String = when (feature) {
         ProFeature.INSIGHTS_LONG_PERIODS -> if (limit == Limit.None) "${ProGates.FREE_INSIGHTS_MONTHS} months" else "12 months"
         ProFeature.SHARED_SPACE -> when (limit) {
@@ -305,7 +315,6 @@ object ProWelcomeCopy {
             Limit.None -> "Not included"
             is Limit.Count -> "${limit.max}"
             is Limit.PerMonth -> "${limit.max}\u00A0a\u00A0month"
-            is Limit.PerDay -> "${limit.max}\u00A0a\u00A0day"
         }
     }
 

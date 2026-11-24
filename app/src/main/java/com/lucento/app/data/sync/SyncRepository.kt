@@ -32,6 +32,7 @@ import kotlinx.serialization.json.longOrNull
 import java.util.UUID
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The whole optional cloud sync engine (see docs/SYNC.md). Room is always the local source of truth — nothing
@@ -52,6 +53,7 @@ import kotlinx.coroutines.withTimeout
  *    as a conflict instead of failing the sync.
  * 5. Save the new cursor only after all of that succeeded. Any failure leaves the cursor, every dirty flag and
  *    every local row exactly as they were, so the next cycle simply repeats the work.
+ * 6. Merge the person's settings with the account's ([settleAccountSettings]); this step never fails the cycle.
  *
  * Conflicts: [localEditWins] / [pullDecision]; the server applies the same rule on every write.
  */
@@ -95,6 +97,24 @@ class SyncRepository(
     private val planFingerprint: suspend () -> String = { "" },
     /** Called once when the server starts refusing uploads (the app re-reads the plan, so its own gate catches up). */
     private val onUploadsRefused: suspend () -> Unit = {},
+    /**
+     * Settings that follow the account (docs/SYNC.md "Settings"), merged after the records in every cycle. Null in tests
+     * that don't exercise them.
+     */
+    private val accountSettings: com.lucento.app.data.preferences.AccountSettingsStore? = null,
+    /**
+     * Whether the signed-in person's own plan lets their settings be saved. Their settings row is theirs, so a Partner, who
+     * syncs the Owner's records on the Owner's plan, needs their own (security audit F-01 gate on `user_settings`).
+     * Left out, nothing is saved: the plan checks deny unless given (Pro-gate review 2026-11-23, F1).
+     */
+    private val accountSettingsUploadAllowed: suspend () -> Boolean = { false },
+    /**
+     * Lucento Pro: theme keys this phone's plan may not pick; an account's choice of one isn't applied here. Left out,
+     * every Pro theme is locked.
+     */
+    private val lockedThemes: suspend () -> Set<String> = {
+        com.lucento.app.data.preferences.ThemeId.keysOf(com.lucento.app.domain.entitlement.ProGates.PRO_THEME_IDS)
+    },
 ) {
     /** How many local changes are waiting for the next sync (rows and deletions); read by the Home header. */
     fun observePendingChanges(): Flow<Int> = syncMeta.observePendingChanges()
@@ -177,6 +197,17 @@ class SyncRepository(
             // that pull has finished, so a first sync that fails half-way pulls first again on the retry (P0-2).
             val initialPullDone = initialPullDone(owner, userId, env)
             val firstIntoExisting = !initialPullDone && remoteHasData(r, env)
+            // The settings here belong to this account from now on; a phone's first sync with it joins it (docs/SYNC.md
+            // "Settings"). Before anything is read, so no merge ever runs for the wrong account. Never fails the cycle.
+            accountSettings?.let { store ->
+                try {
+                    store.bindAccountSettings(userId, claiming = owner == null)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // The merge binds again before it runs.
+                }
+            }
             // Claimed before anything is pulled or pushed, and never moved later: a half-finished pull must still mark
             // this phone as the account's, so a different account signing in next is wiped first (AccountBoundary).
             if (owner == null) preferences.setSyncedUserId(userId)
@@ -232,6 +263,10 @@ class SyncRepository(
                 val again = Rejected()
                 report += upload { pushTombstones(r, env, again) + pushBudgets(r, env, again) }
             }
+            // The person's settings, after the records, so a default wallet that just arrived can be matched. Always the
+            // signed-in account's own row (a Partner's too), and it never fails the cycle.
+            // A full ledger (the row ceiling) doesn't hold settings back: user_settings has no ceiling.
+            report += settleAccountSettings(r, userId, partner, uploadsHeld = refusal == UploadRefusal.PLAN)
             preferences.setLastSyncedAtMillis(clock())
             preferences.addOverriddenChanges(report.overridden)
             val refused = refusal
@@ -297,6 +332,50 @@ class SyncRepository(
         } catch (e: Exception) {
             // Kept as before: values already on this phone stay in the currency they say they're in (base_currency).
         }
+    }
+
+    /**
+     * Settings that follow the account (docs/SYNC.md "Settings"): read the account's document, merge it into this phone's
+     * one setting at a time ([com.lucento.app.domain.settings.AccountSettingsMerge]), and save the result back on top of
+     * the revision that was read. When another phone saved in between, the database keeps its version and this one reads
+     * and merges again (up to [SETTINGS_ATTEMPTS] times, then the next cycle). A Partner's phone in someone else's Shared
+     * Space keeps to the person's own settings: the default wallet and the budget moment belong to the records it holds.
+     *
+     * Never fails the cycle: a project without the table (an older server), a refusal or a lost connection leaves the
+     * records synced and the settings waiting here. Each merge is one edit, so nothing is ever half-applied.
+     */
+    private suspend fun settleAccountSettings(r: SyncRemote, userId: String, partner: Boolean, uploadsHeld: Boolean): SyncReport {
+        val store = accountSettings ?: return SyncReport()
+        val allowed = if (partner) com.lucento.app.domain.settings.AccountSetting.PERSONAL else com.lucento.app.domain.settings.AccountSetting.entries.toSet()
+        var report = SyncReport()
+        try {
+            // Its own limit, well inside the cycle's, so a slow settings request never makes a finished sync look failed.
+            withTimeoutOrNull(SETTINGS_STEP_TIMEOUT_MILLIS) {
+                val locked = lockedThemes()
+                repeat(SETTINGS_ATTEMPTS) {
+                    val row = r.accountSettings(userId)
+                    val all = wallets.getAll()
+                    val uuidOf = all.associate { it.id to it.clientUuid }
+                    val idOf = all.mapNotNull { w -> w.clientUuid?.let { it to w.id } }.toMap()
+                    val merged = store.mergeAccountSettings(userId, row?.document, allowed, { uuidOf[it] }, { idOf[it] }, locked)
+                    report += SyncReport(overridden = merged.replaced, settingsTaken = merged.taken)
+                    val upload = merged.upload ?: return@withTimeoutOrNull
+                    // Uploads the plan refused this cycle wait, as the records' do; so does a person whose own plan has no cloud.
+                    if (uploadsHeld || !accountSettingsUploadAllowed()) return@withTimeoutOrNull
+                    if (r.saveAccountSettings(userId, upload.document, row?.revision)) {
+                        store.markAccountSettingsSent(upload)
+                        report += SyncReport(settingsSent = upload.sent.size + upload.seeded.size)
+                        return@withTimeoutOrNull
+                    }
+                    // Another phone saved first: read its version and merge again.
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Kept as it is: what changed here goes up in a later cycle.
+        }
+        return report
     }
 
     /**
@@ -614,6 +693,10 @@ class SyncRepository(
         // one already valued), and on none otherwise — a one-currency ledger sends exactly what v12 sent.
         val main = mainCurrency()
         val withFx = dirty.any { it.fxBasisRate != null || it.fxRevalue || (main != null && it.currencyCode != main) }
+        // v14, the same way: a kind or icon, and a spending-money choice, go on every wallet of a batch where one is set.
+        // The editor keeps a choice once made (it never goes back to null), so clearing one never needs the keys alone.
+        val withLook = dirty.any { it.kind != null || it.iconKey != null }
+        val withSpending = dirty.any { it.spendable != null || it.spendableCreditMinor != null }
         return pushRows(r, "wallets", dirty, { it.clientUuid!! }, {
             val t = terms[it.id]
             val json = encode(WalletRow.serializer(), WalletRow(
@@ -630,6 +713,14 @@ class SyncRepository(
                 if (withFx) {
                     put(FX_BASIS_RATE, it.fxBasisRate?.let(::JsonPrimitive) ?: JsonNull)
                     put(FX_REVALUE, JsonPrimitive(it.fxRevalue))
+                }
+                if (withLook) {
+                    put(KIND, it.kind?.let(::JsonPrimitive) ?: JsonNull)
+                    put(ICON_KEY, it.iconKey?.let(::JsonPrimitive) ?: JsonNull)
+                }
+                if (withSpending) {
+                    put(SPENDABLE, it.spendable?.let(::JsonPrimitive) ?: JsonNull)
+                    put(SPENDABLE_CREDIT_MINOR, it.spendableCreditMinor?.let(::JsonPrimitive) ?: JsonNull)
                 }
             }
             if (extra.isEmpty()) json else JsonObject(json + extra)
@@ -1000,6 +1091,14 @@ class SyncRepository(
                 if (row.deletedAt != null) return queueDelete(s, table, row.id, local?.updatedAt, local?.dirty, local?.baseRevision, row.deletedAt, serverWins, { dao.findByClientUuid(row.id)?.updatedAt }) { dao.deleteById(local!!.id) }
                 val walletId = resolveWallet(row.walletId, row.currencyCode, s)
                 val toWalletId = row.toWalletId?.let { resolveWallet(it, row.currencyCode, s) }
+                // Tester round (2026-11-17): a scheduled transfer moves money between two money accounts in its currency,
+                // as the editor and backups require; a row that doesn't (a modified client's) is skipped, never kept.
+                if (row.type == com.lucento.app.domain.TransactionType.TRANSFER_OUT.name &&
+                    !scheduledTransferFits(walletId, toWalletId, row.currencyCode)
+                ) {
+                    s.invalidSkipped++
+                    return
+                }
                 val categoryId = resolveCategory(row.categoryId, if (row.type == "INCOME") "INCOME" else "EXPENSE", s)
                 when (decide(local != null, local?.dirty == true, local?.baseRevision, local?.updatedAt ?: 0, row.updatedAt)) {
                     PullDecision.INSERT -> dao.insert(row.toEntity(walletId, toWalletId, categoryId, syncedAt = clock()))
@@ -1123,6 +1222,17 @@ class SyncRepository(
      * The restored row is not dirty, so it is not pushed and does not undelete the parent for other devices.
      * The cursor is allowed to move: deferring here used to re-download every later row forever.
      */
+    /** Both ends of a scheduled transfer are money accounts in [currencyCode]: never a card, loan, receivable or valued asset. */
+    private suspend fun scheduledTransferFits(fromId: Long, toId: Long?, currencyCode: String): Boolean {
+        if (toId == null || toId == fromId) return false
+        return listOf(fromId, toId).all { id ->
+            val entity = wallets.getById(id) ?: return false
+            val type = com.lucento.app.domain.WalletType.entries.firstOrNull { it.name == entity.type } ?: return false
+            entity.currencyCode == currencyCode && !type.isLiability && !type.isValuedManually &&
+                type != com.lucento.app.domain.WalletType.RECEIVABLE
+        }
+    }
+
     private suspend fun resolveWallet(clientUuid: String, currencyCode: String, s: PullState): Long {
         wallets.findByClientUuid(clientUuid)?.let { return it.id }
         val restored = s.deletedWallets[clientUuid]
@@ -1216,6 +1326,12 @@ class SyncRepository(
         /** How long refused uploads wait under an unchanged plan before one more attempt (security audit F-01). */
         const val UPLOAD_REFUSAL_COOLDOWN_MILLIS = 30 * 60_000L
 
+        /** Reads and merges of the settings document per cycle when other phones keep saving first. */
+        const val SETTINGS_ATTEMPTS = 3
+
+        /** The settings step's own limit (a few small requests; each one already times out after 30 s). */
+        const val SETTINGS_STEP_TIMEOUT_MILLIS = 60_000L
+
         /** What Settings and the sync sheet show while uploads are paused; never a technical code. */
         fun refusalMessage(reason: UploadRefusal): String = when (reason) {
             UploadRefusal.PLAN ->
@@ -1240,6 +1356,10 @@ class SyncRepository(
         private const val CLASSIFICATION = "classification"
         private const val FX_BASIS_RATE = "fx_basis_rate"
         private const val FX_REVALUE = "fx_revalue"
+        private const val KIND = "kind"
+        private const val ICON_KEY = "icon_key"
+        private const val SPENDABLE = "spendable"
+        private const val SPENDABLE_CREDIT_MINOR = "spendable_credit_minor"
         private const val BASE_AMOUNT_MINOR = "base_amount_minor"
         private const val BASE_CURRENCY = "base_currency"
         private const val FX_SOURCE = "fx_source"
@@ -1266,6 +1386,11 @@ private fun WalletRow.toEntity(syncedAt: Long, id: Long = 0): WalletEntity = Wal
     // Multicurrency: a rate this version can't read is dropped (the wallet then shows unvalued) rather than misread.
     fxBasisRate = fxBasisRate?.takeIf { com.lucento.app.core.money.FxRate.parse(it) != null },
     fxRevalue = fxRevalue ?: false,
+    // v14: looks and choices only. A key this version doesn't know is kept as text and read as none.
+    kind = kind?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    iconKey = iconKey?.takeIf { com.lucento.app.domain.WalletKind.KEY_PATTERN.matches(it) },
+    spendable = spendable,
+    spendableCreditMinor = spendableCreditMinor?.takeIf { it >= 0L },
 )
 
 private fun CategoryRow.toEntity(syncedAt: Long, id: Long = 0): CategoryEntity = CategoryEntity(

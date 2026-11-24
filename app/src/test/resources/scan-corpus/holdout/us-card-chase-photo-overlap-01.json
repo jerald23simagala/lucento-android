@@ -1,0 +1,229 @@
+{
+  "id": "us-card-chase-photo-overlap-01",
+  "country": "US",
+  "type": "CARD_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-08",
+  "pages": [
+    [
+      "CHASE",
+      "Chase Freedom Unlimited",
+      "Manage your account online at: www.chase.com/cardhelp",
+      "Customer Service: 1-800-524-3880",
+      "ACCOUNT SUMMARY",
+      "Account Number: XXXX XXXX XXXX 3920",
+      "Previous Balance  $1,326.40",
+      "Payment, Credits  -$1,326.40",
+      "Purchases  +$677.46",
+      "Cash Advances  $0.00",
+      "Balance Transfers  $0.00",
+      "Fees Charged  $0.00",
+      "Interest Charged  $0.00",
+      "New Balance  S677.46",
+      "Opening/Closing Date  09/14/26 - 10/13/26",
+      "Credit Access Line  $12,000.00",
+      "Available Credit  $11,322.54",
+      "Cash Access Line  $2,400",
+      "Available for Cash  $2,400",
+      "Past Due Amount  $0.00",
+      "Balance over the Credit Access Line  $0.00",
+      "PAYMENT INFORMATION",
+      "New Balance  $677.46",
+      "Payment Due Date  11/07/26",
+      "Minimum Payment Due  $40.00",
+      "Late Payment Warning: If we do not receive your minimum payment by the date listed above, you may have to pay a late fee of up to $40.00.",
+      "ACCOUNT ACTIVITY",
+      "Date of Transaction  Merchant Name or Transaction Description  $ Amount",
+      "PAYMENTS AND OTHER CREDITS",
+      "09/25  AUTOMATIC PAYMENT - THANK YOU  -1,326.40",
+      "PURCHASE",
+      "09/14  DOORDASH*SWEETGREEN WWW.DOORDASH.CA  23.85",
+      "09/15  SAFEWAY #1551 SEATTLE WA  66.40",
+      "09/17  SQ *ESPRESSO VIVACE SEATTLE WA  5.10",
+      "09/18  AMAZON MKTPL*Z12AB3CD4 Amzn.com/billWA  47.99",
+      "09/20  SHELL OIL 57442381 SEATTLE WA  51.30",
+      "09/21  TST* DICK'S DRIVE-IN SEATTLE WA  12.75",
+      "09/23  HULU 877-8244858 CA  18.99",
+      "09/24  COSTC0 WHSE #0001 SEATTLE WA  201.44",
+      "09/26  SEATTLE PARKING METER SEATTLE WA  6.00"
+    ],
+    [
+      "09/24  COSTCO WHSE #0001 SEATTLE WA  201.44",
+      "09/26  SEATTLE PARKING METER SEATTLE WA  6.00",
+      "09/28  REI #11 SEATTLE SEATTLE WA  89.50",
+      "10/01  APPLE.COM/BILL 866-712-7753 CA  9.99",
+      "10/03  PCC COMMUNITY MARKETS SEATTLE WA  38.12",
+      "10/05  LYFT *RIDE SUN 11PM LYFT.COM CA  19.75",
+      "10/07  PAGLlACCI PIZZA SEATTLE WA  28.40",
+      "10/09  WALGREENS #4502 SEATTLE WA  14.67",
+      "10/12  TARGET 00012345 SEATTLE WA  43.21",
+      "INTEREST CHARGES",
+      "Your Annual Percentage Rate (APR) is the annual interest rate on your account.",
+      "Balance Type  Annual Percentage Rate (APR)  Balance Subject To Interest Rate  Interest Charges",
+      "PURCHASES  Purchases  20.49%(v)(d)  - 0 -  - 0 -",
+      "CASH ADVANCES  Cash Advances  28.24%(v)(d)  - 0 -  - 0 -",
+      "31 Days in Billing Period",
+      "Total fees charged in 2026  $0.00",
+      "Total interest charged in 2026  $0.00"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Chase",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1326.40",
+        "closingBalance": "677.46",
+        "statementBalance": "677.46",
+        "minimumPayment": "40.00",
+        "paymentDueDate": "2026-11-07",
+        "creditLimit": "12000.00",
+        "availableCredit": "11322.54",
+        "transactions": [
+          {
+            "date": "2026-09-25",
+            "description": "AUTOMATIC PAYMENT - THANK YOU",
+            "amount": "1326.40",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-14",
+            "description": "DOORDASH*SWEETGREEN",
+            "amount": "23.85",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "DoorDash"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "SAFEWAY #1551",
+            "amount": "66.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-09-17",
+            "description": "SQ *ESPRESSO VIVACE",
+            "amount": "5.10",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Espresso Vivace"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "AMAZON MKTPL*Z12AB3CD4",
+            "amount": "47.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "SHELL OIL 57442381",
+            "amount": "51.30",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-09-21",
+            "description": "DICK'S DRIVE-IN",
+            "amount": "12.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Dick's Drive-In"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "HULU",
+            "amount": "18.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Hulu"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "WHSE #0001",
+            "amount": "201.44",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Costco"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "SEATTLE PARKING METER",
+            "amount": "6.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Seattle Parking"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "REI #11",
+            "amount": "89.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "REI"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "APPLE.COM/BILL",
+            "amount": "9.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Apple"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "PCC COMMUNITY MARKETS",
+            "amount": "38.12",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "PCC Community Markets"
+          },
+          {
+            "date": "2026-10-05",
+            "description": "LYFT *RIDE",
+            "amount": "19.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Lyft"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "PIZZA SEATTLE",
+            "amount": "28.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Pagliacci Pizza"
+          },
+          {
+            "date": "2026-10-09",
+            "description": "WALGREENS #4502",
+            "amount": "14.67",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "TARGET 00012345",
+            "amount": "43.21",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Two overlapping photos: shot 2 repeats the Costco 201.44 and parking 6.00 lines (the Costco line reads 'COSTC0' in shot 1 and 'COSTCO' in shot 2). OCR noise: 'COSTC0', 'PAGLlACCI', 'S' for $ in the first New Balance. Seattle addresses give the country."
+}

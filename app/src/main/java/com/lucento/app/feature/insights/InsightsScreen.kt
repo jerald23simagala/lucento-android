@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Check
@@ -45,6 +46,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -114,14 +119,17 @@ fun InsightsScreen(
     val reportsState by reports.uiState.collectAsStateWithLifecycle()
     var openReport by remember { mutableStateOf<com.lucento.app.domain.ask.Report?>(null) }
     var chosenPeriod by rememberSaveable { mutableStateOf<TrendPeriod?>(null) }
-    // Lucento Pro: 6 and 12 months are Pro (docs/MONETIZATION.md §3.4). The free plan opens on its own 3 months, and the
-    // note appears only when someone picks a locked period — never as a greeting.
+    // Lucento Pro: 6 and 12 months are Pro (docs/MONETIZATION.md §3.4). The free plan opens on its own 3 months; picking a
+    // locked period shows a preview of it, the person's own shape with every figure hidden (owner, 2026-11-19).
+    var previewPeriod by rememberSaveable { mutableStateOf<TrendPeriod?>(null) }
     val locked = data.longPeriodsLocked
+    val preview = previewPeriod?.takeIf { locked && it != TrendPeriod.THREE }
+    // With 6 and 12 months on the plan (just bought), the preview gives way to the period itself.
+    LaunchedEffect(locked) { if (!locked) previewPeriod = null }
     val period = when (val chosen = chosenPeriod) {
         null -> if (locked) TrendPeriod.THREE else TrendPeriod.SIX
         else -> if (locked && chosen != TrendPeriod.THREE) TrendPeriod.THREE else chosen
     }
-    val lockedPeriodChosen = locked && chosenPeriod != null && chosenPeriod != TrendPeriod.THREE
     var currencyChoice by rememberSaveable { mutableStateOf<String?>(null) }
     val currencies = remember(data.wallets, data.transactions, data.focusCurrency) {
         (listOf(data.focusCurrency) +
@@ -157,26 +165,42 @@ fun InsightsScreen(
         Box {
             SegmentedToggle(
                 options = TrendPeriod.entries.map { it to (if (locked && it != TrendPeriod.THREE) "${it.label} · Pro" else it.label) },
-                selected = period,
-                onSelect = { chosenPeriod = it },
+                selected = preview ?: period,
+                onSelect = { picked ->
+                    if (locked && picked != TrendPeriod.THREE) {
+                        previewPeriod = picked
+                        // Kept, so buying Pro from the preview lands on the period that was being looked at.
+                        chosenPeriod = picked
+                    } else {
+                        previewPeriod = null
+                        chosenPeriod = picked
+                    }
+                },
                 compact = true,
                 selectedTone = { com.lucento.app.core.designsystem.theme.TonePair(colors.primary, colors.onPrimary) },
             )
         }
-        if (lockedPeriodChosen) {
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS),
-                from = com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS,
-            )
-        }
         Spacer(Modifier.height(Spacing.section))
 
-        TrendSection(data, currency, period)
-        Spacer(Modifier.height(Spacing.section))
-        SpendingSection(data, currency, period)
-        Spacer(Modifier.height(Spacing.section))
-        NetWorthTrendSection(data, currency, period)
+        if (preview != null) {
+            val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+            LongPeriodPreview(
+                data = data,
+                currency = currency,
+                period = preview,
+                onSeePlan = { openPro(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS) },
+                onBack = {
+                    previewPeriod = null
+                    chosenPeriod = TrendPeriod.THREE
+                },
+            )
+        } else {
+            TrendSection(data, currency, period)
+            Spacer(Modifier.height(Spacing.section))
+            SpendingSection(data, currency, period)
+            Spacer(Modifier.height(Spacing.section))
+            NetWorthTrendSection(data, currency, period)
+        }
         Spacer(Modifier.height(Spacing.fabClearance))
     }
     openReport?.let { report ->
@@ -192,6 +216,82 @@ fun InsightsScreen(
         )
     }
 }
+
+/**
+ * Insights' 6 or 12 months on a plan without them (owner, 2026-11-19): the person's own income and expenses for that
+ * period, softened and with every figure hidden (the axis blank, nothing spoken), under the plan fact and the way to the
+ * plan page. Their own data, never made-up numbers; the figures stay Pro. With nothing recorded there is no picture,
+ * only the plan fact.
+ */
+@Composable
+private fun LongPeriodPreview(data: InsightsData, currency: String, period: TrendPeriod, onSeePlan: () -> Unit, onBack: () -> Unit) {
+    val endMonth = YearMonth.from(data.today)
+    val months = remember(data.transactions, currency, endMonth, period) {
+        Insights.incomeExpenseTrend(data.transactions, currency, endMonth, period.months)
+    }
+    val hasData = months.any { !it.income.isZero || !it.expense.isZero }
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis())
+    val wall = com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.INSIGHTS_LONG_PERIODS)
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        if (hasData) {
+            // Named, so the two kinds of bar aren't told apart by colour alone.
+            val ext = LucentoTheme.extendedColors
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
+                LegendKey("Income", ext.positive.copy(alpha = PREVIEW_ALPHA))
+                LegendKey("Expenses", ext.negative.copy(alpha = PREVIEW_ALPHA))
+            }
+            Spacer(Modifier.height(Spacing.sm))
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clearAndSetSemantics { contentDescription = "Your last ${period.months} months of income and expenses, with the figures hidden." },
+            ) {
+                androidx.compose.runtime.CompositionLocalProvider(com.lucento.app.core.designsystem.component.LocalAmountsHidden provides true) {
+                    com.lucento.app.core.designsystem.component.IncomeExpenseChart(
+                        months = months,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(3.dp) else Modifier)
+                            .alpha(PREVIEW_ALPHA),
+                    )
+                }
+            }
+            Spacer(Modifier.height(Spacing.md))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                com.lucento.app.feature.pro.ProCopy.wallTitle(wall, plan),
+                style = MaterialTheme.typography.titleMedium,
+                // Announced when the preview takes the place of the charts.
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            com.lucento.app.feature.pro.ProCopy.longPeriodPreviewBody(period.months, hasData),
+            style = MaterialTheme.typography.bodyMedium.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Paragraph),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        com.lucento.app.core.designsystem.component.LucentoPrimaryButton(
+            text = com.lucento.app.feature.pro.ProCopy.WALL_SEE_PLAN,
+            onClick = onSeePlan,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        com.lucento.app.core.designsystem.component.LucentoTextButton(
+            text = com.lucento.app.feature.pro.ProCopy.LONG_PERIOD_BACK,
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/** How strongly the preview draws the person's months (and its legend), so the shape reads and nothing else does. */
+private const val PREVIEW_ALPHA = 0.45f
 
 @Composable
 private fun TrendSection(data: InsightsData, currency: String, period: TrendPeriod) {

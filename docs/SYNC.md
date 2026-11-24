@@ -26,6 +26,7 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | Background runs | `data/sync/SyncWorker.kt` (`SyncWorker`, `SyncScheduler`) |
 | Server I/O (fakeable in tests) | `data/sync/SyncRemote.kt` (`SupabaseSyncRemote`) |
 | Sync cursor / account / enabled flag / last error | `data/sync/SyncPreferences.kt` (DataStore `sync_preferences`) |
+| Settings that follow the account (what, document, merge rule) | `domain/settings/AccountSettings.kt`; stored by `data/preferences/UserPreferencesRepository.kt` ("Settings" below) |
 | Cloud schema + RLS | `supabase/migrations/*.sql` |
 | Local schema (Room v6) | `Migrations.MIGRATION_5_6`, `SyncTombstoneEntity` |
 
@@ -41,10 +42,11 @@ UI (Settings → Cloud sync) ──► SettingsViewModel ──► AuthRepositor
 | `goal_contributions` | `public.goal_contributions` | append/delete-only |
 | `recurring` | `public.recurring` | v9: `client_uuid`, `dirty`, `synced_at`, `base_revision` + triggers (MIGRATION_8_9); debt payments carry `to_wallet_id`, `interest_minor` |
 | `debt_terms` | columns of `public.wallets` | v9: `interest_rate_bps`, `repayment`, `term_months`, `installment_minor`, sent with the wallet (a terms edit bumps the wallet's `updated_at`); pre-v9 builds never send them, so the server keeps them |
+| settings (DataStore `user_preferences`) | `public.user_settings` | one JSON document per account, merged one setting at a time; see "Settings" |
 
-Not synced: DataStore preferences (theme, currency, enabled modules, display name), goal photos and the profile photo. A JSON backup
-does include those preferences (not crash reports, and not the sync cursor or account id). See docs/BACKUP.md. See "Known
-limitations".
+The main currency syncs through `ledger_settings` (Multicurrency, below). Not synced: goal photos, the profile photo, and
+the preferences each phone keeps for itself (the consents and this phone's lock; "Settings" lists them). A JSON backup
+carries the same settings as sync (docs/BACKUP.md). See "Known limitations".
 
 A recurring occurrence's idempotency key uses the schedule's `client_uuid` (`recurring-<uuid>-on-<day>`), so marking the
 same payment paid on two devices records it once. Server schema: `supabase/migrations/20261026120000_recurring_and_debt_terms_sync.sql`
@@ -67,6 +69,9 @@ to the server and every sync fails safely, keeping all local data and dirty flag
   sends nothing) tries the same password: the person's own account just signs in; otherwise they're told to sign in.
 - A new email account records the Terms of Use / Privacy Policy version it agreed to (`terms_version`,
   `terms_accepted_at` in user metadata; docs/LEGAL.md). Google sign-in shows "By continuing with Google, you agree…".
+- Settings › Account & sync shows **Password › Update password** only when the account's sign-in methods (the session's
+  `app_metadata.providers` and identities, `AuthRepository.observeUsesPassword`) include `email`. A Google-only account
+  has no password, so the section is hidden (tester report 2026-11-21); when the session doesn't say, it stays.
 - Onboarding asks first, right after Get started (owner, 2026-11-06): **Keep your money safe** — Sync with an account
   (Google, or "Use email instead" → a create-only page) or Keep it on this phone only. "I already have Lucento" signs in
   only; "I was invited to share" can sign in or create. Connecting turns sync on, but the **first sync runs only when
@@ -218,6 +223,20 @@ Every server row has a `revision` (+1 on each accepted write); each local row re
   of each cycle without ever failing it. Pulled FX values that don't read right are dropped, never misread. **Rollout
   order:** `20261106090000_multicurrency.sql` must reach a project before a v13 phone syncs a ledger with a wallet in
   another currency (otherwise those uploads are refused and stay pending). docs/MULTICURRENCY.md.
+- **Wallet kinds, icons, spending money and scheduled transfers (v14, tester round 2026-11-17).** `wallets.kind` /
+  `icon_key` / `spendable` / `spendable_credit_minor` travel only in upload batches where a wallet has one set (nulls
+  included there); a phone that never sets them sends exactly what v13 sent. The editor keeps a choice once made (a
+  card's credit turned off becomes 0, not null), so a cleared value never needs the keys on its own. Pulled values are
+  checked (`PulledRowRules`: keys `^[a-z0-9_]{1,32}$`, credit 0…10^15); an unknown kind reads as none. Two new values
+  ride in existing columns: wallet type `INVESTMENT` and recurring type `TRANSFER_OUT` (a scheduled transfer: no
+  category, `to_wallet_id` the destination). **Rollout order:** `20261119090000_wallet_kinds_and_spending_money.sql`
+  must reach a project before a v14 build syncs an investment, a kind or a scheduled transfer there, or those uploads
+  are refused and stay pending. Older builds skip a pulled investment or scheduled transfer (counted, never misread), but a transfer into that
+  investment still arrives, so an older phone keeps it under a placeholder "Restored account" (cash) until it updates —
+  every phone on an account should be updated (KNOWN_ISSUES TR-2). Within a batch that carries the keys, an edited
+  wallet sends what this phone holds, nulls included: the last writer of the row wins, as for every other column. A
+  pulled scheduled transfer must join two money accounts in its currency, as in the editor and backups; anything else is
+  skipped (QA review, 2026-11-17).
 - **Lucento Shared (v12).** `transactions.created_by` / `updated_by` are stamped by the database from the session and
   only ever pulled; the app never sends them. `wallets.classification` is sent only when a wallet in that upload batch
   is classified, so a solo v12 phone sends exactly what v11 sent and older builds leave the value alone. **Rollout
@@ -267,12 +286,115 @@ Onboarding's welcome screen offers **I already have an account** (only in builds
 3. One full `SyncRepository.sync()` on this still-empty phone: it pushes only the fresh-install income seeds (their
    deterministic ids merge with the account's) and pulls everything.
 4. If the account brought back a wallet or a spending category (`RestorePlan.hasData`), onboarding completes with
-   `UserPreferencesRepository.completeRestore`: main currency = the one most restored wallets use, every module on,
-   the current theme, and **no guided setup**. Periodic sync is scheduled.
+   `UserPreferencesRepository.completeRestore` and **no guided setup**. The same sync brought back the account's settings
+   ("Settings": theme, modules, name, default wallet and the rest); the theme mode and modules it didn't bring get the
+   defaults (system theme, every module on), written as no value of their own so they never go up as the person's choice.
+   Main currency = the one most restored wallets use; the next cycle settles it to the ledger's (`ledger_settings`) when
+   that differs. Periodic sync is scheduled.
 5. An empty account continues with the normal setup from its first question, still connected. A failed download
    changes nothing and offers Try again or Set up as new. A restore interrupted by the app closing resumes on reopen.
 
-Main currency, theme and enabled modules are device preferences (DataStore), never synced.
+## Settings (2026-11-22)
+
+Tester feedback: sync brought the records back but not the person's settings and customisations, "so restoring means
+setting up again". Since 2026-11-22 the settings follow the account. Until then they were device preferences, never
+synced (owner decision 2026-11-05, reversed on this feedback). The JSON backup carries the same customisations (backup
+v6, docs/BACKUP.md).
+
+**What follows the account** (`AccountSetting`):
+- the person's own choices: theme mode, colour theme, the modules switched on, display name, Show cents, the Wallets
+  view, Home's hidden module offers and exchange rates online;
+- four that belong to the ledger: the default wallet (by its stable id), the budget moment already seen, and the monthly
+  check-in's two months (the latest month planned or dismissed, and the latest recap seen; docs/CALCULATIONS.md "Monthly
+  check-in", owner 2026-11-23). A newer phone's setting reaches an older one as an entry it carries through untouched.
+
+**What each phone keeps for itself:**
+- Consents to send something off the phone, and their choices: crash reports, usage counts, online voice, Smarter reading,
+  and Ask Lucento's AI answers (on or off, and the agreement to what they send). Neither a restore nor another phone ever
+  switches sharing on or off. AI answers stay per phone because declining on the Ask card ("Keep answers on this phone")
+  would otherwise turn them off on every phone and withdraw their agreements.
+- App lock, hiding Lucento in recent apps, and hidden amounts. Showing amounts again asks for *this* phone's lock, which
+  another phone must never bypass.
+- Also this phone's own: the main currency (the ledger's, in `ledger_settings`), onboarding and guided-setup progress,
+  notices and milestones.
+
+**Storage.** `public.user_settings` (`20261122090000_user_settings.sql`) holds one row per account. Its `settings` column
+is a JSON document with one entry per setting, for example `{"theme": {"v": "grove", "at": 1763800000000}, …}`. `at`
+is when the value was chosen, dated after the value it replaced (`AccountSettingsMerge.changedAt`). On the phone, each
+setting keeps its time and a "changed here" flag beside its value in `user_preferences`. The repository has two explicit
+write paths:
+- `trackedEdit`: every setter. It marks the settings it changed.
+- `untrackedEdit`: sync's own writes, the sign-out and Shared Space resets, and a setup's defaults (onboarding's choices,
+  `completeRestore`). Nothing written here goes up as the person's change.
+
+**Binding** (`bindAccountSettings`, at the start of every cycle, before anything is read). A phone's **first** sync with
+an account since it was installed or signed out (it claims the account) **joins** it. Examples: a restore, a new phone,
+or a phone set up on its own that now connects. Its next merge uses the account's settings, even over changes made here.
+Only settings the account has no entry for go up from this phone, and only those with a value of their own (a default is
+not a choice). The join dialog in Settings says so.
+
+A phone that already synced the account's records before settings synced doesn't join. It keeps what it showed: another
+phone's values from before then (dated 0) never replace its own. A change made since does replace them. So updating
+Lucento restyles no phone, and from then on a change made on any phone reaches all of them.
+
+**Merge** (`AccountSettingsMerge.decide`, the last step of each cycle, after the records, so a default wallet that just
+arrived can be matched):
+- Each setting is merged on its own. Two phones that changed different settings both keep their change.
+- A change waiting here stays when it is at least as new as the account's (a tie keeps it). It gives way to a newer one,
+  and a lost change is counted in the "replaced by a newer change from another device" notice (P2-6). A phone with
+  nothing waiting takes the account's value.
+- Sequential changes never depend on clocks. A change made after taking another phone's value is dated after it, so it
+  wins even when this phone's clock runs behind. Only two changes made before either phone synced compare clocks.
+- A value this build can't use leaves the phone's own and is carried through untouched, like any entry this build
+  doesn't know. Examples: a theme or view from a newer version, or a Lucento Pro theme where this phone's plan can't pick
+  it (MONETIZATION §3.8; one already chosen here stays, §6.3).
+- A default wallet that isn't on this phone leaves none here, and the next merge tries again. A waiting value that can't
+  be written for the account (a default wallet with no stable id yet) stays waiting rather than going up as "none".
+- The budget moment, and the check-in's two months, never go back to an earlier month.
+
+**Sign-out and the next account.** The wipe keeps the theme and the other choices on the phone (as before), but sets them
+aside as the signed-out account's (`forgetAccountSettingsSync`). It keeps a SHA-256 of that account (never the id) and
+each setting's sync state. Until a setting is changed here, it counts as **inherited**: shown, never sent to another
+account. Then:
+- **The same account signing back in** gets its settings back as they were, waiting changes included.
+- **Any other account** has those values replaced by its own settings, and receives none of them. A restore
+  (`completeRestore`) puts what it didn't bring back to the defaults.
+- A choice made after the sign-out (the next person's onboarding, or a change) is that person's own and goes to their
+  account.
+
+**Writing.** Compare-and-set: the phone writes the merged document with `base_revision` set to the revision it read.
+- The database (`lucento_user_settings_write`) keeps it only while that is still the stored revision. Otherwise it skips
+  the write and returns no row.
+- The phone then reads again and merges, up to 3 times per cycle and within the step's own 60-second limit, then tries
+  again next cycle. No phone overwrites a version it hasn't seen.
+- A change saved while a sync runs stays waiting and goes up next. Every change asks for a sync shortly after, a second
+  change of a waiting setting included (`accountSettingChanges` → `uploadRequests`). Opening Lucento with a setting still
+  waiting syncs even if a sync finished moments ago, but only where the person's plan can save it
+  (`ForegroundSync.isUpToDate`): a Partner's settings without their own plan wait for good and don't make every return to
+  the app sync (Pro-gate review 2026-11-23, F3).
+- Lucento Pro: the plan checks (`accountSettingsUploadAllowed`, `lockedThemes`) deny unless the app wires them in. A sync
+  built without them saves no settings and applies no Pro theme (Pro-gate review F1).
+
+**Lucento Shared.** The row is always the signed-in person's own. A Partner's phone keeps to the person's settings (theme,
+name…). It neither sends nor takes the default wallet, the budget moment or the check-in's months, which belong to the Owner's
+records it holds,
+and it doesn't keep them waiting. Saving needs the person's own CLOUD (the F-01 gate), so a Partner without their own
+plan keeps their settings on the phone while the space's records sync on the Owner's plan.
+
+**Backups and settings.**
+- A Merge restore leaves the phone's preferences alone, except a default wallet the merge removed.
+- A Replace restore writes the file's settings, but only what changes what the phone shows. Defaults are written as no
+  value, so a file of defaults restyles no other phone.
+- What a Replace does change goes up like any change. With sync on, the confirmation says the account and the other
+  phones will match the file.
+
+**Never fails a cycle.** A project without the table, a refused write or a lost connection leaves the records synced and
+the settings waiting on the phone. Each merge is one DataStore edit, so nothing is half-applied. A full ledger (the row
+ceiling) doesn't hold settings back; a plan refusal does.
+
+**Rollout order:** `20261122090000_user_settings.sql` (it needs `lucento_private.caller_has_cloud()` from
+`20261111090000`, which both projects have) must reach a project before settings can sync there. Until then, builds with
+settings sync skip the step every cycle, records sync as before, and nothing is lost. Older builds never read or write it.
 
 ## Sign-out and switching accounts
 
@@ -297,8 +419,9 @@ in for Smarter reading or a Shared invitation; their records were never uploaded
 for good while the old dialog said "Sign back in to download them again". **Keep them here** runs
 `AccountBoundary.signOutKeepingLedger`: under the sync lock it checks again that no account claimed the records, then
 ends the session (recorded for the server revoke first, as below), cancels background sync, turns sync off, and
-forgets what the phone cached about the account (Lucento Shared's cached space and invitations; Smarter reading and Ask
-Lucento's AI answers are switched off, `forgetAccountConsents`). The ledger, onboarding, name and photo stay, and no
+forgets what the phone cached about the account (Lucento Shared's cached space and invitations; Smarter reading is
+switched off and Ask Lucento's AI answers go back to their default, on but not confirmed, `forgetAccountConsents`). The
+ledger, onboarding, name and photo stay, and no
 wipe marker is set. If a first sync claimed the records in between, nothing changes and the dialog asks again.
 
 After a wipe the welcome screen says what happened, once (`SignOutNotice`, written just before the wipe and cleared if
@@ -314,7 +437,9 @@ setup step, default wallet, display name, acknowledged budget month, Smarter rea
 cleared. So Lucento goes
 back to onboarding, and the next account is checked there: one with data is restored, an empty one is set up
 (including the spending categories), and a failed check sets nothing up. Theme, currency, modules, crash-report and
-usage-count consent and notices already seen stay. Each wipe also bumps `setup_generation`, which keys onboarding's
+usage-count consent and notices already seen stay. The settings that stay are set aside as the signed-out account's
+(`forgetAccountSettingsSync`): that account signing back in gets them back; any other account replaces them and never
+receives them ("Settings"). Each wipe also bumps `setup_generation`, which keys onboarding's
 and the main screen's Activity-scoped ViewModels so the next account never sees the previous run's state. The wipe
 runs to the end even if the screen that started it is closed (`runWipe` is not cancellable), so its marker is never
 left behind to wipe the next account on a later launch. Anything that had not synced is lost —
@@ -443,7 +568,9 @@ On 2026-10-25 the live project reported the Google provider as **enabled**.
      `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75` (each machine's debug keystore differs — check
      with `./gradlew signingReport`).
    - **Android** client for `com.lucento.app` with the **release** keystore's SHA-1, and another with the Play App
-     Signing SHA-1 if the app is distributed through Google Play.
+     Signing SHA-1 if the app is distributed through Google Play. Play can change its app signing key (Play Console ›
+     App integrity › App signing lists the key in use and earlier ones): each key needs its own client, and the old
+     clients stay for phones that still get the old key. The current list and fingerprints: `docs/ACCOUNTS.md`.
    - Authorized domains / branding only matter for the consent screen and browser OAuth; the Lucento website domain
      and Search Console verification are unrelated to this flow.
 2. **Supabase dashboard** → Authentication → Sign In / Providers → **Google**: enabled; **Client IDs** contains the
@@ -505,7 +632,11 @@ transaction arrive with the edited note. Sign in on B with a second test account
   parent is not uploaded, so it does not undelete the account on a device that already removed it.
 - Switching accounts wipes this phone's ledger first (see Sign-out). Unsynced changes are kept only if the user
   cancels the switch and signs back in to the original account.
-- Preferences and goal photos are not synced.
+- Goal photos and the profile photo are not synced. Consents and this phone's lock stay per phone by design ("Settings").
+- After the 2026-11-22 update, phones of one account that were set up differently stay different until a setting is
+  changed on one of them; a restore or a new phone gets the first updated phone's values where nothing has changed since.
+- Settings that couldn't sync leave no trace for support: the step never fails the cycle, so a project without the
+  table or a refused save is invisible except that the settings stay waiting on the phone.
 - Rows with identical meaning created separately before their first sync are not de-duplicated (seed categories are
   the exception). Categories seeded by older versions (before v6) carry random ids, so two upgraded devices can show
   duplicate default income categories.

@@ -82,8 +82,8 @@ palette cross-fades for 250 ms (instant under reduced motion), nothing restarts.
 | **Aurora** | Violet `#6C4DE0` with teal `#2BB8A8` and magenta accents; the hero panel carries the system's only gradient (`#4B37B8 → #2F4DB0`, AA at both ends). | Both |
 
 - **What a theme may change** (`BrandColors`): surfaces, ink, primary and containers, outline, accent / accent text /
-  warm accent, highlight, the hero panel (+ gradient end), chart bar/track tokens, the categorical series, and its
-  landscape. **What it can't** (financial semantics, fixed per light/dark mode): positive / negative / warning and their
+  warm accent, highlight, the hero panel (+ gradient end), chart bar/track tokens, the categorical series, Home's
+  shortcut tiles (`ShortcutTones`) and its landscape. **What it can't** (financial semantics, fixed per light/dark mode): positive / negative / warning and their
   containers and indicators, progress success, error roles, category tiles, wallet tones and wallet card faces.
   Themes are built as `LightExtended/DarkExtended.withBrand(…)`, and `ThemeInvarianceTest` checks it.
 - The approved logo, wordmark and mascot art are never re-tinted; launcher icon and splash stay Sunrise. Lottie files
@@ -106,9 +106,10 @@ palette cross-fades for 250 ms (instant under reduced motion), nothing restarts.
   checks ink and muted ink at both ends and the middle of every face, and the trend text and bars where they sit.
   Sunrise's start moved from `#2768ED` and its muted ink from `#C9D7FF`: the small labels were 3.4:1 in the bright
   corner (AA needs 4.5).
-- Persistence: DataStore `theme_id` beside `theme_mode`; unknown values fall back to Sunrise. A device choice (like the
-  wallets view): kept across sign-outs, not in backups or sync (the backup settings format is strict; adding it would
-  need a backup schema bump). Owner-confirmed 2026-11-05.
+- Persistence: DataStore `theme_id` beside `theme_mode`; unknown values fall back to Sunrise. Kept across sign-outs. Since
+  2026-11-22 the theme (like the wallets view) follows the account and is in backups (backup v6; docs/SYNC.md
+  "Settings"), after tester feedback that a restore meant setting up again. Until then it was a device choice
+  (owner-confirmed 2026-11-05).
 - Adding a theme: one `ThemeSpec` (two `ThemeColors` built from `BrandColors`, a `BalanceCardFace`), a landscape, then
   `ThemeContrastTest` and `DataSeriesTest` must pass. No screen changes.
 
@@ -293,15 +294,38 @@ Cloud sync) and the profile button. A pinned row stays visible while scrolling: 
 (calendar icon, "November 2026", ▾; this month back to the first month with data). Top to bottom:
 1. **First-run cards** (new users only): "Record your first transaction" spotlight (also rings the dock's + until the
    first entry; the pulse stops under reduced motion) and **Getting started** (x of 3 done). Both disappear once used.
-2. **Net Wallet Balance card**: an ID-1-proportioned blue card (theme-independent, like a physical card) with a
+2. **Net worth card** (labelled "Net Wallet Balance" until 2026-11-23, when the owner chose one name with Progress,
+   Insights, Reports and Ask): an ID-1-proportioned blue card (theme-independent, like a physical card) with a
    guilloché texture, the Lucento mark, a decorative gold chip and a contactless glyph; the signed balance (info
    tooltip explains assets − owed), "vs last month" mini-bars with a % only when comparable (docs/CALCULATIONS.md),
-   then **Wallets** (assets) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
-3. **Monthly Budget**: spent (hero) "of <total> budget", % used, a 7dp bar, a verdict chip in words (Over budget ·
-   Under budget · Ahead of pace · On track), and a subtle italic "Top 2 spending categories" note above two tiles that
-   open Transactions filtered to that category and month.
+   then **Assets** (everything held; "Wallets" until the tester round of 2026-11-18) and **Debt & Loans** (signed, −) figures. Empty: mascot on the left with a short prompt.
+3. **Monthly budget** (owner's redesign, 2026-11-18), one card in three parts, with the pace chip in words (Over
+   budget · Under budget · Ahead of pace · On track) in its header. **A**: a half gauge (health colour) with the amount
+   spent in its hollow and "spent of <budget>" under it, a "N% spent" pill, and "Budgeted ₱X • Unbudgeted ₱Y"; at 130 %
+   text and above (over 120 %), or when "spent of" would need a second line, the pill takes the hollow and the amounts
+   move under the gauge. **B**: **Budget remaining** and **Spendable wallets** as a subtle grid (owner, 2026-11-18):
+   a 1dp outline in `borderDefault` with the card's corner radius, a divider between the two cells (stacked in a panel
+   under 280dp or from 130 % text), and in each cell the caps name and the figure centred (18sp, one size for both,
+   neutral ink, red with its minus sign below zero; a chevron in the corner, as each cell is a button), then under a
+   rule the two parts as a small ledger: "Unspent ₱30,920.10" / "Upcoming −₱15,649.90" and "In wallets ₱31,064.30" /
+   "Due −₱29,394.30", descriptions left and amounts aligned right, one size for all four (smaller when the widest needs
+   it). Both names take the same number of lines, so the rules and rows line up. No captions, icon tiles or tinted
+   boxes. **C**: **Safe to spend** in a green panel with a check (red with
+   an alert at 0, never negative) and a chevron, the loudest figure on the card (36sp; the spent figure is 32sp, the
+   limits up to 22sp), and the sentence that says which limit set it (a second line only when the wallets don't take
+   part); the whole panel opens how it is worked out. TalkBack reads each column and the verdict as one button with one sentence. A
+   past month ends on Remaining / Overspent. The Budget tab shows the same B and C under its hero, with Safe per day
+   (`SpendingCapacityPanel.kt`).
+   **To watch** follows as its own card: up to five budgeted categories closest to their limit, the name and what's
+   left on one line (under the bar at large text), the bar and % below; "See all" opens the Budget tab.
 4. **Shortcuts**: Goals · Insights · Awards · Debts · Scheduled (only modules that are on; switched-off ones offer
-   "Turn on" or "Hide").
+   "Turn on" or "Hide"). Each tile has its own hue from the theme (`ShortcutTones`, tester round 2026-11-17): in
+   Sunrise Goals brand blue, Insights violet, Awards navy on sunlight (cream on deep gold at night), Debts slate (the
+   debt category's own tone), Scheduled sky. None reads as a status colour (red, green and amber mean state on the same
+   screen): every glyph but Goals, or the tile when it carries more colour, stays ≥ 15 OKLab ΔE from the positive,
+   negative and warning tones of its mode (`ThemeInvarianceTest`; the first coral, gold and teal sat within 3–9, design
+   review 2026-11-17). Goals always carries the theme's primary;
+   Mono keeps all five graphite. Glyphs keep ≥ 3:1 on their tile (`ThemeContrastTest`).
 5. **Upcoming scheduled transactions** (≤ 3, two-line rows, never auto-recorded) and **Recent transactions** (≤ 5 in
    the shown month), each with "See all".
 Amounts on cards use the same size for whole units and decimals. Awards (milestones, docs/CALCULATIONS.md) are
@@ -347,6 +371,56 @@ budgeted yet** rows ("Set amount"). Tapping a row opens an amount sheet that pre
 categories: add, rename, reorder, deactivate (archive) and restore. Existing users get a one-time "Make your budget
 yours" card (choose from presets or keep their categories); a pre-0.5 overall limit is explained once and can be
 removed. Users with no categories see "Finish setting up your budget".
+
+## Scheduled: Select mode (tester round, 2026-11-18)
+All schedules has a quiet **Select** pill above the list, and a long press on a row also starts Select mode with that
+row selected. Rows then show a check (the setup kit's `CheckMark`, its empty ring at the full outline colour for 3:1)
+and toggle on tap; the check alone marks a selected row, as in the account picker. The bar above the list, pinned
+while the list scrolls, reads **Select all** (empty, checked, or a dash when only some are selected), "N selected" and
+**Done**. The dock steps aside (`LocalHideDock`) and a floating action bar takes its place: **Change day**, **Change
+amount**, **Pause** (or **Resume** when every plan that can change is paused) and **Delete**, as icon-over-label
+buttons, two rows of two from 130 % text. Change day and Change amount open sheets with a **What changes** list that
+says exactly what will happen: "Nov 23 → Nov 5 (overdue)", "Stays Nov 30 · Dec 30 → Dec 31" when the next date stays,
+"· ends …" when an end date moves, signed amounts ("−₱350.00 → −₱1,650.00"); their buttons count the plans that change
+and are off when none would. Delete asks first and names the plans. Back, the top bar's back and Done leave Select mode;
+a filter that hides a plan drops it from the selection. Confirmations play only after the write; a change that changed
+nothing, or failed, says so in place. From 130 % text a schedule row stacks (name and account full width, amount and
+status under them), as do the selection bar and the What changes lines. In the scheduled-payment editor, a card or loan
+that already has a payment plan shows an amber warning right under **Pay to**, announced to TalkBack, with those plans,
+**Adjust existing** (opens Select mode with them selected and a note saying so) and **Add another** (deep blue for
+contrast on amber). Saving while it is unanswered asks the same question in a dialog.
+
+## Pro walls met again, and two previews (owner, 2026-11-19)
+A Pro wall met again in the same app session is a snackbar with the plan fact and **Unlock**, not the dialog again; it
+shows where the person is: every `LucentoBottomSheet` carries its own snackbar host (a sheet is a window above the app,
+so the app's would sit behind it), and `MessageHosts` sends a message to the newest open sheet, otherwise the app. In a
+sheet it sits at the top, below the status bar, never over the sheet's own buttons; it stays 10 s with a close button
+when it has an action, which ignores taps in its first 600 ms; from 130 % text the action goes under the message
+(`LucentoSnackbar`, shared by the app and every sheet).
+Insights' 6 and 12 months on the Free plan are a preview card: the person's own income-and-expense chart for the
+period at 45 % opacity (blurred on Android 12+), its axis blank (the hidden-amounts mode), one spoken line, then the
+plan fact, See Lucento Plan and Back to 3 months; the segmented control shows the period as chosen. A Pro theme tapped
+in the profile sheet is tried on: Lucento (the sheet included) recolours at once; the tried tile is ringed and reads
+"Trying", the description line is the tried theme's, and a note expands under the themes with the plan fact, that
+nothing is saved and what it returns to, See Lucento Plan (secondary, as the Pro card below has the filled button) and
+Done; the saved theme keeps its check.
+
+## Pro walls and Free limits (tester round, 2026-11-18)
+Every Pro wall is one dialog at the tap that would cross it (`ProWallDialog` in `feature/pro/ProWall.kt`, built on
+`ConfirmDialog` and its `icon` slot): the WorkspacePremium ribbon in a pale circle, a centred title saying what the Free
+plan includes ("The Free plan includes 3 money wallets") or what is Pro ("Grove is part of Lucento Pro"), a body with the
+person's own number and what stays free (never the title again), then **Not now** (text) and **See Lucento Plan**
+(primary). Dialog titles break in balanced lines (`LineBreak.Heading`), so no word sits alone on the last line. The
+dialog is hosted where the wall is met, inside an editor sheet when that is where it happens, so a draft is never lost;
+See Lucento Plan closes the sheet before the plan page opens. There are no inline lock notes any more (`ProNote` is
+gone). `ProBadge` still marks locked wallet types in the type picker (also when editing: a retype into a full or
+Pro-only kind is marked) and locked themes. Add wallet opens the editor on Cash while money wallets fit; when they are
+full it opens the type sheet first, with the money types marked, so nobody lands in a form that silently starts as a
+card; the dialog appears only when nothing fits. Getting started has no dialog and no
+mention of Pro: at the Free numbers an accounts step swaps its "Add another" chips for a quiet line, "You can edit
+these any time in Wallets." (owner, 2026-11-19: nothing promised that Free doesn't give), and its header for "These are the accounts you’re starting with." (or "…cards and loans…"); the
+setup editor leaves locked types out of its picker, and from 130 % text an account row puts its amount under the name
+so neither is cut. Copy: customer copy D-0 / D-0a.
 
 ## Insights (v0.5)
 *Tester round 3, second pass (2026-11-11):* Ask Lucento stays on top; the built-in **reports** sit right under it as

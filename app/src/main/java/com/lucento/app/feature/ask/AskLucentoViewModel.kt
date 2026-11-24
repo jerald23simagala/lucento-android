@@ -13,6 +13,7 @@ import com.lucento.app.data.repository.RecurringRepository
 import com.lucento.app.data.repository.TransactionRepository
 import com.lucento.app.data.repository.WalletRepository
 import com.lucento.app.domain.ask.AnswerCheck
+import com.lucento.app.domain.ask.AskAiRoute
 import com.lucento.app.domain.ask.AskRouter
 import com.lucento.app.domain.ask.AskScope
 import com.lucento.app.domain.ask.AskTopic
@@ -32,6 +33,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -43,7 +45,7 @@ import java.io.File
 import java.time.LocalDate
 import java.time.YearMonth
 
-/** Who worked an answer out: the phone (reports, never presented as AI) or Gemini (opt-in). */
+/** Who worked an answer out: the phone (reports, never presented as AI) or Gemini (once the person confirmed). */
 enum class AnswerSource { PHONE, GEMINI }
 
 sealed interface AskMessage {
@@ -60,13 +62,20 @@ sealed interface AskMessage {
         val note: String? = null,
         val unverified: Boolean = false,
         val followUps: List<String> = emptyList(),
-        /** The question needs AI answers, which are off: the answer offers to turn them on. */
+        /** The question needs AI answers, which the person turned off: the answer offers to turn them on. */
         val offersAi: Boolean = false,
         /** Gemini didn't answer [retry] (busy, too slow, unreachable): the answer offers to ask it again. */
         val retry: String? = null,
     ) : AskMessage {
         val text: String get() = parts.joinToString("") { it.text }
     }
+
+    /**
+     * AI answers are on (the default) but this account hasn't confirmed them yet (owner, 2026-11-17): before [question]
+     * leaves the phone, Ask says what would be sent. "Ask Gemini" sends it; "Keep answers on this phone" turns AI answers
+     * off and answers here what the phone can.
+     */
+    data class ConfirmAi(override val id: Long, val question: String) : AskMessage
 }
 
 data class AskUiState(
@@ -77,16 +86,21 @@ data class AskUiState(
     val thinking: Boolean = false,
     /** This build has an AI proxy (debug builds without a test proxy don't). */
     val aiConfigured: Boolean = false,
-    /** Signed in to a sync account: the proxy needs it for the daily allowance. */
+    /** Signed in to a Lucento account: the proxy counts the allowance per account. */
     val signedIn: Boolean = false,
-    /** The user's consent to AI answers. */
-    val aiOn: Boolean = false,
-    val remainingToday: Int? = null,
-    /** The one-time "turn on AI answers?" pop-up was already shown on this phone. */
-    val aiOfferShown: Boolean = true,
+    /** AI answers are on: by default, until the person turns them off (owner, 2026-11-17). */
+    val aiOn: Boolean = true,
+    /** The person confirmed what AI answers send; until then a question shows [AskMessage.ConfirmAi] first. */
+    val aiConfirmed: Boolean = false,
+    /** What is left of the AI allowance, once the server has said. */
+    val remaining: Int? = null,
+    /** The plan's allowance is Pro's (Pro, Lifetime's included year, the Cloud add-on) rather than the free plan's. */
+    val aiPro: Boolean = false,
     val hasRecords: Boolean = false,
     /** Lucento Pro: statements as PDF are Pro; on screen they are always free (docs/MONETIZATION.md §3.4). */
     val pdfLocked: Boolean = false,
+    /** The free plan's monthly AI questions just ran out: show the Pro dialog. */
+    val allowanceWall: Boolean = false,
 ) {
     val aiAvailable: Boolean get() = aiConfigured && signedIn
     val aiActive: Boolean get() = aiAvailable && aiOn
@@ -94,10 +108,11 @@ data class AskUiState(
 
 /**
  * Ask Lucento (docs/ASK.md). Preset questions and the report tiles are answered on the phone by [ReportBuilder] — exact,
- * offline, labelled "Calculated on this phone". A free-form question goes to Gemini only while the user's AI answers
- * consent is on, with [AskSnapshotBuilder]'s summary; the reply's figures are filled in here ([AnswerCheck]), any report
- * it asks for is built here, and nothing it says can change data. Without consent, a sign-in or a proxy, Lucento says
- * what it can do instead. The conversation lives only in memory.
+ * offline, labelled "Calculated on this phone". AI answers are on by default for a signed-in account, and a free-form
+ * question goes to Gemini, with [AskSnapshotBuilder]'s summary, only once the person confirmed what is sent
+ * ([AskAiRoute]); the reply's figures are filled in here ([AnswerCheck]), any report it asks for is built here, and
+ * nothing it says can change data. Turned off, or without a sign-in or a proxy, Lucento says what it can do instead.
+ * The conversation lives only in memory.
  */
 class AskLucentoViewModel(
     transactions: TransactionRepository,
@@ -120,7 +135,11 @@ class AskLucentoViewModel(
         val messages: List<AskMessage> = emptyList(),
         val thinking: Boolean = false,
         val remaining: Int? = null,
+        /** Which allowance the server said it counted (true: Pro's); null until it has answered. */
+        val remainingPro: Boolean? = null,
         val nextId: Long = 1,
+        /** The free plan's monthly allowance just ran out: the Pro dialog, once (owner, 2026-11-18). */
+        val allowanceWall: Boolean = false,
     )
 
     private val inputs: StateFlow<ReportInputs?> = combine(
@@ -140,6 +159,8 @@ class AskLucentoViewModel(
         base.copy(
             wallets = ledger.wallets,
             transactions = ledger.withFxResults,
+            // A schedule from a valued foreign wallet at that wallet's rate, so "safe" is Home's figure (2026-11-17).
+            schedules = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, base.schedules),
             categories = ledger.withFxCategories(base.categories),
             goals = g,
             contributions = contributions,
@@ -157,29 +178,62 @@ class AskLucentoViewModel(
             aiConfigured = client.isConfigured,
             signedIn = email != null,
             aiOn = prefs.askLucentoAi,
-            aiOfferShown = prefs.askAiOfferShown,
-            remainingToday = chat.remaining,
+            aiConfirmed = prefs.askAiConfirmed,
+            remaining = chat.remaining,
+            // The server's word once it has answered; before that, the plan this phone holds.
+            aiPro = chat.remainingPro
+                ?: (plan != null && com.lucento.app.domain.entitlement.ProGates.aiProAllowance(plan, System.currentTimeMillis())),
             hasRecords = data != null && (data.transactions.isNotEmpty() || data.wallets.isNotEmpty()),
             pdfLocked = plan != null && !com.lucento.app.domain.entitlement.ProGates.pdfAllowed(plan, System.currentTimeMillis()),
+            allowanceWall = chat.allowanceWall,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AskUiState())
+
+    /** The allowance dialog was answered (See Lucento Plan or Not now). */
+    fun dismissAllowanceWall() {
+        conversation.update { it.copy(allowanceWall = false) }
+    }
 
     private fun pdfAllowedNow(): Boolean =
         entitlements?.value?.let { com.lucento.app.domain.entitlement.ProGates.pdfAllowed(it, System.currentTimeMillis()) } ?: true
 
     /** Asks [question]. Ignored while an answer is on its way (one at a time, never duplicated). */
-    fun ask(question: String) = send(question, echo = true, consented = false)
+    fun ask(question: String) = send(question, echo = true, choice = AiChoice.AS_SET)
 
-    private fun send(question: String, echo: Boolean, consented: Boolean) {
+    /** How a question meets AI answers: as they are set, or right after the person agreed to or declined them. */
+    private enum class AiChoice { AS_SET, AGREED, DECLINED }
+
+    private fun send(question: String, echo: Boolean, choice: AiChoice) {
         val text = question.trim().take(QUESTION_LIMIT)
         if (text.isEmpty() || conversation.value.thinking) return
         val data = inputs.value ?: return
         val state = uiState.value
-        val history = conversation.value.messages
+        val route = AskAiRoute.of(
+            available = state.aiAvailable,
+            on = when (choice) {
+                AiChoice.AGREED -> true
+                AiChoice.DECLINED -> false
+                AiChoice.AS_SET -> state.aiOn
+            },
+            confirmed = choice == AiChoice.AGREED || state.aiConfirmed,
+            offTopic = AskScope.topic(text) == AskTopic.OFF_TOPIC,
+        )
+        // One confirmation at a time: a new question replaces one still waiting for the person.
+        conversation.update { c -> c.copy(messages = c.messages.filterNot { it is AskMessage.ConfirmAi }) }
+        if (route == AskAiRoute.CONFIRM_FIRST) {
+            // Nothing leaves the phone: the question waits under a card saying what would be sent.
+            if (echo) add(AskMessage.Question(nextId(), text), thinking = false)
+            add(AskMessage.ConfirmAi(nextId(), text), thinking = false)
+            return
+        }
+        // Asked again after a confirmation, the question is already the last message: it isn't history as well.
+        val history = conversation.value.messages.let { messages ->
+            if (!echo && (messages.lastOrNull() as? AskMessage.Question)?.text == text) messages.dropLast(1) else messages
+        }
         if (echo) add(AskMessage.Question(nextId(), text), thinking = true) else conversation.update { it.copy(thinking = true) }
         viewModelScope.launch {
             val answer = try {
-                answer(text, data, state, history, aiActive = state.aiAvailable && (state.aiOn || consented))
+                answer(text, data, state, history, aiActive = route == AskAiRoute.GEMINI, declined = choice == AiChoice.DECLINED)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -196,23 +250,45 @@ class AskLucentoViewModel(
     }
 
     /**
-     * Turns AI answers on or off. Turned on from an answer that offered it, [thenAsk] is that question, asked again
-     * (without repeating it in the conversation) now that the user agreed.
+     * Turns AI answers on (only from the consent sheet, which the person accepted) or off. Turned on from an answer that
+     * offered it, [thenAsk] is that question, asked again (without repeating it in the conversation) now that they agreed.
      */
     fun setAiAnswers(enabled: Boolean, thenAsk: String? = null) {
         viewModelScope.launch {
             preferences.setAskLucentoAi(enabled)
-            if (enabled && thenAsk != null) send(thenAsk, echo = false, consented = true)
+            if (enabled && thenAsk != null) send(thenAsk, echo = false, choice = AiChoice.AGREED)
         }
     }
 
-    /** The one-time suggestion was shown (accepted or not): it never pops up by itself again. */
-    fun aiOfferShown() {
-        viewModelScope.launch { preferences.setAskAiOfferShown() }
+    /** "Ask Gemini" on [AskMessage.ConfirmAi] [cardId]: AI answers are agreed to, and the waiting question is sent. */
+    fun confirmAi(cardId: Long) = resolveConfirmation(cardId, agreed = true)
+
+    /** "Keep answers on this phone": AI answers turn off, nothing is sent, and the phone answers what it can. */
+    fun declineAi(cardId: Long) = resolveConfirmation(cardId, agreed = false)
+
+    private fun resolveConfirmation(cardId: Long, agreed: Boolean) {
+        if (conversation.value.thinking) return
+        // The card goes at the first tap, so a second tap (or the other button) finds nothing to do.
+        val card = conversation.value.messages.firstOrNull { it.id == cardId } as? AskMessage.ConfirmAi ?: return
+        conversation.update { c -> c.copy(messages = c.messages.filterNot { it.id == cardId }) }
+        viewModelScope.launch {
+            preferences.setAskLucentoAi(agreed)
+            send(card.question, echo = false, choice = if (agreed) AiChoice.AGREED else AiChoice.DECLINED)
+        }
     }
 
     fun clear() {
         if (!conversation.value.thinking) conversation.update { it.copy(messages = emptyList()) }
+    }
+
+    // ------------------------------------------------------------------ speech (the composer's microphone, shared)
+
+    /** Whether the person agreed to online voice ([com.lucento.app.feature.capture.SpeechRequest]); read fresh. */
+    suspend fun onlineVoiceAllowed(): Boolean = preferences.preferences.first().onlineVoice
+
+    /** The person agreed to online voice after an offline attempt failed: the same preference as the composer's. */
+    fun allowOnlineVoice() {
+        viewModelScope.launch { preferences.setOnlineVoice(true) }
     }
 
     /** Writes [report] as a PDF to the document the user picked. */
@@ -234,7 +310,15 @@ class AskLucentoViewModel(
         }
     }
 
-    private suspend fun answer(text: String, data: ReportInputs, state: AskUiState, history: List<AskMessage>, aiActive: Boolean): AskMessage.Answer {
+    private suspend fun answer(
+        text: String,
+        data: ReportInputs,
+        state: AskUiState,
+        history: List<AskMessage>,
+        aiActive: Boolean,
+        /** The person just chose "Keep answers on this phone" for this question. */
+        declined: Boolean = false,
+    ): AskMessage.Answer {
         // Owner test round 2: a question plainly not about money is answered here, without spending the AI allowance.
         val topic = AskScope.topic(text)
         if (topic == AskTopic.OFF_TOPIC) return AskMessage.Answer(0, plain(AskScope.OFF_TOPIC_REPLY), AnswerSource.PHONE)
@@ -251,18 +335,15 @@ class AskLucentoViewModel(
             }
         }
         if (!aiActive) {
-            return local() ?: when {
+            return local(if (declined) AskAiCopy.DECLINED_NOTE else null) ?: when {
+                declined -> AskMessage.Answer(0, plain(AskAiCopy.DECLINED), AnswerSource.PHONE)
                 state.aiAvailable -> AskMessage.Answer(
                     0,
                     plain("I can answer that with AI. Turn on AI answers and I’ll send your figures and recent transactions to Gemini to work it out — you’ll see exactly what’s sent first."),
                     AnswerSource.PHONE,
                     offersAi = true,
                 )
-                state.aiConfigured -> AskMessage.Answer(
-                    0,
-                    plain("On this phone I can prepare your net worth, cash flow, budget, debts and top categories — try one of those below. To ask anything else with AI, sign in to a sync account in Settings."),
-                    AnswerSource.PHONE,
-                )
+                state.aiConfigured -> AskMessage.Answer(0, plain(AskAiCopy.signInHint(state.aiPro)), AnswerSource.PHONE)
                 else -> AskMessage.Answer(
                     0,
                     plain("On this phone I can prepare your net worth, cash flow, budget, debts and top categories — try one of those below."),
@@ -271,10 +352,11 @@ class AskLucentoViewModel(
             }
         }
         val snapshot = withContext(Dispatchers.Default) { AskSnapshotBuilder.build(data, state.currency) }
-        val turns = history.takeLast(AskLucentoClientTurns).mapNotNull {
+        val turns = history.filterNot { it is AskMessage.ConfirmAi }.takeLast(AskLucentoClientTurns).mapNotNull {
             when (it) {
                 is AskMessage.Question -> AskLucentoClient.Turn(fromUser = true, text = it.text)
                 is AskMessage.Answer -> AskLucentoClient.Turn(fromUser = false, text = it.text)
+                is AskMessage.ConfirmAi -> null
             }
         }
         val result = try {
@@ -286,7 +368,16 @@ class AskLucentoViewModel(
         }
         return when (result) {
             is AskLucentoClient.Result.Answered -> {
-                conversation.update { it.copy(remaining = result.remainingToday) }
+                conversation.update {
+                    it.copy(
+                        remaining = result.remaining,
+                        remainingPro = when (result.plan) {
+                            "PRO" -> true
+                            "FREE" -> false
+                            else -> it.remainingPro
+                        },
+                    )
+                }
                 val checked = AnswerCheck.check(result.answer, snapshot)
                 val kind = ReportKind.entries.firstOrNull { it.name == result.report && !it.needsWallet }
                 val current = YearMonth.from(data.today)
@@ -303,6 +394,16 @@ class AskLucentoViewModel(
                 )
             }
             else -> {
+                // The free plan's monthly questions are used up: the answer still comes from the phone, and the Pro
+                // dialog says what the plan includes (owner, 2026-11-18). Pro's own monthly limit has no dialog.
+                // The server's last word can lag a purchase it hasn't checked yet: a phone that already holds Pro's
+                // allowance never gets the Free dialog.
+                val phonePro = entitlements?.value?.let {
+                    com.lucento.app.domain.entitlement.ProGates.aiProAllowance(it, System.currentTimeMillis())
+                } ?: false
+                if (result == AskLucentoClient.Result.LimitReached && !state.aiPro && !phonePro) {
+                    conversation.update { it.copy(allowanceWall = true) }
+                }
                 val reason = failureReason(result, state.signedIn)
                 // Worth asking again: Gemini was busy, slow or unreachable. Not a used-up allowance or an ended session.
                 val retry = text.takeIf { result is AskLucentoClient.Result.Failed || result == null }
@@ -341,9 +442,9 @@ class AskLucentoViewModel(
          * ended on the server (signed out elsewhere, password changed): say so, rather than "needs your sync account".
          */
         internal fun failureReason(result: AskLucentoClient.Result?, signedIn: Boolean): String = when (result) {
-            AskLucentoClient.Result.LimitReached -> "Your AI adviser allowance is used up for now"
+            AskLucentoClient.Result.LimitReached -> "This month’s AI questions are used up"
             AskLucentoClient.Result.NotSignedIn ->
-                if (signedIn) "Your sign-in has expired — sign in again in Settings › Account & sync" else "AI answers need your sync account"
+                if (signedIn) "Your sign-in has expired — sign in again in Settings › Account & sync" else "AI answers need you to sign in"
             null -> "Gemini took too long to answer"
             else -> "Gemini couldn’t be reached"
         }

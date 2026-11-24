@@ -1,5 +1,9 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.domain.Transfer
+import com.lucento.app.domain.AccountChoices
+import com.lucento.app.core.designsystem.component.AccountPickerSheet
+import com.lucento.app.core.designsystem.component.AccountField
 import com.lucento.app.core.designsystem.component.Hairline
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.FilledTonalIconButton
@@ -68,7 +72,6 @@ import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.automirrored.outlined.Notes
 import com.lucento.app.core.designsystem.component.IconFieldHeader
 import com.lucento.app.core.designsystem.component.LucentoFields
-import com.lucento.app.core.designsystem.component.WalletChoicePill
 
 /**
  * Moves money between two of the user's own wallets. Saved as two linked legs in one database
@@ -88,6 +91,8 @@ fun TransferEditorSheet(
     onDelete: (() -> Unit)?,
     onDismiss: () -> Unit,
     sourceNote: String? = null,
+    /** Earlier transfers, for the account picker's "Recent" (where money last came from and went). */
+    recentTransfers: Collection<Transfer> = emptyList(),
 ) = AmountsShown {
     val sheetState = com.lucento.app.core.designsystem.component.rememberStickySheetState()
     val scope = rememberCoroutineScope()
@@ -98,6 +103,8 @@ fun TransferEditorSheet(
     var error by remember { mutableStateOf<TransferDraftError?>(null) }
     var pickingDate by remember { mutableStateOf(false) }
     var confirmingDelete by remember { mutableStateOf(false) }
+    var pickingFrom by remember { mutableStateOf(false) }
+    var pickingTo by remember { mutableStateOf(false) }
     val isNew = initial.group == null
 
     val from = wallets.firstOrNull { it.id == draft.fromWalletId }
@@ -169,14 +176,15 @@ fun TransferEditorSheet(
                 )
             }
 
-            val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
+            // Tester round (2026-11-17): a field each, opening the account picker, instead of a wall of pills.
             IconFieldHeader(Icons.Filled.NorthEast, "From", Modifier.padding(top = Spacing.xs))
-            WalletPills(wallets, draft.fromWalletId, mixedCurrencies) { id ->
-                haptics.tick()
-                val keepTo = wallets.firstOrNull { it.id == draft.toWalletId }?.takeIf { it.id != id }
-                draft = draft.copy(fromWalletId = id, toWalletId = keepTo?.id)
-                error = null
-            }
+            AccountField(
+                wallet = from,
+                onClick = { pickingFrom = true },
+                spokenLabel = "From",
+                placeholder = "Choose where the money comes from",
+                isError = error is TransferDraftError.FromRequired,
+            )
             if (error is TransferDraftError.FromRequired) ErrorText("Choose where the money comes from.")
 
             // Between the two: a round button that swaps From and To (once both are chosen), on a hairline.
@@ -202,11 +210,14 @@ fun TransferEditorSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                WalletPills(destinations, draft.toWalletId, mixedCurrencies) { id ->
-                    haptics.tick()
-                    draft = draft.copy(toWalletId = id)
-                    error = null
-                }
+                AccountField(
+                    wallet = to,
+                    onClick = { pickingTo = true },
+                    spokenLabel = "To",
+                    placeholder = "Choose where the money goes",
+                    isError = error == TransferDraftError.ToRequired || error == TransferDraftError.SameWallet ||
+                        error == TransferDraftError.CurrencyMismatch,
+                )
             }
             when (error) {
                 TransferDraftError.ToRequired -> ErrorText("Choose where the money goes.")
@@ -287,6 +298,38 @@ fun TransferEditorSheet(
         }
     }
 
+    if (pickingFrom) {
+        AccountPickerSheet(
+            title = "From which account?",
+            wallets = wallets,
+            selectedId = draft.fromWalletId,
+            recentIds = AccountChoices.recentSources(recentTransfers),
+            onPick = { picked ->
+                val keepTo = wallets.firstOrNull { it.id == draft.toWalletId }?.takeIf { it.id != picked.id }
+                draft = draft.copy(fromWalletId = picked.id, toWalletId = keepTo?.id)
+                error = null
+                pickingFrom = false
+            },
+            onDismiss = { pickingFrom = false },
+        )
+    }
+    if (pickingTo) {
+        AccountPickerSheet(
+            title = "To which account?",
+            // Every account stays listed, as in the schedule editor; the one the money leaves says so (design review).
+            wallets = wallets,
+            selectedId = draft.toWalletId,
+            recentIds = AccountChoices.recentDestinations(recentTransfers, draft.fromWalletId),
+            onPick = { picked ->
+                draft = draft.copy(toWalletId = picked.id)
+                error = null
+                pickingTo = false
+            },
+            onDismiss = { pickingTo = false },
+            unavailable = { if (it.id == draft.fromWalletId) "The money leaves this account" else null },
+        )
+    }
+
     if (confirmingDelete && onDelete != null) {
         ConfirmDialog(
             title = "Delete this transfer?",
@@ -300,21 +343,6 @@ fun TransferEditorSheet(
             },
             onDismiss = { confirmingDelete = false },
         )
-    }
-}
-
-/** The wallets to pick from, wrapping onto more lines: each with its identity tile; the currency only when it varies. */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun WalletPills(wallets: List<Wallet>, selectedId: Long?, showCurrency: Boolean, onSelect: (Long) -> Unit) {
-    FlowRow(
-        Modifier.fillMaxWidth().selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs),
-    ) {
-        wallets.forEach { w ->
-            WalletChoicePill(w, selected = selectedId == w.id, onClick = { onSelect(w.id) }, detail = w.currencyCode.takeIf { showCurrency })
-        }
     }
 }
 

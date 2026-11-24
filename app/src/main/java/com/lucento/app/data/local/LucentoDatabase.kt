@@ -23,7 +23,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SyncTombstoneEntity::class,
         DebtTermsEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class LucentoDatabase : RoomDatabase() {

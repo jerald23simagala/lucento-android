@@ -1,0 +1,44 @@
+{
+  "id": "ph-receipt-orderslip-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-12",
+  "pages": [
+    [
+      "TEA TALK",
+      "ORDER SLIP",
+      "Queue No. 27",
+      "Cashier: Joy",
+      "Date: 11/10/2026  3:14 PM",
+      "1  Wintermelon MT Lg  120.00",
+      "1  Okinawa MT Med  105.00",
+      "1  Add Pearl  20.00",
+      "Total Due  245.00",
+      "Cash  500.00",
+      "Change  255.00",
+      "THIS IS NOT AN OFFICIAL RECEIPT",
+      "Thank you, come again!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Tea Talk",
+        "total": "245.00",
+        "currency": "PHP",
+        "currencyEvidence": "NONE",
+        "date": "2026-11-10",
+        "dateAmbiguous": true,
+        "direction": "OUT",
+        "category": "cafe",
+        "paymentInstrument": "Cash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Milk tea order slip with no address, TIN, phone or currency. 11/10/2026 reads Nov 10 (truth, PH month-first) or Oct 11; nothing on the slip settles it."
+}

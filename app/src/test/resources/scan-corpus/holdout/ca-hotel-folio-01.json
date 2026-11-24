@@ -1,0 +1,50 @@
+{
+  "id": "ca-hotel-folio-01",
+  "country": "CA",
+  "type": "INVOICE",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-12",
+  "pages": [
+    [
+      "FAIRMONT ROYAL YORK",
+      "100 Front Street West, Toronto, Ontario M5J 1E3",
+      "Tel 416 368 2511",
+      "GST/HST No. 10223 4567 RT0001",
+      "GUEST FOLIO",
+      "Guest: Priya Shah",
+      "Room 1214  Deluxe King",
+      "Arrival  09 Oct 2026  Departure  10 Oct 2026",
+      "Folio No. 448812  Confirmation 77812345",
+      "Date  Description  Charges (C$)  Credits (C$)",
+      "09 Oct 2026  Room Charge - Deluxe King  389.00",
+      "09 Oct 2026  Municipal Accommodation Tax 6%  23.34",
+      "09 Oct 2026  HST 13%  53.60",
+      "09 Oct 2026  EPIC Restaurant - Room 1214 (tax incl.)  95.86",
+      "10 Oct 2026  MASTERCARD ************5521  561.80",
+      "Total Charges  C$ 561.80",
+      "Total Credits  C$ 561.80",
+      "Balance Due  C$ 0.00",
+      "Thank you for staying with us. Fairmont Royal York - an Accor property."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Fairmont Royal York",
+        "total": "561.80",
+        "currency": "CAD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-10",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "hotel",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "5521"
+      }
+    ]
+  },
+  "notes": "Hotel folio: room + 6% MAT + 13% HST + restaurant = C$ 561.80, settled by Mastercard at checkout (the payment is printed as a credit and the balance due is 0.00). Date is the checkout/payment date."
+}

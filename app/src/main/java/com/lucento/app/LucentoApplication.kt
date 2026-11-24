@@ -42,6 +42,8 @@ import com.lucento.app.domain.backup.BackupEngine
 import java.io.File
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.map
+import com.lucento.app.core.money.MoneyFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.awaitClose
@@ -68,6 +70,11 @@ class LucentoApplication : Application() {
         if (container.pendingRevokes.all().isNotEmpty()) com.lucento.app.data.sync.RevokeScheduler.schedule(this)
         // The welcome email (docs/EMAILS.md): asked for once per signed-in account; nothing while signed out.
         container.welcomeEmail.start(CoroutineScope(SupervisorJob() + Dispatchers.Default), container.auth.observeUserId())
+        // Settings › Money › Show cents: the formatter's whole-units choice for every amount written outside Compose
+        // (Ask's answers, report PDFs, notifications). Compose reads the same preference through LocalWholeUnits.
+        CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+            container.preferences.preferences.map { !it.showCents }.distinctUntilChanged().collect { MoneyFormatter.wholeUnits = it }
+        }
         // Home-screen widgets (docs/WIDGETS.md): redrawn after every change to what they show, and just after midnight.
         com.lucento.app.feature.widget.WidgetRefresher.start(this)
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
@@ -77,8 +84,12 @@ class LucentoApplication : Application() {
             }
         }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
-            // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now".
-            uploadRequests(container.syncRepository.observePendingChanges()).collect {
+            // Every new, edited or deleted row is uploaded shortly after it is saved, not only on "Sync now", and so is a
+            // changed setting that follows the account (docs/SYNC.md "Settings").
+            kotlinx.coroutines.flow.merge(
+                uploadRequests(container.syncRepository.observePendingChanges()),
+                uploadRequests(container.preferences.accountSettingChanges),
+            ).collect {
                 if (backgroundSyncAllowed(container.syncPreferences.isEnabled(), container.onboardingComplete(), container.planAllowsSync())) {
                     // Open: send it now. In the background (or if the app is closed before it runs): WorkManager.
                     if (container.inForeground.get()) container.foregroundSync.request(forced = true)
@@ -154,10 +165,26 @@ class AppContainer(application: Application) {
     /** P2-10: whether this process has been unlocked. Process-wide, so rotation never re-locks and a cold start does. */
     val appLock: com.lucento.app.core.security.AppLockSession by lazy { com.lucento.app.core.security.AppLockSession() }
 
+    /** Pro walls met this session (owner, 2026-11-19): the first tap a dialog, later taps a short message. In memory. */
+    val proWalls: com.lucento.app.feature.pro.ProWallMemory by lazy { com.lucento.app.feature.pro.ProWallMemory() }
+
+    /** A Pro theme tried on in the profile sheet, never saved (owner, 2026-11-19). In memory. */
+    val themeTrial: com.lucento.app.feature.profile.ThemeTrial by lazy { com.lucento.app.feature.profile.ThemeTrial() }
+
     /** Background and launch sync wait for this (P0-2); onboarding's own restore syncs directly. */
     suspend fun onboardingComplete(): Boolean = preferences.preferences.first().onboardingComplete
     val backup: BackupEngine by lazy {
-        BackupEngine(RoomBackupStore(database, runner, preferences, GoalPhotos(application)))
+        BackupEngine(
+            RoomBackupStore(
+                database, runner, preferences, GoalPhotos(application),
+                // Lucento Pro: a backup file restores a Pro theme only where the plan allows it (docs/MONETIZATION.md §3.8).
+                themeAllowed = { theme ->
+                    // The plan read from its sealed copy first: on a cold start the state is still the free default.
+                    entitlements.loadCached()
+                    com.lucento.app.domain.entitlement.ProGates.themeAllowed(theme.name, entitlements.state.value, System.currentTimeMillis())
+                },
+            ),
+        )
     }
     /**
      * Lucento Shared: a Partner's phone (bound to an Owner's Shared Space) doesn't change the financial structure. Read
@@ -303,6 +330,13 @@ class AppContainer(application: Application) {
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {
         com.lucento.app.core.banks.InstitutionRepository { application.assets.open("banks/institutions.json").bufferedReader().use { it.readText() } }
     }
+    /** The bundled merchant and payment-provider dictionaries (assets/merchants), for reading scans on this phone. */
+    val merchants: com.lucento.app.data.capture.MerchantDictionary by lazy {
+        com.lucento.app.data.capture.MerchantDictionary {
+            application.assets.list("merchants").orEmpty().filter { it.endsWith(".json") }.sorted()
+                .map { name -> application.assets.open("merchants/$name").bufferedReader().use { it.readText() } }
+        }
+    }
     val categories: CategoryRepository by lazy { CategoryRepository(database.categoryDao(), runner = runner, access = structureAccess) }
     val transactions: TransactionRepository by lazy {
         TransactionRepository(
@@ -366,12 +400,18 @@ class AppContainer(application: Application) {
             scheduleRevoke = { com.lucento.app.data.sync.RevokeScheduler.schedule(application) },
         ) }
 
-    /** The composer's reader: Gemini when Smarter reading is on (see docs/CAPTURE.md), else this phone. */
+    /**
+     * The composer's reader: Gemini when Smarter reading is on and the plan includes it (see docs/CAPTURE.md), else this
+     * phone. Without the plan the server would refuse every message, so it isn't asked (owner, 2026-11-15).
+     */
     val interpreter: com.lucento.app.domain.capture.TransactionInterpreter by lazy {
         com.lucento.app.data.ai.HybridTransactionInterpreter(
             local = com.lucento.app.domain.capture.LocalTransactionInterpreter(),
             remote = com.lucento.app.data.ai.RemoteTransactionInterpreter(accessToken = auth::accessToken),
-            enabled = { preferences.preferences.first().smartReading },
+            enabled = {
+                preferences.preferences.first().smartReading &&
+                    com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed(entitlements.state.value, System.currentTimeMillis())
+            },
             currency = { preferences.preferences.first().primaryCurrency },
         )
     }
@@ -412,6 +452,25 @@ class AppContainer(application: Application) {
                 com.lucento.app.domain.entitlement.ProGates.cloudPlanFingerprint(entitlements.state.value)
             },
             onUploadsRefused = { refreshEntitlements() },
+            // Settings that follow the account (docs/SYNC.md "Settings"). The row is the person's own, so it is saved on
+            // their own plan, even on a Partner's phone (which syncs the records on the Owner's).
+            accountSettings = preferences,
+            accountSettingsUploadAllowed = { accountSettingsUploadAllowed() },
+            // MONETIZATION §3.8: an account's Pro theme isn't applied on a phone whose plan can't pick it.
+            lockedThemes = {
+                entitlements.loadCached()
+                com.lucento.app.data.preferences.ThemeId.keysOf(
+                    com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(entitlements.state.value, System.currentTimeMillis()),
+                )
+            },
+        )
+    }
+
+    /** Whether the signed-in person's own plan lets their settings be saved: a Partner's phone too needs their own cloud. */
+    private suspend fun accountSettingsUploadAllowed(): Boolean {
+        entitlements.loadCached()
+        return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(
+            entitlements.state.value, partnerOfSpace = false, now = System.currentTimeMillis(),
         )
     }
 
@@ -424,9 +483,14 @@ class AppContainer(application: Application) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
             allowed = { backgroundSyncAllowed(syncPreferences.isEnabled(), onboardingComplete(), planAllowsSync()) },
             upToDate = {
-                val last = syncPreferences.lastSyncedAtMillis()
-                last != null && System.currentTimeMillis() - last < com.lucento.app.data.sync.ForegroundSync.FRESH_MILLIS &&
-                    syncRepository.pendingChangeCount() == 0
+                val settingsWaiting = preferences.accountSettingsWaiting()
+                com.lucento.app.data.sync.ForegroundSync.isUpToDate(
+                    lastSyncedAt = syncPreferences.lastSyncedAtMillis(),
+                    now = System.currentTimeMillis(),
+                    pendingChanges = syncRepository.pendingChangeCount(),
+                    settingsWaiting = settingsWaiting,
+                    settingsCanUpload = settingsWaiting && accountSettingsUploadAllowed(),
+                )
             },
             sync = { syncRepository.sync() },
         )

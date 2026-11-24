@@ -171,7 +171,10 @@ class PlanRepositoriesTest {
     @Test fun scheduleValidation() = runTest {
         fun input(type: TransactionType = TransactionType.EXPENSE, amount: Long = 100, interval: Int = 1, end: LocalDate? = null, category: Long? = rent) =
             RecurringRepository.Input(null, "X", type, Money(amount, "USD"), bank, category, Frequency.WEEKLY, interval, start, end)
-        assertEquals(RecurringRepository.SaveResult.InvalidType, recurring.save(input(type = TransactionType.TRANSFER_OUT)))
+        assertEquals(RecurringRepository.SaveResult.InvalidType, recurring.save(input(type = TransactionType.TRANSFER_IN)))
+        assertEquals(RecurringRepository.SaveResult.InvalidType, recurring.save(input(type = TransactionType.ADJUSTMENT_OUT)))
+        // A scheduled transfer needs where the money goes (tester round, 2026-11-17).
+        assertEquals(RecurringRepository.SaveResult.InvalidTransfer, recurring.save(input(type = TransactionType.TRANSFER_OUT, category = null)))
         assertEquals(RecurringRepository.SaveResult.AmountNotPositive, recurring.save(input(amount = 0)))
         assertEquals(RecurringRepository.SaveResult.InvalidInterval, recurring.save(input(interval = 0)))
         assertEquals(RecurringRepository.SaveResult.EndBeforeStart, recurring.save(input(end = start.minusDays(1))))

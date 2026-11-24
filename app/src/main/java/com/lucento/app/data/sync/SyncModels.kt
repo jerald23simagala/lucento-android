@@ -60,6 +60,15 @@ internal data class WalletRow(
      */
     @SerialName("fx_basis_rate") val fxBasisRate: String? = null,
     @SerialName("fx_revalue") val fxRevalue: Boolean? = null,
+    /**
+     * v14 (tester round, 2026-11-17): the wallet's kind and chosen icon, and its Safe to spend choice. Like the FX keys,
+     * sent only in batches where a wallet uses them (SyncRepository), so a phone that never set one sends exactly what
+     * v13 sent and keeps syncing with a project that doesn't have the columns yet.
+     */
+    val kind: String? = null,
+    @SerialName("icon_key") val iconKey: String? = null,
+    val spendable: Boolean? = null,
+    @SerialName("spendable_credit_minor") val spendableCreditMinor: Long? = null,
 )
 
 @Serializable
@@ -237,6 +246,10 @@ data class SyncReport(
      * budget, goal or schedule). They are never sent — the database would refuse them — and the Owner's copy replaces them.
      */
     val notPermitted: Int = 0,
+    /** Settings that follow the account (docs/SYNC.md "Settings") changed on this phone to the account's values. */
+    val settingsTaken: Int = 0,
+    /** Settings this phone saved to the account: its own changes, and values the account had none of. */
+    val settingsSent: Int = 0,
 ) {
     operator fun plus(other: SyncReport) = SyncReport(
         pushed + other.pushed,
@@ -249,6 +262,8 @@ data class SyncReport(
         invalidSkipped + other.invalidSkipped,
         overridden + other.overridden,
         notPermitted + other.notPermitted,
+        settingsTaken + other.settingsTaken,
+        settingsSent + other.settingsSent,
     )
 }
 

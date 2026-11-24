@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -83,6 +84,15 @@ fun LucentoBottomSheet(
     LaunchedEffect(Unit) {
         if (!reducedMotion) appear.animateTo(1f, tween(durationMillis = 320, delayMillis = 60, easing = FastOutSlowInEasing))
     }
+    // A short message asked for while this sheet is open (a Pro wall met again) shows in the sheet, not behind it.
+    val messageHosts = LocalMessageHosts.current
+    val sheetMessages = remember { androidx.compose.material3.SnackbarHostState() }
+    val messageScope = androidx.compose.runtime.rememberCoroutineScope()
+    val sheetHost = remember(sheetMessages, messageScope) { MessageHost(sheetMessages, messageScope) }
+    androidx.compose.runtime.DisposableEffect(messageHosts, sheetHost) {
+        messageHosts?.enterSheet(sheetHost)
+        onDispose { messageHosts?.leaveSheet(sheetHost) }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         modifier = modifier,
@@ -91,26 +101,59 @@ fun LucentoBottomSheet(
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Column(
+        // The sheet's own window takes its bar icons from the phone's dark setting, not Lucento's theme: with Lucento dark
+        // on a light phone the clock and battery went dark on the dark sheet (design review, 2026-11-18). Match the theme.
+        val view = androidx.compose.ui.platform.LocalView.current
+        val dark = LucentoTheme.isDark
+        androidx.compose.runtime.SideEffect {
+            (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window?.let { window ->
+                androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+        }
+        // The message overlays the sheet's foot rather than adding to its height.
+        androidx.compose.foundation.layout.Box(
             Modifier
                 .fillMaxWidth()
+                // A sheet only Back closes stays put for a drag that starts on its message, too.
                 .then(
                     if (dragToDismiss) {
-                        Modifier.nestedScroll(KeepFlingInSheet)
-                    } else {
                         Modifier
-                            .padding(top = Spacing.md)
-                            .nestedScroll(KeepAllInSheet)
-                            // A drag on the form's still parts (not taken by a scrolling list) goes no further either.
-                            .pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
+                    } else {
+                        Modifier.pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
                     },
-                )
-                .graphicsLayer {
-                    alpha = 0.35f + 0.65f * appear.value
-                    translationY = (1f - appear.value) * 20.dp.toPx()
-                },
-            content = content,
-        )
+                ),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (dragToDismiss) {
+                            Modifier.nestedScroll(KeepFlingInSheet)
+                        } else {
+                            Modifier
+                                .padding(top = Spacing.md)
+                                .nestedScroll(KeepAllInSheet)
+                                // A drag on the form's still parts (not taken by a scrolling list) goes no further either.
+                                .pointerInput(Unit) { detectVerticalDragGestures { change, _ -> change.consume() } }
+                        },
+                    )
+                    .graphicsLayer {
+                        alpha = 0.35f + 0.65f * appear.value
+                        translationY = (1f - appear.value) * 20.dp.toPx()
+                    },
+                content = content,
+            )
+            // At the sheet's top, never over its own buttons at the foot (Save at a limit; design review 2026-11-19).
+            androidx.compose.material3.SnackbarHost(
+                sheetMessages,
+                Modifier
+                    .align(androidx.compose.ui.Alignment.TopCenter)
+                    .statusBarsPadding(),
+            ) { data -> LucentoSnackbar(data) }
+        }
     }
 }
 
@@ -216,6 +259,8 @@ fun ConfirmDialog(
     secondaryLabel: String? = null,
     onSecondary: (() -> Unit)? = null,
     secondaryDestructive: Boolean = false,
+    /** The tile’s icon instead of the warning or question mark (the Pro dialog’s crest). */
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val ext = LucentoTheme.extendedColors
@@ -226,14 +271,21 @@ fun ConfirmDialog(
         containerColor = colors.surfaceContainerLowest,
         icon = {
             IconTile(
-                icon = if (destructive) Icons.Outlined.WarningAmber else Icons.AutoMirrored.Outlined.HelpOutline,
+                icon = icon ?: if (destructive) Icons.Outlined.WarningAmber else Icons.AutoMirrored.Outlined.HelpOutline,
                 container = tone.container,
                 content = tone.content,
                 size = 52.dp,
                 shape = CircleShape,
             )
         },
-        title = { Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center) },
+        // Balanced lines: "Grove is part of / Lucento Pro", never a last word alone.
+        title = {
+            Text(
+                title,
+                style = MaterialTheme.typography.headlineSmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                textAlign = TextAlign.Center,
+            )
+        },
         // Scrolls when it can't fit (large text, a short screen): the dialog then shrinks the text, never the buttons,
         // and without this the end of a long explanation was cut off where nobody could read it.
         text = {

@@ -1,0 +1,56 @@
+{
+  "id": "se-receipt-ica-01",
+  "country": "SE",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-10",
+  "pages": [
+    [
+      "ICA Nara Hornstull",
+      "Langholmsgatan 13",
+      "117 33 Stockholm",
+      "Tel 08-668 12 30",
+      "Org.nr 556123-4567",
+      "Kvitto",
+      "MJOLK 3% 1,5L  21,95",
+      "SMOR NORMALSALTAT 500G  54,90",
+      "KNACKEBROD SPORT  28,50",
+      "KAFFE ZOEGAS 450G  64,95",
+      "BANAN  29,11",
+      "1,124 kg x 25,90 kr/kg",
+      "DISKMEDEL YES 520ML  24,95",
+      "Totalt  224,36",
+      "Kort  224,36",
+      "Moms %  Moms  Netto  Brutto",
+      "6,00  11,29  188,12  199,41",
+      "25,00  4,99  19,96  24,95",
+      "Mottaget Kort",
+      "VISA  ************5108",
+      "Kontaktlos",
+      "Ref 220917 Butik 1047",
+      "Datum 2026-10-09  Kl 18:31",
+      "Stammis: 4 poang",
+      "Valkommen ater!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "ICA",
+        "total": "224.36",
+        "currency": "SEK",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-09",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "5108"
+      }
+    ]
+  },
+  "notes": "Swedish receipt: 'kr' appears only in the per-kg line; Stockholm address and Org.nr give the country. Food VAT 6% (temporarily halved in 2026), detergent 25%. Swedish letters read as plain Latin (Nara, Langholmsgatan)."
+}

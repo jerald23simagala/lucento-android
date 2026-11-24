@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,10 @@ fun NavRow(
     trailing: (@Composable () -> Unit)? = null,
     /** When true the title wraps instead of ellipsizing, so a large font scale does not clip it. */
     wrapTitle: Boolean = false,
+    /** The row leaves Lucento (another app or the browser): an "opens elsewhere" mark instead of the chevron. */
+    external: Boolean = false,
+    /** What a tap does, for TalkBack ("Open in Facebook"). */
+    onClickLabel: String? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Row(
@@ -56,7 +61,7 @@ fun NavRow(
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .clip(MaterialTheme.shapes.medium)
-            .clickable(role = Role.Button, onClick = onClick)
+            .clickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick)
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -87,7 +92,11 @@ fun NavRow(
             Spacer(Modifier.width(Spacing.sm))
             trailing()
         }
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        if (external) {
+            Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+        } else {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = colors.onSurfaceVariant)
+        }
     }
 }
 
@@ -150,7 +159,7 @@ fun SwitchRow(
 }
 
 /**
- * A small labelled switch for a header or a toolbar ("Gemini", "Smarter reading"): the label and switch toggle together,
+ * A small labelled switch for a header or a toolbar (Ask Lucento's "Gemini"): the label and switch toggle together,
  * TalkBack announces one switch, and the touch target is at least 48dp tall.
  */
 @Composable

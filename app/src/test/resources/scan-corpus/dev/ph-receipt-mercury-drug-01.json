@@ -1,0 +1,57 @@
+{
+  "id": "ph-receipt-mercury-drug-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-28",
+  "pages": [
+    [
+      "MERCURY DRUG CORPORATION",
+      "No. 7 Mercury Ave., Bagumbayan, Quezon City",
+      "MERCURY DRUG - KATIPUNAN 2",
+      "315 Katipunan Ave., Loyola Heights, Quezon City",
+      "VAT REG TIN: 000-388-474-00261",
+      "MIN: 140326754  S/N: ML2T0937",
+      "Tel. (02) 8911-5072",
+      "SI#: 0261-0089174",
+      "10/27/2026 07:15 PM  T#02  C#118",
+      "BIOGESIC 500MG TAB  20 @ 4.75  95.00",
+      "ALAXAN FR CAP  10 @ 10.25  102.50",
+      "CETAPHIL GENTLE CLNSR 125ML  1 @ 449.00  449.00",
+      "LOSARTAN 50MG TAB (GEN)  30 @ 9.25  277.50 VE",
+      "TOTAL SALES  924.00",
+      "LESS: DISCOUNT  0.00",
+      "AMOUNT DUE  924.00",
+      "MASTERCARD  924.00",
+      "CARD NO: ************3371",
+      "APPR CODE: 551032",
+      "VATable Sales  577.23",
+      "VAT Amount  69.27",
+      "VAT Exempt Sales  277.50",
+      "Zero Rated Sales  0.00",
+      "Suki Card: 6504 2291 0083",
+      "THIS SERVES AS YOUR SALES INVOICE",
+      "Thank you for your patronage!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Mercury Drug",
+        "total": "924.00",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-27",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "pharmacy",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "3371"
+      }
+    ]
+  },
+  "notes": "No currency symbol; Philippine VAT TIN and Quezon City address give the country. Maintenance medicine is VAT-exempt (VE)."
+}

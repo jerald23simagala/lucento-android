@@ -1,0 +1,37 @@
+Fast capture by default, voice in Ask Lucento — device check, 2026-11-15
+Branch feature/fast-capture-ask-voice. Emulator Lucento_Shots_API35 (API 35, Play Store image, 1080x2400 @ 420 dpi),
+debug build installed over the AVD's earlier 0.5.8-debug data (PHP demo month). Screenshots (PNG, not committed) beside
+this file.
+
+Build before the plan lock and the placeholder change:
+- Ask Lucento shows the microphone left of the field (01). First tap with RECORD_AUDIO revoked: Android's
+  "Allow Lucento to record audio?" (02).
+- The AVD's saved preferences had online voice ON (user_preferences.preferences_pb, online_voice = true). Listening
+  online: the speech service answered with a network error, so Ask showed "Couldn't reach your phone's speech
+  service…" (03). Internet worked (ping 8.8.8.8 ok); Google's speech service on this AVD is not set up.
+- Settings › Privacy & security: Online voice turned off (04). Smarter reading isn't shown: debug build, no proxy, signed
+  out.
+- Ask, offline: "Your phone can't turn speech into text offline. Try online voice, or type it instead." with the
+  Try online voice action (05). The action opens "Use online voice?" (06). Use online voice saved online_voice = true
+  and listened online at once: the listening sheet shows "Take your time. Try “How much did I spend this month?”" with
+  no stray full stop (07).
+- Composer: intro note "Your messages are read on this phone, so their rows appear straight away." (08). Composer mic
+  through the shared VoiceInput: the sheet shows "Try “Dinner 450, parking 90”." (09); after 10 s of silence,
+  "Didn't catch anything. Tap the microphone to try again, or type it."
+- 200 % text: Ask's bar keeps the microphone, field and send at full size, no overlap (10). Back to 100 %.
+- Typed "How much did I spend this month?" in Ask: answered once, on the phone (Cash flow statement, "Calculated on this
+  phone").
+
+Build with the launcher fix and the new placeholder:
+- RECORD_AUDIO revoked, Ask › microphone, rotated to landscape with Android's question open (logcat: "ActivityRecord …
+  MainActivity … is relaunching"), then Don't allow: the speech service's own window opened (Google, "Tap to stop
+  listening", English (United States)) (11). The first build showed "no speech recogniser" in this case (launchers
+  were set in an effect that hadn't run yet).
+- Second denial: Android no longer asks; the window opens straight away. Closing it: "Listening stopped. You can type it
+  instead." (12).
+- Portrait, 100 %: "Ask about your money…" fits beside the microphone (13).
+
+Restored afterwards: RECORD_AUDIO granted (user-set/user-fixed flags cleared), portrait, font scale 1.0, online voice on.
+
+Not checked on a device: a real spoken question or transaction (the emulator's speech service produced no text), the
+Smarter reading row, dialog and plan lock (debug builds hide Smarter reading), "Gemini is reading…".

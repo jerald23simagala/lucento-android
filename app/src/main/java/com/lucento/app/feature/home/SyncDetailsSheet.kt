@@ -41,7 +41,13 @@ data class SyncSheetCopy(
     val actionOpensPro: Boolean = false,
 )
 
-fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): SyncSheetCopy = when (status) {
+fun syncSheetCopy(
+    status: CloudStatus,
+    details: SyncDetails,
+    nowMillis: Long,
+    /** The plan held: Pro Lifetime without Lucento Cloud hears about Lucento Cloud when paused. */
+    plan: com.lucento.app.domain.entitlement.DisplayPlan = com.lucento.app.domain.entitlement.DisplayPlan.FREE,
+): SyncSheetCopy = when (status) {
     CloudStatus.LOCAL -> if (!details.configured) SyncSheetCopy(
         headline = "Cloud sync isn’t available",
         body = "This version of Lucento doesn’t include cloud sync. Everything works on this phone.",
@@ -83,13 +89,17 @@ fun syncSheetCopy(status: CloudStatus, details: SyncDetails, nowMillis: Long): S
         action = if (details.everSynced) "Sync now" else "Finish setting up sync",
         actionOpensSettings = !details.everSynced,
     )
-    CloudStatus.PAUSED -> SyncSheetCopy(
-        headline = "Cloud sync is part of Lucento Pro",
-        body = "Everything you add or change is saved on this phone" + pendingSuffix(details.pendingChanges) +
-            " Nothing in your account is deleted; uploads resume when your plan includes cloud sync. A backup file is always free.",
-        action = "See Lucento Pro",
-        actionOpensPro = true,
-    )
+    CloudStatus.PAUSED -> {
+        val cloud = plan == com.lucento.app.domain.entitlement.DisplayPlan.LIFETIME
+        SyncSheetCopy(
+            headline = if (cloud) "Cloud sync comes with Lucento Cloud" else "Cloud sync is part of Lucento Pro",
+            body = "Everything you add or change is saved on this phone" + pendingSuffix(details.pendingChanges) +
+                " Nothing in your account is deleted; uploads resume when " +
+                (if (cloud) "Lucento Cloud is on" else "your plan includes cloud sync") + ". A backup file is always free.",
+            action = com.lucento.app.feature.pro.ProCopy.WALL_SEE_PLAN,
+            actionOpensPro = true,
+        )
+    }
     CloudStatus.SYNCED -> SyncSheetCopy(
         headline = "Synced",
         body = syncStatusText(details.lastSyncedAtMillis, nowMillis, 0, null) + ", nothing waiting. " + SYNC_CADENCE,
@@ -125,7 +135,8 @@ fun SyncDetailsSheet(
     onDismissOverridden: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val copy = syncSheetCopy(status, details, System.currentTimeMillis())
+    val now = System.currentTimeMillis()
+    val copy = syncSheetCopy(status, details, now, com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(now))
     val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(

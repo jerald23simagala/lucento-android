@@ -83,6 +83,7 @@ import com.lucento.app.core.designsystem.component.SectionHeader
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import com.lucento.app.data.preferences.ThemeMode
 import androidx.fragment.app.FragmentActivity
@@ -201,6 +202,7 @@ fun SettingsScreen(
                 page = page,
                 onOpenPage = onOpenPage,
                 onFxRatesOnline = viewModel::setFxRatesOnline,
+                onShowCents = viewModel::setShowCents,
                 onFeature = viewModel::setFeatureEnabled,
                 onSmartReading = viewModel::setSmartReading,
                 onAskLucentoAi = viewModel::setAskLucentoAi,
@@ -274,6 +276,9 @@ fun SettingsScreen(
                         "the most recently changed amount is kept — check your budgets afterwards.\n\n" +
                         "Anything you recorded in both places will appear twice and be counted twice in your totals " +
                         "until you delete the extra copy.\n\n" +
+                        // docs/SYNC.md "Settings": a phone joining an account takes the account's settings.
+                        "Settings your account already has, like your theme and the features you use, replace this " +
+                        "phone’s. Any it doesn’t have yet come from this phone.\n\n" +
                         "Choose Don’t connect to leave this phone as it is, not signed in.",
                     confirmLabel = "Add to account",
                     onConfirm = viewModel::confirmAccountPrompt,
@@ -332,9 +337,12 @@ fun SettingsScreen(
         )
     }
     if (confirmReplace) {
+        // With sync on, what Replace writes goes up like any change: the account and the other phones end up like the file.
+        val syncing = state?.cloudSync?.let { it.signedInEmail != null && it.status.enabled } == true
         ConfirmDialog(
             title = "Replace everything on this device?",
-            text = "This erases the wallets, transactions, budgets, goals and schedules on this phone, then imports the file. It can’t be undone.",
+            text = "This erases the wallets, transactions, budgets, goals and schedules on this phone, then imports the file. It can’t be undone." +
+                if (syncing) " Cloud sync is on, so your account and your other phones will match the file too." else "",
             confirmLabel = "Replace",
             destructive = true,
             onConfirm = {
@@ -412,12 +420,22 @@ fun EnabledFeaturesSection(state: SettingsUiState, onFeature: (Feature, Boolean)
     }
 }
 
+/** "Off: ₱1,234.56 reads ₱1,235." in the main currency; nothing for a currency without cents (JPY). */
+private fun showCentsExample(currencyCode: String): String? {
+    val digits = Money.zero(currencyCode).fractionDigits
+    if (digits == 0) return null
+    val minor = java.math.BigDecimal("1234.56").setScale(digits, java.math.RoundingMode.HALF_UP).unscaledValue().longValueExact()
+    val sample = Money(minor, currencyCode)
+    return "Off: ${MoneyFormatter.format(sample, wholeUnits = false)} reads ${MoneyFormatter.format(sample, wholeUnits = true)}."
+}
+
 @Composable
 private fun SettingsContent(
     current: SettingsUiState,
     page: SettingsPage?,
     onOpenPage: (SettingsPage) -> Unit,
     onFxRatesOnline: (Boolean) -> Unit,
+    onShowCents: (Boolean) -> Unit,
     onFeature: (Feature, Boolean) -> Unit,
     onSmartReading: (Boolean) -> Unit,
     onAskLucentoAi: (Boolean) -> Unit,
@@ -493,6 +511,16 @@ private fun SettingsContent(
             note = if (prefs.fxRatesOnline) null else "Off: you type rates, or use a wallet’s last or average rate.",
             checked = prefs.fxRatesOnline,
             onCheckedChange = onFxRatesOnline,
+        )
+        // Tester round (2026-11-17): figures without cents. A display choice; nothing recorded changes.
+        SectionHeader("Amounts", Modifier.padding(top = Spacing.section))
+        SwitchRow(
+            title = "Show cents",
+            description = "Off: the amounts you read are rounded to whole units, so lines may not add up to the cent. " +
+                "Where you type an amount or open one transaction, the cents stay.",
+            note = if (prefs.showCents) null else showCentsExample(prefs.primaryCurrency),
+            checked = prefs.showCents,
+            onCheckedChange = onShowCents,
         )
       }
       SettingsPage.FEATURES -> EnabledFeaturesSection(current, onFeature, showHeader = false)
@@ -586,11 +614,17 @@ private fun SettingsContent(
             SmartReadingSection(
                 on = prefs.smartReading,
                 signedIn = true,
+                locked = current.smartReadingLocked,
                 onChange = onSmartReading,
             )
         }
         if (current.cloudSync.configured && current.cloudSync.signedInEmail != null && com.lucento.app.BuildConfig.AI_ASK_URL.isNotBlank()) {
-            AskLucentoAiSection(on = prefs.askLucentoAi, onChange = onAskLucentoAi)
+            AskLucentoAiSection(
+                on = prefs.askLucentoAi,
+                confirmed = prefs.askAiConfirmed,
+                pro = current.aiProAllowance,
+                onChange = onAskLucentoAi,
+            )
         }
         Hairline(inset = Sizes.iconTile + Spacing.md)
         Fact(Icons.Outlined.DocumentScanner, "Receipts are read on this phone", "On-device text recognition reads the photo; it isn’t uploaded.")
@@ -660,6 +694,11 @@ internal fun CloudSyncSection(
     showHeader: Boolean = true,
     onDeleteAccount: () -> Unit = {},
 ) {
+    // Sync now while the plan doesn't include cloud sync: the Pro dialog (owner, 2026-11-18).
+    var syncWall by remember { mutableStateOf(false) }
+    if (syncWall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC), onDismiss = { syncWall = false })
+    }
     Column {
         if (showHeader) SectionHeader("Cloud sync", Modifier.padding(top = Spacing.section))
         when {
@@ -668,7 +707,7 @@ internal fun CloudSyncSection(
             }
             state.signedInEmail == null -> {
                 Text(
-                    "Back up your wallets, transactions, budgets and goals and keep them in sync across your " +
+                    "Back up your wallets, transactions, budgets, goals and settings and keep them in sync across your " +
                         "devices. Lucento stays fully usable without this — your data stays on this phone until you " +
                         "connect an account and keep sync on.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -706,7 +745,11 @@ internal fun CloudSyncSection(
                 Spacer(Modifier.height(Spacing.sm))
                 // Sync now stands alone here: signing out removes records, so it sits with the account's other
                 // lasting actions further down rather than beside an everyday button.
-                OutlinedButton(onClick = onSyncNow, enabled = !state.syncing, modifier = Modifier.heightIn(min = Sizes.minTouch)) {
+                OutlinedButton(
+                    onClick = { if (state.lockedByPlan) syncWall = true else onSyncNow() },
+                    enabled = !state.syncing,
+                    modifier = Modifier.heightIn(min = Sizes.minTouch),
+                ) {
                     if (state.syncing) {
                         CircularProgressIndicator(Modifier.size(Sizes.iconTile / 2), strokeWidth = 2.dp)
                     } else {
@@ -735,26 +778,29 @@ internal fun CloudSyncSection(
                     )
                 }
                 // Tester round 3: the password and the account's deletion each get their own clearly marked section, so
-                // nobody mistakes one for the other.
-                SectionHeader(
-                    "Password",
-                    Modifier.padding(top = Spacing.section),
-                    supporting = "For signing in with your email. Signing in with Google doesn’t use it.",
-                )
-                Spacer(Modifier.height(Spacing.xs))
-                com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth()) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconTile(
-                            icon = Icons.Outlined.Lock,
-                            container = MaterialTheme.colorScheme.primaryContainer,
-                            content = MaterialTheme.colorScheme.onPrimaryContainer,
-                        )
-                        Spacer(Modifier.width(Spacing.md))
-                        Text("Update password", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(Spacing.sm))
-                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                // nobody mistakes one for the other. An account that only signs in with Google has no password, so it
+                // gets no Password section (tester report 2026-11-21).
+                if (state.usesPassword != false) {
+                    SectionHeader(
+                        "Password",
+                        Modifier.padding(top = Spacing.section),
+                        supporting = "For signing in with your email. Signing in with Google doesn’t use it.",
+                    )
+                    Spacer(Modifier.height(Spacing.xs))
+                    com.lucento.app.core.designsystem.component.LucentoCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconTile(
+                                icon = Icons.Outlined.Lock,
+                                container = MaterialTheme.colorScheme.primaryContainer,
+                                content = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                            Spacer(Modifier.width(Spacing.md))
+                            Text("Update password", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(Spacing.sm))
+                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                            ChangePasswordForm(busy = state.syncing, onSubmit = onChangePassword)
+                        }
                     }
                 }
                 // Owner decision 2026-11-12: one name, "Sign out", everywhere (it was "Disconnect" here). Its dialog
@@ -777,13 +823,14 @@ internal fun CloudSyncSection(
             }
         }
         // Lucento Pro: signed in, but the plan doesn't include cloud sync (docs/MONETIZATION.md §3.5). Nothing is lost.
+        // Said plainly; Sync now opens the Pro dialog (owner, 2026-11-18).
         if (state.lockedByPlan && state.signedInEmail != null) {
             Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_SYNC,
-                text =
-                if (state.status.enabled) "Cloud sync is paused: it’s part of Lucento Pro. Everything stays on this phone and in your account; uploads resume when your plan includes it. A backup file is always free."
-                else "Cloud sync is part of Lucento Pro. You’re signed in; everything stays on this phone. A backup file is always free.",
+            InfoNote(
+                com.lucento.app.feature.pro.ProCopy.syncLockedNote(
+                    paused = state.status.enabled,
+                    plan = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis()),
+                ),
             )
         }
         // The status line already shows the stored error; don't print the same sentence twice (account mismatch).
@@ -874,21 +921,50 @@ private fun Fact(icon: ImageVector, title: String, body: String) {
 
 /**
  * Smarter reading (opt-in, off by default): typed and spoken messages are read by Gemini through Lucento's server.
- * Turning it on always goes through a dialog that says what is sent and where; it needs a sync account, which carries
- * the daily allowance. Receipts are always read on this phone, and so is everything when this is off or unreachable.
+ * This is the only place it is turned on (owner, 2026-11-15), and nowhere else mentions it (owner, 2026-11-23: Gemini is
+ * for Ask Lucento). Turning it on always goes through a dialog that says first that each message uses one of the AI
+ * questions Ask Lucento uses and that adding transactions gets slower, then what is sent and where; it needs a sync
+ * account, which carries the AI allowance, and a plan that includes it ([locked] otherwise: a Pro note instead, owner
+ * 2026-11-15). Receipts are always read on this phone, and so is everything when this is off, unreachable or not in the plan.
  */
 @Composable
-private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boolean) -> Unit) {
+private fun SmartReadingSection(on: Boolean, signedIn: Boolean, locked: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
+    var wall by remember { mutableStateOf(false) }
     SectionHeader("Smarter reading", Modifier.padding(top = Spacing.section))
     SwitchRow(
         title = "Read messages with Gemini",
         checked = on,
-        onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
+        // Turning it on outside the plan opens the Pro dialog (owner, 2026-11-18); off always works.
+        onCheckedChange = { wanted ->
+            when {
+                !wanted -> onChange(false)
+                locked -> wall = true
+                else -> asking = true
+            }
+        },
+        // Off always works, so a consent given earlier can be taken back while it is paused.
         enabled = signedIn || on,
-        description = "Better at messy, multi-item messages. Off or offline, Lucento reads them on this phone as before.",
-        note = if (!signedIn) "Connect a sync account above first — it keeps your daily allowance." else null,
+        description = "Better at messy, multi-item messages. Off, Lucento reads them on this phone straight away.",
+        // The costs stay in view, on or off: the AI questions it uses, and why the composer has no switch of its own.
+        note = when {
+            !signedIn -> "Connect a sync account above first — it keeps your AI allowance."
+            locked -> null
+            else -> com.lucento.app.feature.capture.SmartReadingCopy.NOTE
+        },
     )
+    if (locked && on) {
+        // Like cloud sync: an earlier "on" is paused, not lost, and says so plainly.
+        val lifetimeWithoutCloud = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis()) ==
+            com.lucento.app.domain.entitlement.DisplayPlan.LIFETIME
+        InfoNote(
+            if (lifetimeWithoutCloud) com.lucento.app.feature.capture.SmartReadingCopy.PAUSED_CLOUD
+            else com.lucento.app.feature.capture.SmartReadingCopy.PAUSED,
+        )
+    }
+    if (wall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.SMART_READING), onDismiss = { wall = false })
+    }
     if (asking) {
         ConfirmDialog(
             title = com.lucento.app.feature.capture.SmartReadingCopy.CONSENT_TITLE,
@@ -904,8 +980,9 @@ private fun SmartReadingSection(on: Boolean, signedIn: Boolean, onChange: (Boole
 }
 
 /**
- * Online voice (off by default): the composer's microphone may let the phone's speech service go online. Turning it on
- * always shows the same consent as the composer's prompt ([com.lucento.app.feature.capture.SpeechRequest]).
+ * Online voice (off by default): the microphone (the composer and Ask Lucento) may let the phone's speech service go
+ * online. Turning it on always shows the same consent as the microphone's prompt
+ * ([com.lucento.app.feature.capture.SpeechRequest]).
  */
 @Composable
 private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {
@@ -933,18 +1010,24 @@ private fun OnlineVoiceRow(on: Boolean, onChange: (Boolean) -> Unit) {
 }
 
 /**
- * Ask Lucento's AI answers (docs/ASK.md): off until the user agrees to what is sent. Reports are always calculated on
- * this phone, with or without it.
+ * Ask Lucento's AI answers (docs/ASK.md): on by default for a signed-in account, with nothing sent until the person
+ * confirms what is sent (their first question in Ask, or this dialog; owner, 2026-11-17). Off is immediate; turning them
+ * back on shows the dialog. Reports are always calculated on this phone, with or without them.
  */
 @Composable
-private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
+private fun AskLucentoAiSection(on: Boolean, confirmed: Boolean, pro: Boolean, onChange: (Boolean) -> Unit) {
     var asking by remember { mutableStateOf(false) }
     SectionHeader("Ask Lucento", Modifier.padding(top = Spacing.section))
     SwitchRow(
         title = "AI answers with Gemini",
         checked = on,
         onCheckedChange = { wanted -> if (wanted) asking = true else onChange(false) },
-        description = "Ask anything about your money and get advice. Off, Ask Lucento still prepares your reports on this phone.",
+        description = "Ask anything about your money and get advice. " +
+            if (on && !confirmed) {
+                "Nothing is sent until you confirm your first question in Ask Lucento."
+            } else {
+                "Off, Ask Lucento still prepares your reports on this phone."
+            },
     )
     if (asking) {
         ConfirmDialog(
@@ -955,8 +1038,8 @@ private fun AskLucentoAiSection(on: Boolean, onChange: (Boolean) -> Unit) {
                 "note) to Lucento’s server, which asks Google’s Gemini. ${com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE} " +
                 "Receipts, photos, older transactions and other " +
                 "currencies are never sent. Every amount in an answer is worked out on this phone. Gemini's advice is " +
-                "based on your figures, but AI can be inaccurate, so check it before you act on it. Each account has a " +
-                "daily allowance, shared with Smarter reading, and you can turn this off at any time.",
+                "based on your figures, but AI can be inaccurate, so check it before you act on it. " +
+                "${com.lucento.app.feature.ask.AskAiCopy.allowance(pro)} You can turn this off at any time.",
             confirmLabel = "Turn on",
             onConfirm = {
                 asking = false
@@ -1014,7 +1097,8 @@ private fun RestorePreviewDialog(
                 Spacer(Modifier.height(Spacing.sm))
                 Text(
                     "Merge keeps records already on this phone and updates one only when the file is newer. " +
-                        "Replace erases this phone’s records and uses the file. Theme and currency change only when you replace.",
+                        "Replace erases this phone’s records and uses the file. Your settings, like theme and currency, " +
+                        "change only when you replace.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

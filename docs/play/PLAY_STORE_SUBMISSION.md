@@ -71,10 +71,10 @@ because accounts, sync, AI and usage counts are all opt-in.
 | Category › type | Collected | Why (purposes) | Ephemeral? | Notes |
 |---|---|---|---|---|
 | Personal info › Email address | Yes | Account management, App functionality | No | Account email; a Lucento Shared invitation stores the invitee's email until it's accepted, declined or expires |
-| Personal info › Name | Yes | Account management | No | Google sign-in's name in the account metadata; the Shared Space label a member chooses |
+| Personal info › Name | Yes | Account management, App functionality | No | Google sign-in's name in the account metadata; the Shared Space label a member chooses; since 2026-11-22 the display name chosen in Lucento, kept with the person's settings while cloud sync is on (docs/SYNC.md "Settings") |
 | Personal info › User IDs | Yes | Account management, App functionality | No | The Supabase account id |
 | Financial info › Purchase history | Yes | App functionality, Account management, Fraud prevention, security and compliance | No | Product, order number, status, dates, purchase-token hash (Lucento Pro). Since 2026-11-13 the purchase check (no account) also sends a buyer's signed Play purchase record every few hours while online, so a refund ends Pro; the server keeps the product, Google's state and the token hash only |
-| Financial info › Other financial info | Yes | App functionality | No | The synced ledger (wallets, transactions, budgets, goals, debts, schedules); figures sent to the AI features the person turns on |
+| Financial info › Other financial info | Yes | App functionality | No | The synced ledger (wallets, transactions, budgets, goals, debts, schedules) and, since 2026-11-22, the default wallet among the synced settings (the theme, modules and similar app choices are not a listed data type; re-check when filling the form); figures sent to the AI features once the person turns them on or confirms them (AI answers are on by default but send nothing until the first question is confirmed, and can be turned off: still **optional**) |
 | App activity › Other user-generated content | Yes | App functionality | **Yes** | Messages and questions typed or spoken into the AI features; the server keeps no copy |
 | App activity › App interactions | Yes | Analytics | No | Usage counts, off by default: event names and timings, kept 90 days |
 | App info and performance › Crash logs | Yes (optional) | Analytics | No | Crashlytics, off by default; stacks without amounts or notes. CI releases include it once the `GOOGLE_SERVICES_JSON` secret exists (docs/QUALITY.md); check the run summary says "with crash reporting" before uploading |
@@ -114,21 +114,26 @@ saves them to `/data/local/tmp/lucento-shots/delete-0*.png`), plus the public pa
 | Contact email | lucentoapp@gmail.com |
 | Website | `https://www.lucentoapp.com` |
 | Privacy policy | `https://www.lucentoapp.com/privacy` |
-| Graphics | `docs/play/graphics/global/` (main listing, US dollars) and `docs/play/graphics/ph/` (Philippines custom listing, pesos), same eight designs in each: one clear view, type it like a text, safe to spend, one net worth, multicurrency (Pro), insights, goals, Lucento Shared (Pro); feature graphic 1024 × 500; icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged). Built 2026-11-08 from the website's phone template and treatments (window/focus/angle/lift) on dark captures: PH from the website's peso run, global from `ScreenshotTourTest -e demoCurrency USD -e demoDark true` and `WebsiteShowcaseTest -e showcaseCurrency USD` (`artifacts/play-global-*-usd-dark/`) |
+| Graphics | `docs/play/graphics/global/` (main listing, US dollars) and `docs/play/graphics/ph/` (Philippines custom listing, pesos), same eight designs in each: one clear view, type it like a text, safe to spend, one net worth, multicurrency (Pro), Milestones (its coloured year is Pro; it replaced Insights on 2026-11-24, owner's choice), goals, Lucento Shared (Pro); feature graphic 1024 × 500; icon 512 × 512 (the Rising Crest `play-store-512.png` from lucento-website `brand/logo`, unchanged). Rebuilt 2026-11-24 from app 0.5.19 by lucento-studio `lab/play-graphics/render.mjs` (the website's phone template and treatments, window/focus/angle/lift) on dark captures from `tools/screenshots/capture_marketing.sh` (docs/QUALITY.md › Marketing screenshots): global from `tour-usd` + `showcase-usd`, Philippines from `tour-php` + `showcase-php`. The first set (2026-11-08, app 0.5.0) had no saved source |
 
 Copy rules: never promise "no ads" (ads may come to Free); never call local parsing AI; mark Pro features; no prices,
 "best" or "#1" in graphics; name no third-party brands (GCash, Maya, Meralco) in metadata, since Play can reject
 unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the institution count from README.
 
-### Main listing, English (global default), 2804 characters
+### Main listing, English (global default), 3313 characters
 
 > Lucento is a budget planner and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. No bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
+> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND
 > Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+>
+> PLAN EACH MONTH, SEE YOUR YEAR
+> • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or a trip gets its own amount.
+> • Every month gets a recap: what you kept, where the money went and how the budget ended.
+> • Milestones shows your budget year month by month (Pro), and the awards you earn from your own records.
 >
 > EVERY ACCOUNT, ONE NET WORTH
 > Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of 409 banks and providers in 48 countries, so each account looks like the card you know. Lucento adds what you have and what you owe into one net worth.
@@ -151,7 +156,7 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 > Lucento Pro adds:
 > • unlimited wallets and up to 20 goals
 > • wallets in other currencies
-> • 6- and 12-month Insights and PDF statements
+> • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
 > • Lucento Shared, so a partner can record from their own phone
@@ -161,17 +166,22 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 >
 > Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
 
-### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 2902 characters
+### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3414 characters
 
 Short description: Type your gastos like a text. Budget, ipon and utang in pesos, offline. (71)
 
 > Lucento is a budget app and expense tracker made for how Filipinos handle money: cash, bank accounts, e-wallets, credit cards and loans, all in one clear view. Track your gastos, ipon and utang in pesos, with no bank login. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan a receipt, which is read on your phone.
+> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND THIS MONTH
 > Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+>
+> PLAN EACH MONTH, SEE YOUR YEAR
+> • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or Christmas gets its own amount.
+> • Every month gets a recap: what you kept, where the money went and how the budget ended.
+> • Milestones shows your budget year month by month (Pro), and the awards you earn from your own records.
 >
 > EVERY ACCOUNT, ONE NET WORTH
 > Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of your bank or e-wallet, from 409 providers in 48 countries, including Philippine banks and e-wallets. Lucento adds what you have and what you owe into one net worth.
@@ -194,7 +204,7 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 > Lucento Pro adds:
 > • unlimited wallets and up to 20 goals
 > • wallets in other currencies
-> • 6- and 12-month Insights and PDF statements
+> • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
 > • Lucento Shared, so your partner can record from their own phone
@@ -221,3 +231,6 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 3. Release notes in plain words; no promises about features that aren't in the build.
 4. If anything changed what leaves the phone: update `LegalDocuments.kt`, bump `VERSION`, regenerate the website legal
    data, redeploy the site, then update the Data safety form.
+5. If a screen in the listing changed, or a release adds something the listing should show: capture and redraw the
+   graphics (docs/QUALITY.md › Marketing screenshots), update §4's text, and upload both listings again; Play keeps
+   the old graphics until they are replaced.

@@ -1,0 +1,45 @@
+{
+  "id": "ph-payment-maya-buyload-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-15",
+  "pages": [
+    [
+      "10:03",
+      "Maya",
+      "Load purchase successful",
+      "You bought",
+      "₱299.00",
+      "SMART GIGA 299",
+      "Mobile number  0928 123 4567",
+      "Promo  GIGA 299 (30 days)",
+      "Amount  ₱299.00",
+      "Fee  ₱0.00",
+      "Total  ₱299.00",
+      "Reference ID  7C21E9A40D33",
+      "Nov 15, 2026, 10:02 AM",
+      "Done"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Smart",
+        "total": "299.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-15",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "phone",
+        "paymentInstrument": "Maya",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Prepaid load bought in Maya for a Smart number; the promo name contains 299 and '30 days' is a validity period."
+}

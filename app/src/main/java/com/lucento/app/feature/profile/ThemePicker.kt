@@ -21,6 +21,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material3.Icon
@@ -36,6 +37,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,7 +72,13 @@ fun ThemePicker(
     val haptics = rememberHaptics()
     val modeIsDark = mode.isDark()
     val current = ThemeSpec.of(selected)
-    val lockedTapped = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<ThemeSpec?>(null) }
+    // A Pro theme tried on: Lucento shows it while the sheet is open, and nothing is saved (owner, 2026-11-19).
+    val trial = LocalThemeTrial.current
+    val trying = trial.trying.collectAsState().value
+    // The trial lasts only while the picker is there (the sheet closed, signed out, Lucento left).
+    androidx.compose.runtime.DisposableEffect(trial) { onDispose { trial.end() } }
+    // A theme picked during a trial shows at once and stays until the saved value catches up: nothing flashes between.
+    androidx.compose.runtime.LaunchedEffect(selected, trying) { if (trying != null && trying == selected) trial.end() }
     Column(modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -83,13 +93,22 @@ fun ThemePicker(
                     dark = spec.isDark(modeIsDark),
                     selected = spec.id == selected,
                     locked = spec.id in lockedThemes,
+                    trying = spec.id == trying && spec.id in lockedThemes,
                     onSelect = {
-                        if (spec.id in lockedThemes) {
-                            lockedTapped.value = spec
-                        } else if (spec.id != selected) {
-                            haptics.tick()
-                            lockedTapped.value = null
-                            onTheme(spec.id)
+                        when {
+                            // The saved theme (one kept from Pro too) only ends a trial.
+                            spec.id == selected -> trial.end()
+                            spec.id in lockedThemes -> {
+                                haptics.tick()
+                                trial.start(spec.id)
+                            }
+                            else -> {
+                                haptics.tick()
+                                if (trying != null) trial.start(spec.id)
+                                // A theme of one's own replaces one waiting for a purchase.
+                                trial.clearAfterPurchase()
+                                onTheme(spec.id)
+                            }
                         }
                     },
                 )
@@ -97,16 +116,36 @@ fun ThemePicker(
         }
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            current.character,
+            // While a theme is tried on, its own line: the app is wearing it.
+            (trying?.takeIf { it in lockedThemes }?.let { ThemeSpec.of(it) } ?: current).character,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        lockedTapped.value?.let { spec ->
-            Spacer(Modifier.height(Spacing.sm))
-            com.lucento.app.feature.pro.ProNote(
-                "${spec.displayName} is part of Lucento Pro. Sunrise and Midnight are always free.",
-                from = com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES,
-            )
+        val tried = trying?.takeIf { it in lockedThemes }
+        val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+        val reducedMotion = com.lucento.app.core.designsystem.theme.LucentoTheme.reducedMotion
+        androidx.compose.animation.AnimatedVisibility(
+            visible = tried != null,
+            enter = if (reducedMotion) androidx.compose.animation.EnterTransition.None
+            else androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = if (reducedMotion) androidx.compose.animation.ExitTransition.None
+            else androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+        ) {
+            // The last theme tried stays named while the note folds away.
+            val shown = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(tried) }
+            if (tried != null) shown.value = tried
+            shown.value?.let { id ->
+                ThemeTrialNote(
+                    theme = ThemeSpec.of(id).displayName,
+                    saved = current.displayName,
+                    onSeePlan = {
+                        // Bought from here, Pro brings this theme with it (owner, 2026-11-19).
+                        trial.keepAfterPurchase(id)
+                        openPro(com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES)
+                    },
+                    onDone = { trial.end() },
+                )
+            }
         }
         Spacer(Modifier.height(Spacing.md))
         if (current.darkOnly) {
@@ -121,19 +160,71 @@ fun ThemePicker(
     }
 }
 
+/** Under the themes while one is tried on: the plan fact, that nothing is saved, and the way to the plan page. */
+@Composable
+private fun ThemeTrialNote(theme: String, saved: String, onSeePlan: () -> Unit, onDone: () -> Unit) {
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current.displayPlan(System.currentTimeMillis())
+    com.lucento.app.core.designsystem.component.LucentoCard(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.sm),
+        contentPadding = Spacing.md,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(Spacing.sm))
+            Text(
+                com.lucento.app.feature.pro.ProCopy.wallTitle(
+                    com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.EXTRA_THEMES, subject = theme),
+                    plan,
+                ),
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite },
+            )
+        }
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            com.lucento.app.feature.pro.ProCopy.themeTrialBody(saved),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        com.lucento.app.core.designsystem.component.LucentoSecondaryButton(
+            text = com.lucento.app.feature.pro.ProCopy.WALL_SEE_PLAN,
+            onClick = onSeePlan,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        com.lucento.app.core.designsystem.component.LucentoTextButton(
+            text = com.lucento.app.feature.pro.ProCopy.THEME_TRIAL_DONE,
+            onClick = onDone,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
 private val PreviewWidth = 104.dp
 private val PreviewArtHeight = 72.dp
 
 /** One theme as a small picture of itself: its landscape, a hero bar and two action swatches, then its name. */
 @Composable
-private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSelect: () -> Unit, locked: Boolean = false) {
+private fun ThemePreview(
+    spec: ThemeSpec,
+    dark: Boolean,
+    selected: Boolean,
+    onSelect: () -> Unit,
+    locked: Boolean = false,
+    /** Tried on, not saved (owner, 2026-11-19): ringed and marked "Trying"; the saved theme keeps its check. */
+    trying: Boolean = false,
+) {
     val colors = spec.colors(dark)
     val ui = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(16.dp)
     val description = buildString {
         append(spec.displayName)
         append(" theme. ")
-        if (locked) append("Lucento Pro feature. ")
+        if (trying) append("Trying, not saved. ") else if (locked) append("Lucento Pro feature. ")
         append(spec.character)
     }
     Column(
@@ -153,7 +244,7 @@ private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSe
                 .clip(shape)
                 .background(colors.scheme.background)
                 .border(
-                    if (selected) BorderStroke(2.dp, ui.primary) else BorderStroke(1.dp, ui.outlineVariant),
+                    if (selected || trying) BorderStroke(2.dp, ui.primary) else BorderStroke(1.dp, ui.outlineVariant),
                     shape,
                 ),
         ) {
@@ -165,7 +256,15 @@ private fun ThemePreview(spec: ThemeSpec, dark: Boolean, selected: Boolean, onSe
                 alpha = if (dark && !spec.sceneryIsNight) 0.55f else 1f,
                 modifier = Modifier.matchParentSize(),
             )
-            if (locked) com.lucento.app.feature.pro.ProBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs))
+            if (trying) {
+                com.lucento.app.core.designsystem.component.StatusPill(
+                    text = "Trying",
+                    tone = com.lucento.app.core.designsystem.component.StatusTones.brand,
+                    modifier = Modifier.align(Alignment.TopEnd).padding(Spacing.xs),
+                )
+            } else if (locked) {
+                com.lucento.app.feature.pro.ProBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs))
+            }
             // A miniature of the theme: its hero panel with a figure bar, and its primary + accent as two dots.
             Column(Modifier.align(Alignment.BottomStart).padding(Spacing.xs)) {
                 Box(

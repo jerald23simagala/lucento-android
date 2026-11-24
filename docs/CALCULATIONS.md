@@ -31,6 +31,7 @@ Docs: docs/MULTICURRENCY.md. Code: `domain/fx/FxLedger.kt` (`FxLedger`, `FxTrans
 | Wallet balance (credit card, loan) | amount owed = opening + expenses + transfers out + adjustments out − income − transfers in − adjustments in | `WalletBalanceCalculator` |
 | Balance flag | cash / e-wallet / savings below zero, a bank account below zero (overdrawn?), or a card / loan below zero (owed to you). Shown as a warning with a reconcile note; never changes a figure | `Wallet.balanceFlag` |
 | Net worth | assets − liabilities, per currency | `NetWorthCalculator` |
+| Display precision (Settings › Money › **Show cents**, tester round 2026-11-17) | on by default: amounts show their currency’s minor units. Off: every amount people read is rounded **half-up on its absolute value** to whole units (−₱12.50 → −₱13; a figure that rounds to zero shows no sign), so rounded lines may not add up by one unit. Display only: storage, parsing, sync, exports and every calculation stay exact. Home, Budget, Insights, Wallets, lists, Ask Lucento’s answers, report PDFs and the widget follow it; amount inputs and editors, the single-transaction view, the composer’s rows and totals and the parser’s questions always show cents. Currencies without a minor unit are unchanged | `MoneyFormatter.wholeUnits`, `LocalWholeUnits`, `AmountsShown`, `AmountsExact` |
 | Income / Expenses | sum of INCOME / EXPENSE in the period. **Transfers and balance adjustments never count.** | `TransactionQueries.totalsByCurrency` |
 | Net flow | income − expenses for the month; compared with last month when last month has records | `CashflowCalculator.netFlow` |
 | Burn rate | actual: expenses this month ÷ days elapsed (incl. today), half-up. Projection (labelled): expenses × days in month ÷ days elapsed. Comparison: last month's expenses ÷ its length | `CashflowCalculator.burnRate` |
@@ -43,15 +44,18 @@ Docs: docs/MULTICURRENCY.md. Code: `domain/fx/FxLedger.kt` (`FxLedger`, `FxTrans
 | Burn-rate bar | consumed = spent (all expenses) ÷ budget (display fraction); elapsed = day of month ÷ days in month; level NORMAL / APPROACHING (APPROACHING or LOW) / EXHAUSTED; no percentage without a budget. Daily allowance = remaining ÷ days left incl. today, rounded down, only when positive | `BudgetPlanner.burn` |
 | Budget pace | used % (as burn-rate bar) vs elapsed % (day of month ÷ days in month, rounded down; 100 % for a past month). AHEAD when used > elapsed + 10, BEHIND when used < elapsed − 10, else ALIGNED; none without a budget. Home's pace card and its wording read it | `BudgetBurn.pace` |
 | Featured savings goal | the unreached goal with the highest percent (ties: earlier target date, then older); when all are reached, the newest goal | `GoalsSummary.overview().top` |
-| Manually valued assets | `OTHER_ASSET` wallets: balance = the valuation the user enters (no movements; repositories refuse transactions, transfers and schedules on them). Counted once as an asset in net worth | `WalletType.isValuedManually` |
+| Manually valued assets | `OTHER_ASSET` wallets ("Property & valuables" since the tester round, 2026-11-17): balance = the valuation the user enters (no movements; repositories refuse transactions, transfers and schedules on them). Counted once as an asset in net worth | `WalletType.isValuedManually` |
+| Investments (tester round, 2026-11-17) | `INVESTMENT` wallets: an asset money moves into and out of — contributions and withdrawals are transfers — whose value also changes on its own. **Update value** (the wallet page's adjust card) records the change as a balance adjustment, so a gain is never income and a loss never spending. Counted once as an asset in net worth; not spending money unless the person says so; counts towards the Free plan's money wallets like savings | `WalletType.INVESTMENT` |
 | Savings level | Σ min(max(saved, 0), target) ÷ Σ targets for goals in one currency; closest = unreached goal with the highest percent. A view only: never added to net worth or budgets | `GoalsSummary.overview` |
 | Net worth composition | assets and liabilities grouped by wallet type, per currency; totals equal `NetWorthCalculator` | `NetWorthComposer.compose` |
 | Income/expense trend | INCOME and EXPENSE per month (zero-filled); transfers never appear | `Insights.incomeExpenseTrend` |
 | Upcoming payments | next unpaid occurrence of each active schedule due within 30 days (overdue flagged), date order, max 4. Listing never records anything | `RecurringMath.upcomingPayments` |
-| Safe to spend — with category allocations | budget − spent (**every** expense this month in the currency — budgeted + unbudgeted, as "Spent (budget)" above; corrected 2026-11-03, the code always did this) − **bills due**: unpaid scheduled expenses due by month end (overdue included), **whatever their category** — budgeted, unbudgeted or none — because once paid each one is spending and lands in Spent (owner, 2026-11-03; until then only budgeted categories counted, which left Bills due at zero for most people). A debt payment counts only its interest (the rest is a transfer); credit card payments never count. Current month only; the Recurring module switched off means no bills are subtracted. Home's Monthly budget card shows it (only this basis) | `CashflowCalculator.safeToSpend` |
-| Home budget card formula | Read as a short statement, no operator symbols: Budget, Spent (Budgeted, Unbudgeted), then **Remaining** = budget − spent in green, or **Overspent** in red with its minus sign once below zero; this month only, **Bills due** in red as a deduction (−), and **Safe to spend** = remaining − bills due on the tinted last line, **always shown** this month: green above zero, and at or below zero it reads **0** in red with a caption ("Bills due take what’s left" / "You’re over budget this month") — the display never goes negative, the deficit is visible in Overspent and Bills due above it (owner, 2026-11-03, round 3; round 2 had hidden it); the Budget page's Safe to spend tile follows the same rule, round 5, and gives the same reason, round 6). A past month ends at Remaining / Overspent. Every figure is read from `BudgetPlan` / `SafeToSpend`, nothing is recomputed | `HomeStateBuilder.budgetFormula`, `BudgetFormula.overspent / showsSafeToSpend / nothingSafe / safeToSpendShown` |
-| Safe to spend — without a budget (estimate, labelled) | cash + bank + e-wallet balances − unpaid recurring expenses due by month end that are paid from those accounts. Savings, liabilities, and bills paid from them are excluded | same |
-| Safe per day | safe to spend ÷ days left incl. today, rounded down; shown only when positive. The Budget hero's "Safe per day" (decision D1, 2026-11-03), so it always equals Home's safe to spend ÷ days left; with nothing left it shows safe to spend itself; a past month shows its daily average instead | same; `budgetDailyFigure` |
+| Safe to spend (tester round, 2026-11-17) | with a budget, the **lower** of two figures: what the budget allows (next row) and what the spending money allows (**money on hand**, below; the app calls it "spending money"). `limitedByMoney` says when the money set it; both stay on the result (`budgetAllows`, `moneyOnHand`) for the "How Safe to spend works" sheet (opened from the Safe to spend panel, spoken "How Safe to spend is worked out", and from Budget remaining). The spending money takes part only once money has been **recorded** in a spending wallet (`MoneyOnHand.recorded`: a starting balance, income, a transfer in or a balance adjustment, or a card whose credit is counted) — a ledger of expenses alone has balances that only ever go down, so it follows the budget, and the sheet says why (QA review, 2026-11-17). Without a budget, the money on hand alone (an estimate, labelled). Safe per day = this figure ÷ days left | `CashflowCalculator.safeToSpend` |
+| Money on hand | **Sources**: every wallet in the currency that is spending money (`Wallet.isSpendingMoney`: the person's choice, else the type's default — cash, bank and e-wallet yes; savings, investments and cards no; never loans, receivables or valued assets) adds its balance (below zero when overdrawn); a card the person chose adds the credit they named **less what this month has put on it and not paid back** — its charges and money moved off it this month, less whatever its payments and refunds this month leave over once they have settled what was owed when the month opened (a statement already set aside, or last month's balance) — capped at what is still available (limit − owed, never below zero); below zero once more went on the card than was counted; nothing without a limit. When this month's statement is due by month end and paid from spending money (the account that paid the card last, or a schedule to it), the month opens the day after the statement instead: the charges before it are that payment's, set aside below, so they never count twice; a card paid from savings keeps them. Spending on the card uses the counted credit up; paying the card, a bill from it marked paid, or a refund never moves the figure the wrong way (`MoneyOnHandCalculator.creditUsed`; QA review 2026-11-18). **Deductions**, unpaid and due by month end (overdue included), from those wallets only: bills (one line), loan and card payments planned as schedules (principal **and** interest — the cash leaves either way — but never more than the debt still owes, and the line then says so), a card's payment due from its billing days when the account that usually pays it is spending money (skipped when a scheduled payment or transfer to that card is due this month), and scheduled transfers into a wallet that isn't spending money (a transfer between two spending wallets stays on hand). A schedule paid from a foreign wallet that has a rate is valued at that wallet's average rate, as its balance is (`FxTranslation.valueSchedules`; Home, the Budget tab and Ask Lucento alike). Expected income is never added. Allows = sources − deductions; may be negative | `MoneyOnHandCalculator.compute`, `MoneyOnHand` |
+| Safe to spend — with category allocations (what the budget allows) | (a bill paid from a foreign wallet with a rate counts in bills due at that wallet's rate, as its spending counts in Spent: `FxTranslation.valueSchedules`, tester round 2026-11-17) budget − spent (**every** expense this month in the currency — budgeted + unbudgeted, as "Spent (budget)" above; corrected 2026-11-03, the code always did this) − **bills due**: unpaid scheduled expenses due by month end (overdue included), **whatever their category** — budgeted, unbudgeted or none — because once paid each one is spending and lands in Spent (owner, 2026-11-03; until then only budgeted categories counted, which left Bills due at zero for most people). A debt payment counts only its interest (the rest is a transfer); credit card payments never count. Current month only; the Recurring module switched off means no bills are subtracted. Home's Monthly budget card shows it (only this basis) | `CashflowCalculator.safeToSpend` |
+| Home budget card and the Budget tab (owner's redesign, 2026-11-18) | Three parts, read from one `SafeToSpend` (`SpendingCapacity.of`); nothing is worked out again, so the parts always add up to their figures. **A** (Home): a half gauge of the share of the budget spent, the amount spent "spent of" the budget, "N% spent", and "Budgeted ₱X • Unbudgeted ₱Y" (Spent = budgeted + unbudgeted). **B**, a subtle grid of two cells side by side (stacked in a panel narrower than 280dp or from 130 % text), set out alike so their lines balance (owner, 2026-11-18): the name and the figure centred (one figure size for both), then under a rule two parts as a small ledger, the description on the left and the amount aligned on the right (one size for all four, smaller when the widest needs it; below 85 % each description goes over its amount). **Budget remaining** = budget − spent − upcoming expenses (`SafeToSpend.budgetAllows`): "Unspent ₱X" (budget − spent, with its minus sign once over) and "Upcoming −₱Y" (upcoming expenses: unpaid bills due by month end, as above). **Spendable wallets** = what the spending money allows (`MoneyOnHand.allows`): "In wallets ₱X" (the sources) and "Due −₱Y" (everything due from them: bills, loan and card payments, transfers out of spending money). It shows "—" with "No spending wallets" when none counts, or "Not counted yet" until money is recorded in one (QA, 2026-11-18). **C**, the verdict: **Safe to spend** = the lower of the two (`SafeToSpend.amount`), never shown below 0: green with a check above zero, red with an alert at 0, and one sentence on which limit set it, "Limited by your remaining budget.", "Limited by your available spending wallets." or "Both your budget and wallet availability are limiting your spending.", or at 0 what took it ("You’re over budget this month.", "This month’s budget is used up." when nothing was left before the bills either, "Bills due take what’s left of your budget.", "What’s due takes everything in your spending wallets.", "Your spending wallets show no money."). A second line appears only when the wallets don't take part, saying why only the budget is used. Budget remaining and the verdict open "How Safe to spend works" (sections "From your budget" and "From your spending wallets", each ending on the card's figure); Spendable wallets opens the choice of wallets (the explanation on a Partner's phone). **Bills come off both limits on purpose** (owner decision 2026-11-18, OT-40): each limit has to cover them on its own, and the verdict takes the lower, never the sum, so nothing is taken twice. Leaving them out of the wallet figure (the brief subtracted only transfers that aren't expenses) would promise money the bills are about to take: ₱20,000 in the spending wallets, ₱6,000 of bills and ₱4,000 to savings due leave ₱10,000, which the wallets show; without the bills they would read ₱16,000, and with ₱15,000 of budget left Safe to spend would say ₱15,000. The Budget tab shows B and C under its hero this month, from the same calculation and inputs (`budgetSafeToSpend`), with Safe per day under the verdict; its hero reads "Unspent of your ₱X budget" and ends on "Spent ₱X = ₱Y budgeted + ₱Z unbudgeted". A past month keeps the Budget hero with Spent and the daily average, and Home's card closes on Remaining / Overspent. The home-screen widget gives short forms of the verdict's sentences (`BudgetFormula.caption`: "Limited by your spending wallets", "What’s due takes your spending wallets", "Your spending wallets show no money", "You’re over budget this month", "This month’s budget is used up", "Bills due take what’s left") | `SpendingCapacity.of`, `SpendingCapacityPanel`, `budgetSafeToSpend`; widget: `BudgetFormula.caption` |
+| Safe to spend — without a budget (estimate, labelled) | the money on hand (above): spending wallets' balances and chosen card credit − bills, loan and card payments and scheduled transfers out due by month end. By default that is cash + bank + e-wallet − what is paid from them, as before the tester round | same |
+| Safe per day | safe to spend ÷ days left incl. today, rounded down; shown only when positive. On the Budget tab it is the line under Safe to spend ("₱X a day for N days"; owner's redesign 2026-11-18, the hero's Safe per day tile until then, decision D1, 2026-11-03), so it always equals Home's safe to spend ÷ days left; with nothing left it isn't shown (the verdict reads 0); a past month's hero shows its daily average instead. Both read the translated ledger, so spending in other currencies counts at its own value (`budgetDailyFigure` takes the `TranslatedLedger`; until 2026-11-16 the Budget tab passed the untranslated lists and left foreign-wallet spending out) | same; `budgetSafeToSpend`, `dailyFigure` |
 | Net worth trend (Wallets) | net worth at the end of each of the last 6 months (`BalanceHistory.lastMonths`; the last point is today's net worth); the change pill compares last month with this one only, and only when both measure the same wallets and last month was above zero (`comparableTrendPercent`) | `WalletsOverview.trend` |
 | Assets / liabilities split (Wallets) | assets ÷ (assets + owed) in whole percent, half-up; liabilities take the rest (always 100 together); no bar when either side is zero or below | `WalletsOverview.assetShare` |
 | Category spent | EXPENSE in the calendar month, budget currency, matching category. No rollover; refunds recorded as income are not netted | `BudgetCalculator` |
@@ -63,7 +67,7 @@ Docs: docs/MULTICURRENCY.md. Code: `domain/fx/FxLedger.kt` (`FxLedger`, `FxTrans
 | Recurring idempotency key | `recurring-<schedule id>-on-<due epoch day>` (v0.4). Keyed by due date, not index, so editing a schedule's timing (which restarts the index) never makes a new payment look like a duplicate of an old one. v0.3 keys (`recurring-<id>-<index>`) cannot collide | `RecurringSchedule.occurrenceKey` |
 | Goal milestone | halfway / reached, when saved × 100 crosses target × 50 / × 100 because of a contribution (never a withdrawal) | `GoalMilestones` |
 | Archived goal | only a reached goal (saved ≥ target) can be archived; it keeps its contributions but is left out of every goal total (Goals hero, Home's savings card, featured goal) and takes no money in or out until restored. It still counts for the Goal Setter milestone | `GoalRepository.archive` / `restore` |
-| Budget month kept | the previous calendar month: allocations that existed all month (created on/before its 1st) sum to a positive budget in the main currency, budgeted spending > 0 and ≤ that budget. Acknowledged once (persisted) | `BudgetMilestones` |
+| Budget month kept | the previous calendar month: it had a budget from its 1st (an amount in the main currency set on or before that day; a row without a creation date can't show it), its plan (every amount it has, as on the Budget tab, one set while planning it in the check-in's first days included) is positive, and that month's Spent (every expense, budgeted or not, as on the Budget tab; other currencies at their own value from the translated ledger) is > 0 and ≤ that budget. Acknowledged once (persisted). Until 2026-11-16 it read the untranslated transactions, so foreign-wallet spending could not stop it; until 2026-11-23 only allocations created on or before the 1st counted, so an amount set in the check-in's first days was left out of the budget while its spending counted | `BudgetMilestones` |
 
 ## Budget model (v0.5)
 - The overall budget is derived — the sum of category amounts — for one currency and one calendar month. There is no
@@ -125,8 +129,13 @@ What each action writes (`BudgetRepository`):
 | First amount (onboarding, guide, a category with no amount) | `setAllocation` = recurring from the current month |
 
 Months changed on their own after M keep their amounts when "onward" is used, and the confirmation says so. Past months
-can only be corrected for themselves. Spending is counted by each transaction's calendar date, so a month starts on the
-1st in the user's local calendar.
+can only be corrected for themselves. The Budget tab reaches up to 12 months ahead (`MONTHS_AHEAD`, owner 2026-11-23): a
+month that hasn't started shows its planned total (the same sum), how it compares with the month before, and each
+category's amount with where it comes from ("Only December · usually ₱2,000", or "Every month"). Nothing is spent in it
+yet, so it shows no pace, no Safe to spend and no per-day figure. Spending is counted by each transaction's calendar date, so a month starts on the
+1st in the user's local calendar. Budget periods other than calendar months (payday, weekly, biweekly) are planned for
+Pro after launch and not built; any implementation must follow the rules in `docs/handover/NEXT_TASKS.md` › "Custom
+budget periods" (new tables only, never new scope columns on `budgets`).
 
 ### Home: total balance and "Where it went" (redesign Part E)
 - **Total balance** is net worth in the dashboard currency (assets minus what is owed, `NetWorthComposition.netWorth`);
@@ -134,7 +143,7 @@ can only be corrected for themselves. Spending is counted by each transaction's 
 - **Where it went** (`spendingBreakdown`): the shown month's EXPENSE rows in the dashboard currency, grouped by
   category, largest first; the top four are listed and the rest summed as "Other". Transfers, adjustments, goal
   contributions and income never count. Shares are of that month's total spending in that currency.
-- **Vs last month** (wallet card, `BalanceHistory`): net wallet balance at the end of the previous month, rebuilt from
+- **Vs last month** (wallet card, `BalanceHistory`): net worth at the end of the previous month, rebuilt from
   opening balances and transactions dated up to then (wallets created later are left out), against the shown month.
   The percentage appears only when the previous month's balance is above zero and no wallet in that currency was added
   in between (`comparableTrendPercent`): a new wallet's opening balance is not growth. The spoken comparison states the
@@ -144,11 +153,108 @@ can only be corrected for themselves. Spending is counted by each transaction's 
 Worked out from stored records (`Achievements.earned`), never from counters: Money Keeper (an asset wallet), Budget
 Builder (a category with an amount this month, lifecycle rules), First Step (an expense or income recorded), Getting
 Consistent (expenses or income on 7 different days, any order — no streak), Financial Explorer (Insights opened; a
-local flag), Goal Setter (a savings goal, archived ones included). Each is acknowledged once, after the write that earned it; the first run with
-milestones records what is already earned without showing anything. Progress (`Achievements.progress`) comes from the
+local flag), Goal Setter (a savings goal, archived ones included), Secured (app lock turned on at some point; a local
+flag). The progress awards (owner, 2026-11-23) recognise results rather than setup:
+- **Steady Month**: a whole finished month, at most 24 back, that stayed within its budget by the budget moment's rules
+  (`BudgetMilestones.keptWithin`: a budget from the month's 1st, real spending, Spent at or under the total, in the main
+  currency on the translated ledger). So the recap's verdict and the award agree: a month whose budget began later says
+  so under its verdict ("Your budget began on November 10"), and until the first whole month
+  (`BudgetMilestones.firstWholeMonth`: the month after the first amount, or its own month when set on a 1st) has ended,
+  the cabinet names it under the award ("Your first whole month is December.").
+- **Goal Reached**: a goal (archived ones too) whose contributions, added up in date order, reached its target at some
+  point (`Achievements.everReached`); taking money back later doesn't undo it.
+- **Loan Cleared**: a loan (`WalletType.LOAN`, not a card: paying a card in full is routine) owing nothing, with at
+  least one payment (a transfer in) recorded on it.
+
+Each is acknowledged once, after the write that earned it; the first run with milestones records what is already earned
+without showing anything. Awards an update adds are recorded the same quiet way (`Achievements.newToThisPhone`, from the
+`achievements_known` record; a phone without one knew the first seven), so an update never brings ceremonies for the
+past. The cabinet shows what the records earn plus every award already presented (`shownEarned`): none is taken away. Progress (`Achievements.progress`) comes from the
 same facts, so it never disagrees with what is earned: `current` of `target`, capped at the target; only Getting
 Consistent has a target above 1 and shows a count ("3 of 7 days"). Awards earned together (`toAcknowledgeAll`: a
 restored backup, a first sync, one write that earns two) are acknowledged together and presented in one ceremony.
+
+### Monthly check-in (owner, 2026-11-23)
+A card on Home asks to plan a month: budgets differ from month to month (a birthday, an event, a yearly bill). Pure rules
+in `MonthCheckIn`:
+- **When**: from the last 3 days of a month (planning next month) to the 7th of the next (planning that month, and
+  offering last month's recap). Outside those days there is no card. It shows only while Lucento is open: it is never a
+  notification, and it never opens over the composer or a widget.
+- **Plan part**: Budgets on, the phone may change the budget (not a Partner's), and the budget is settled: it has an
+  amount this month and its first amount is at least 14 days old (`budgetSettled`; rows without a creation date count
+  as settled). It goes once the month is planned (the plan page's first saved change, or "Done planning") or dismissed.
+  Only the month the card asks about next, or an earlier one, is recorded as planned (`countsAsPlanned`): planning March
+  from November keeps March's amounts but leaves the December, January and February check-ins to come.
+- **Recap part**: the 1st to the 7th, when last month has income or expenses recorded; it goes once the recap is opened
+  (from the card, or from its square on Milestones) or dismissed.
+- **Markers**: `budget_month_planned` and `recap_month_seen` ("yyyy-MM", the latest month done or dismissed) follow the
+  account like the budget moment (docs/SYNC.md "Settings": ledger settings, never moving back to an earlier month). They
+  aren't in the JSON backup (docs/BACKUP.md), like the one-time notices.
+- **The plan page** (`MonthPlanScreen`) is the Budget tab's own plan for that month: every change starts as that month's
+  only (`BudgetChangeContext.planning`; "onward" is one tap away), and "Add something" sets a month-only amount on any
+  category or a new one. From the 1st, the card says how the recap month's budget ended: "₱18,200 of ₱20,000 spent",
+  or "₱1,200 over budget" (in a month's last days this month's figures are on the budget card below it).
+- **Hints** (`MonthPlanHints`, facts only, at most 4, at most 2 of each kind, in this order): scheduled expenses that don't
+  come every month (yearly, every few months; not weekly, monthly, linked or paused ones) with an occurrence in the
+  month; the same month last year where a category's spending was at least 10 % above its usual amount for this month
+  (an amount set for the month alone doesn't count), or it had none; last month's budgeted categories that went over (so
+  far, in a month's last days). A hint opens its category's amount with a suggestion, said where it comes from
+  (`hintSuggestion`): a bill due adds its amount to the category's usual monthly amount (`PlannedSource.usual`, never an
+  amount already raised for the month); last year's month proposes what it cost then; last month's overspending proposes
+  what was spent in that category (owner, 2026-11-23: what was spent, labelled, rather than the usual amount). Nothing
+  is saved until the person saves it, and each save says what it did and the month's new total ("Restaurants: $235.00
+  for December only. December’s budget: $2,775.00."). Once the month has its own amount for a
+  hint's category, the hint says so ("$235.00 set for December", with "Change") and opens at that amount, with no
+  suggestion: a hint never adds to what the person has already set.
+- **Add something** on a category that already has an amount asks for the extra ("Extra for December") and saves the
+  amount plus the extra for that month only ("Personal care becomes $260.00 for December ($60.00 planned + $200.00)").
+- **The page's order**: the intro and "each change is saved as you make it" first; the hints; Add something; the
+  budgeted categories with this month's own amounts first, folded after five as on the Budget tab (a usual amount has no
+  subtitle: only what differs gets one); categories without an amount; "Done planning".
+- **Reaching the plan page**: from the card; from the Budget tab on any month ahead ("Plan <month>"); and on the Budget
+  tab's running month from the 1st to the 7th, so the hints never depend on the card.
+- **Closing the card** ("Not this month") hides both parts and offers Undo, which puts the two months back as they were
+  (the one time they move back). The message names what stops: "We won’t ask about December again", or "November’s
+  recap hidden" (the recap stays a tap away on Milestones).
+
+### Milestones recap (owner, 2026-11-23)
+The Milestones page ("Progress" until the same day; from Home's Quick links) opens with the Awards card (the award
+cabinet has its own page), then the calendar year's budget on top; a month's story is its own page (`MonthRecapScreen`,
+opened from the month's square on every plan and from Home's check-in card). Both come from the same calculators as the rest of the app (`MonthRecaps`), in the main currency on the translated ledger (FX results left
+out, as on Home and Budget):
+- **Kept** = income − expenses (`CashflowCalculator.netFlow`), signed. Transfers, adjustments and goal contributions
+  never count.
+- **Budget**: the Budget tab's plan for the month (`BudgetPlanner.plan`): spent of the total, categories within, and the
+  ones that went over, by how much. Null when Budgets is off or the month had no budget. When the first amount in the
+  currency was set after the month's 1st (`RecapBudget.since`; unknown when an amount has no date), the line says when
+  the budget began, since such a month can't be a Steady Month.
+- **Where it went**: the 3 largest expense categories, with their share of the month's expenses.
+- **Biggest change**: the category whose spending moved most since the month before (by size, either way; ties to the
+  larger amount, then category id), only when the month before has records. A month still running is compared with the
+  same days of the month before ("at this point in October", up to its last day if shorter), never with all of it.
+- **Net worth**: at the month's end (today's for the current month), and its change since the month before ended
+  (`BalanceHistory`), when wallets existed then.
+- **Goals**: contributions less withdrawals in the month for goals in this currency (archived included), and goals whose
+  savings crossed the target in it. **Debts**: payments (transfers in) to cards and loans in the month. Both only when
+  their module is on.
+- **Days recorded**: days with income or expenses (any currency) of the month's days so far.
+- **The budget year** (`MonthRecaps.calendarYear`): January to December of one year (this one first; earlier years
+  with its switcher, back to the year of the first records), one square per month (owner: "square months 3 x 4 or
+  4 x 3", flat colours). A month with records and a budget compares the Budget tab's plan total with what was spent
+  (`MonthBudgetResult`, so far for the running month): the share used as the Budget tab rounds it
+  (`Insights.percentOf`, half-up) and its level (`BudgetPlanner.health`): on track below 80 %, getting close from 80 %
+  or with 10 % or less left, over from 100 % (said "fully used" when spent to the cent, as on the Budget tab). A month
+  recorded without a budget is grey, one with nothing recorded an outline with a dash (never 0 % used), one still to come
+  an empty outline, and the squares show only with Budgets on. Each square says its month and share in words and figures, so colour is never the only cue; only
+  months with records open their recap.
+- **The year's totals** (up to today's month): finished budgeted months within budget (the Budget tab's verdict:
+  spent ≤ total), what was kept, income and expenses, the months where more came in than went out, and net worth's
+  change from the end of the year before to the end of its last month so far. A year still running says "so far"; when
+  records start after January it is told from the first month with records ("kept since September"). The budget year
+  is Lucento Pro, gated like Insights' 12 months (`ProGates.insightsPeriodAllowed(12)`, docs/MONETIZATION.md §3.4),
+  previewed on Free as the person's own months in grey with every result hidden; each month's recap is free.
+- Last month kept within budget is celebrated once, on its recap page or the Budget tab, whichever comes first (the
+  same `acknowledged_budget_month`).
 
 ### Spendable now (Home, P2-1)
 The summed balances of cash, bank and e-wallet accounts in the dashboard currency (`NetWorthComposition.available`).
@@ -193,8 +299,9 @@ Optional per card (`debt_terms.credit_limit_minor`, `statement_day`, `due_day`; 
 - **Available credit** = credit limit − owed now; negative when over the limit (`CreditCardMath.available`).
 - **Payment reminder**: with billing days set, the due date becomes a reminder on Home (Upcoming card and the bell)
   showing the amount due, while there is something to pay. It is derived every time, never stored as a recurring
-  payment, and **never counted in Safe to spend**: the card's purchases were already counted as spending, and paying the
-  card is a transfer (Debt rules above). A tap (the bell, Upcoming, or Payment on the card) opens that transfer filled
+  payment, and **never counted as spending** (budget, Bills due): the card's purchases were already counted as spending,
+  and paying the card is a transfer (Debt rules above). Since the tester round (2026-11-17) Safe to spend's money on
+  hand sets it aside from the paying account when that account is spending money (above). A tap (the bell, Upcoming, or Payment on the card) opens that transfer filled
   in: the amount due, today, the note "<card> payment", to the card, from the **paying account** — the account that paid
   the card last (the source of the latest transfer into it), otherwise the cash, bank or e-wallet account in the card's
   currency with the most money (savings only when there is no everyday account), never another card or loan or another
@@ -236,7 +343,11 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
 ## Scheduled outlook (Scheduled page, Home's Upcoming and the bell)
 `ScheduleOutlook` (pure, unit-tested). Nothing here is recorded: only "Mark paid" writes a transaction.
 - **Flow** of a scheduled item: **income**; **expense** (a bill: spending); **transfer** — a debt payment (to a card or
-  loan), a card's payment due (`CreditCardMath`), or a collection from a receivable (owner round 10). Amounts are signed
+  loan), a card's payment due (`CreditCardMath`), a collection from a receivable (owner round 10), or a **scheduled
+  transfer** between two of the person's money accounts (tester round, 2026-11-17: type TRANSFER_OUT, `to_wallet_id`
+  the destination, no category; e.g. "₱1,000 into MP2 every month"). Marking one done records one transfer, keyed by the
+  occurrence; it never changes net flow, Bills due or the budget, and Safe to spend's money on hand sets it aside when
+  it leaves spending money. Amounts are signed
   from the user's side (`signedOccurrence`): income and collections +, expenses, debt payments and card dues −. Ink:
   income green, expenses red, transfers neutral (owner, 2026-11-03); the sign always carries the meaning too. The bell's
   "outgoing this week" adds only the − entries, so a collection never lowers it.
@@ -256,6 +367,31 @@ For a loan repaid monthly with a term (`LoanMath.progress`):
 - **Category required**: a scheduled bill or income must have a category (`RecurringRepository.SaveResult.CategoryRequired`,
   owner 2026-11-03); a debt payment gets the shared "Debt interest" category for its interest. Older schedules without
   one keep working and ask for one when edited.
+- **Changing several at once** (Scheduled › All schedules, Select mode; tester round, 2026-11-18; `ScheduleBulk`, pure,
+  unit-tested). Each change is one database transaction (`RecurringRepository.moveDay`, `setAmount`, `setPaused`,
+  `delete`): every plan selected takes it, or none does, and a plan that can't take it is skipped and counted.
+  - **Change day**: weekly plans take a weekday; every other plan, one-time ones included, a day of the month. The
+    occurrence still waiting moves to that day in the same month (weekly: the same week, as the phone's calendar starts
+    it, so a Sunday plan moved to Monday goes to the next day where weeks start on Sunday), so none is gained or lost.
+    One moved before today is then overdue, and an overdue one moved after today no longer is; the preview marks both.
+    The plan restarts there: its first date is the moved date and the count starts again, as when the editor changes
+    the timing. A plan already on that day isn't rewritten. A month shorter than the day uses its last day and later
+    months keep the day (Nov 30, then Dec 31): the plan is anchored on an earlier occurrence month that has the day,
+    with the occurrences before the waiting one counted as handled (a yearly February plan moved to the 29th or 30th
+    gets Feb 29 in leap years). A plan with an end date keeps the same number of dates left: the end date stays when
+    they fit, and otherwise becomes the new last date (the preview says "ends …"); with one date left that moves past
+    the end, the end date becomes the day before the date after it, so the plan isn't stored as one-time. Recorded
+    transactions never change. The waiting date's idempotency key is dated, and it stays in the month or week whose
+    date was still waiting, so it can't match a payment the plan recorded for an earlier month or week.
+  - **Change amount**: one amount for plans in one currency; plans in another, or ended, are skipped. A debt payment's
+    amount is its whole payment, as the editor plans it, so an older plan's interest part is cleared (the split is
+    entered at Mark paid).
+  - **Pause / Resume** skips ended plans and plans already that way. **Delete** keeps every transaction the plans
+    recorded.
+- **A second payment plan for one debt** (`ScheduleBulk.paymentPlansFor`): any unfinished plan paying that card or loan,
+  or collecting from that receivable, paused ones included (resuming one would remind twice). The scheduled-payment
+  editor warns while one exists, listing them: "Adjust existing" opens All schedules filtered to that debt with those
+  plans selected; "Add another" carries on. Nothing blocks a second plan.
 
 ## Ask Lucento reports
 *Since tester round 3 these built-in reports are listed on Insights, under Ask Lucento; an Ask answer can still show one. The wallet statement is described above.*
@@ -279,7 +415,7 @@ the same `Report` is drawn on screen and written to the PDF. See docs/ASK.md for
 - **AI answers' figures** (docs/ASK.md; `AskSnapshotBuilder`, all on the phone): *projected spending* this month =
   spending so far ÷ days so far × days in the month (`CashflowCalculator.burnRate`); *averages* = totals over the last
   full months on record (up to three, never the current month) ÷ their number, half-up; *share of income kept* = (income −
-  expenses) ÷ income over those months, whole percent; *money on hand* = cash, bank and e-wallet balances; goals use
+  expenses) ÷ income over those months, whole percent; *money on hand* = cash, bank and e-wallet balances (Ask's own figure, by type; Safe to spend's spending money above follows the person's choices); goals use
   `GoalCalculator` (still to save, needed a month by the target date, projected date at the pace so far); a debt's
   *monthly interest* = owed × yearly rate ÷ 12 (`DebtMath.monthlyInterest`). **Transaction patterns** (expenses, one
   currency; the payee is the note, lower-cased, punctuation and 4+-digit runs dropped): *top payees* over 90 days;
@@ -392,36 +528,70 @@ apostrophe).
 
 ## Receipt amounts
 **Which line is the total**, best first: "Grand total"; "Amount due" / "Total due" / "Balance due" / "Amount payable" /
-"Amount to pay"; "Total amount" / "Net total" / "Net amount" / "Total"; "Amount paid" / "Total paid" / "You paid". Never
-"Subtotal", tax lines, change, cash tendered or "Minimum amount due". When the only label is "Amount paid" and a change
-line is printed, the total is paid − change (`ReceiptParser.findTotal`).
-Amounts are read with the minor-unit digits of the currency printed on the receipt (unambiguous symbols/ISO codes
-only; `$` and `¥` are ambiguous and ignored), else the default wallet's currency, else 2. A group of three after a
-single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD). Plain
-integers count only on a line labelled as the total. Dates, times, percentages, phone/TIN/reference numbers and
-quantities are masked first. The result is always a suggestion on an editable review screen; missing values stay
-missing.
+"Amount to pay" / "Amount sent" / "Refund amount"; "Total amount" / "Net total" / "Net amount" / "Total" / "Fuel sale";
+"Amount paid" / "Total paid" / "You paid" / "You sent" / a line starting "Amount" — and their equivalents in 20 languages
+(SUMME, ZU ZAHLEN, TOTAL TTC, NET À PAYER, TOTAL A PAGAR, TOTALE, TE BETALEN, TOTAL BAYAR, 合計, 합계 …;
+`ReceiptParser.totalLabels`). Never "Subtotal", tax lines, "GST included in total", the total row of a tax table,
+change, cash tendered, savings, points, suggested tips, item counts or "Minimum amount due". When the only label is
+"Amount paid" and a change line is printed, the total is paid − change (`ReceiptParser.findTotal`). A label alone on its
+line takes the next line's amount only when that line holds nothing else. Abbreviations count ("Amt due", "Total amt",
+"TTL", "Amt paid"), and a "VAT inclusive" / "incl. VAT" / "TTC" / "inkl. MwSt" qualifier doesn't make a total line a tax
+line. With no total line, cash tendered − change is the total only when that amount is also printed on the receipt;
+otherwise nothing is pre-filled, and the amounts offered leave out cash tendered, change, tax lines, discounts, savings
+and points (cash − change, when printed, is offered first). With a tip, items + tax + tip are checked against the total.
+A total printed negative, or refund words on its line or a title line, makes the receipt a refund (income).
+**Currency** (`DocumentCurrency`): the one printed (or clearly dominating); a shared symbol (`$`, `¥`, `kr`, `Rs`) settled
+by the document's country (`DocumentLocale`), else by the person's only account in such a currency (the row says "check
+the currency"); nothing printed and a firm country → that country's currency; otherwise unknown and the account's.
+Amounts are read with that currency's minor-unit digits, else the default wallet's, else 2. A group of three after a
+single separator is thousands (`1,250`, `12.500`) except for 3-decimal currencies with a `.` (`12.500` KWD); Indian
+`1,23,456.00` is one number. Plain integers count on a line labelled as the total, or with a currency beside them
+(`¥348`, `348円`). Dates, times, percentages, phone/TIN/reference/account numbers, quantities with units, meter readings
+and written dates are masked first. **Date**: a labelled bill/invoice/transaction date wins; due dates, periods and
+expiry dates are passed over; day/month order by another date on the receipt, else the country, else marked unclear.
+The result is always a suggestion on an editable review screen; missing values stay missing. More: docs/SCAN.md.
 
 ## Statement scans
-`domain/capture/StatementParser.kt` (pure, unit-tested; `ScanOcrTest` runs it on real on-device OCR). A scan is a
-**statement** (one transaction per line) when two or more lines each carry a date and an amount; or dates head (or sit
-under) groups of amounts, with +/− marks or statement words, and no more receipt words than statement words; or three or
-more lines carry +/− marks and nothing reads like a receipt. Otherwise it is a **receipt** (one payment, above).
-- **Lines**: opening/closing balances, totals, minimum due, limits and due dates are never transactions; an opening
-  balance anchors the balance check. A wrapped second line joins the dated line above it.
-- **Amount**: with a balance column (a header naming "balance", or most amount lines carrying two amounts) the first
-  amount is the transaction and the last the running balance; otherwise the last amount. Bare integers count only with
-  a currency or a sign beside them.
+`domain/capture/StatementParser.kt` (pure, unit-tested; `ScanOcrTest` and `DocumentIntelligenceDeviceTest` run it on
+real on-device OCR). A scan is a **statement** (one transaction per line) when two or more lines each carry a date and an
+amount; or dates head (or sit under) groups of at least two different amounts, with +/− marks or statement words, and no
+more receipt words than statement words; or three or more lines carry +/− marks and nothing reads like a receipt. A bill
+or receipt with at most three dated lines, no running balance and its own total to pay stays a **receipt**, unless it
+reads like a card statement.
+- **Lines**: opening/closing balances, totals, minimum due, limits, rewards, balance labels, daily-balance and APR tables,
+  fee summaries, prose and declined lines are never transactions; an opening balance anchors the balance check. A
+  wrapped second line joins the dated line above it. On a statement whose lines carry their own dates, an undated line
+  counts only with a running balance, under a date line, or as a card's interest or fee. At most 200 lines.
+- **Amount**: with columns known from positions, the amount under Debit/Credit (or Amount) and the Balance column's;
+  with a balance column (a header naming "balance", or most amount lines carrying two amounts) the first amount is the
+  transaction and the last the running balance; otherwise the last amount. Bare integers count only with a currency or
+  a sign beside them (or on a dated line in a currency without decimals); digits glued to letters are codes.
 - **Direction** (money in or out of the account), strongest first: the running balance (previous − amount = this
-  balance → out; previous + amount → in), checked oldest-first and newest-first and the better fit kept; a mark beside
-  the amount (−, +, ( ), CR, DR; a trailing minus is a credit on a card statement and a debit on a bank's); the words
-  (deposit, salary, received, cash in, refund → in; withdrawal, purchase, payment to, transfer to, fee → out); on a card
-  statement, a charge unless it says payment, credit or refund. Anything else is marked for the user to check.
+  balance → out; previous + amount → in, reversed on a page that plainly is a card statement, whose balance is owed),
+  checked oldest-first and newest-first and the better fit kept; the column; a mark beside the amount (−, +, ( ), CR,
+  DR, (Cr), (Dr); a trailing minus or a minus is a credit on a card statement and a debit on a bank's); a bank's
+  convention (debits printed with a minus: unsigned amounts are money in); the section heading; the words
+  (`FinancialTerms`, by account type); on a card statement, a charge unless it says payment, credit or refund. Anything
+  else is marked for the user to check.
 - **Dates**: a day above 12 settles day/month order for the whole statement; otherwise the order that keeps its dates
-  within about two months, then the phone's order, and the dates are marked as unclear. A year not printed is the latest
-  one that keeps the date on or before the statement's newest full date (or today). Future dates and dates more than
-  five years back are dropped (the row's date is then marked).
-- **Rows** (`StatementCandidates`): all in the scanned account; out → expense, in → income, except money into a card or
-  loan (a payment: a transfer whose source the user picks) and a line naming another of the user's same-currency
-  accounts (a transfer between them). "Already saved?" for a statement row matches the same amount and type in the
-  account within three days, whatever the description.
+  within about two months, then the document's country's order, then the phone's order, and the dates are marked as
+  unclear. A year not printed is the latest one that keeps the date on or before the statement's newest full date (or
+  today). Future dates and dates more than five years back are dropped (the row's date is then marked). European
+  `dd.mm` lines and month names in ten languages are read.
+- **Rows** (`StatementCandidates`): all in the statement's account (the person's wallet at the bank named in the heading,
+  else the account in its currency, else the active wallet); out → expense, in → income, except a refund (income, on a
+  card too), money into a card or loan (a payment: a transfer whose source the user picks), money added to an e-wallet
+  (a transfer in), a line naming another of the user's same-currency accounts (a transfer between them), and ATM
+  withdrawals and cash advances (a transfer to the one cash wallet).
+
+## Statement check
+`StatementReconciler` compares a statement's rows with the saved ledger of its account; nothing saved is changed.
+**Saved already**: same account, amount and type within 3 days (closest date, then closest words; one saved transaction
+per line) → held back, offered with "Add anyway". **Possibly saved**: the same amount in the account within 7 days or as
+another type, or in another account within 3 days → added, with a note. **Printed twice**: same day, amount, direction
+and (nearly) the same words → added, marked. A line repeating a row already waiting in the batch is held back. **Not on
+the statement**: saved in the account within the statement's period (whole statements only: a period, or both balances,
+printed). **Balance**: the statement's closing balance against `WalletBalanceCalculator.balanceOn` on its last day plus
+every row offered (a card's balance is what's owed); skipped for a wallet created after that day. **Adds up**: opening ±
+posted lines = closing. Refunds and reversals are paired with a charge of the same amount sharing a word, and a refund
+with a saved purchase of the same amount within 120 days; fees and interest are totalled.

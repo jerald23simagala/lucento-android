@@ -1,9 +1,10 @@
 # Lucento launch film: feature discovery
 
-**App version:** 0.5.8 (versionName), `main` at `0679ccf`. **Date:** 2026-11-14.
+**App version:** 0.5.14 (version code 19), `main` at `c4458d9`. **Date:** 2026-11-19 (first written 2026-11-14 for
+0.5.8; section 7 lists what changed since).
 **Method:** every feature below was verified in the Kotlin source (`app/src/main/java/com/lucento/app/`), not taken
 from the README, roadmap or changelog, which are partly out of date (see section 6). The screens used in the film were
-captured from the same build on the API 35 emulator on 2026-11-14 with the demo month the website and Play listing
+captured from the same build on the API 35 emulator on 2026-11-19 with the demo month the website and Play listing
 already use (`DemoMonth.seed`, pesos ×10).
 
 Companion documents live in [`launch-film/`](launch-film/): the feature-to-visual map, the storyboard, the voiceover
@@ -18,7 +19,8 @@ holds (cash, bank, e-wallet, savings, cards, loans, things they own, money owed 
 debts, reports and an assistant all live in one ledger. That ledger works fully offline and can be shared with one
 partner. It is not an expense tracker with extras. The strongest evidence is how the pieces connect:
 
-- Safe to spend sets upcoming bills aside before it tells you what's left.
+- Safe to spend sets upcoming bills aside, then takes the lower of what the budget allows and what the spending
+  wallets can cover.
 - A loan payment splits into principal and interest.
 - A credit card knows its statement cycle.
 - Ask Lucento answers from the same ledger, and every figure in an answer is calculated on the phone.
@@ -54,10 +56,11 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 
 | Feature | Where | Status | Plan | User benefit | Marketing potential | Film |
 |---|---|---|---|---|---|---|
-| Net wallet balance card, drawn as a bank card with the theme's landscape: Wallets vs Debt & Loans, change vs last month | `feature/home/HomeScreen.kt` | Full | Free | Your position at a glance | High: the signature visual | Hero (S02) |
+| Net wallet balance card, drawn as a bank card with the theme's landscape: Assets vs Debts & loans, change vs last month | `feature/home/HomeScreen.kt` | Full | Free | Your position at a glance | High: the signature visual | Hero (S02) |
 | Shortcut row: Goals, Insights, Awards, Debts, Scheduled; switched-off modules offer "Turn on…" | `feature/home/HomeScreen.kt` | Full | Free | Everything one tap away | Medium | Hero (S02) |
-| Monthly budget card: verdict chip (Ahead of pace / On track…), % spent ring, "To watch" categories | `feature/home/HomeScreen.kt` | Full | Free | Know if you're on pace before it's too late | High | Hero (S02) |
-| **Safe to spend**: budget − spent − bills still due this month; never shown below zero | `feature/home/HomeState.kt` | Full | Free | A number you can act on today | High (also a widget) | Support (S02) |
+| Monthly budget card (redesigned in 0.5.14): verdict chip (Ahead of pace / On track…), "₱X spent of ₱Y" gauge, "Budgeted • Unbudgeted", then two limits side by side, **Budget remaining** (budget − spent − upcoming bills) and **Spendable wallets** (what the spending wallets hold less what's due from them), each with its parts, then Safe to spend and "To watch" categories. The Budget tab shows the same figures | `feature/home/SpendingCapacity.kt`, `HomeScreen.kt` | Full | Free | Know if you're on pace, and whether the money is really there | High | Hero (S02) |
+| **Safe to spend**: the lower of Budget remaining and Spendable wallets, so bills are counted once; never shown below zero | `feature/home/SpendingCapacity.kt` | Full | Free | A number you can act on today | High (also a widget) | Support (S02) |
+| Show cents (Settings › Money, on by default): off rounds the amounts people read; entry and storage keep cents | `data/preferences/UserPreferencesRepository.kt` | Full | Free | Calmer numbers | Low | No |
 | Upcoming (scheduled items and card payments) and Recent transactions | `feature/home/HomeScreen.kt` | Full | Free | What's next and what just happened | Medium | Montage |
 | Payments bell: overdue and next 7 days, "To pay by …" total, one-tap card payment | `feature/home/HomeScreen.kt` (`PaymentsBell`) | Full | Free | Bills in one place, in the app | Medium (in-app only, see 5) | Montage |
 | Month selector, up to 24 months back | `feature/home/HomeViewModel.kt` | Full | Free | Look back at any month | Low | No |
@@ -70,7 +73,8 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 
 | Feature | Where | Status | Plan | User benefit | Marketing potential | Film |
 |---|---|---|---|---|---|---|
-| Wallet types: Cash, Bank account, E-wallet, Savings, Credit card, Loan | `domain/Wallet.kt`, `feature/wallets/` | Full | Free: 3 money wallets + 2 cards/loans; Pro: no limit | Every account in one place | High | Hero (S03) |
+| Wallet types: Cash, Bank account, E-wallet, Savings, Investment, Credit card, Loan | `domain/Wallet.kt`, `feature/wallets/` | Full | Free: 3 money wallets + 2 cards/loans; Pro: no limit | Every account in one place | High | Hero (S03) |
+| Investment wallet (0.5.13): stocks, funds, Pag-IBIG MP2, time deposits, crypto; money moves in and out and its value is updated; never counted as spending money | `domain/Wallet.kt` (`INVESTMENT`) | Full | Free (counts as a money wallet) | Savings that grow sit in the net worth, out of the budget | Medium | Later |
 | Receivable (money owed to you) and Other asset (home, car, investments; value typed in by you) | `domain/Wallet.kt` | Full | Pro | A true net worth, not just bank balances | High | Support (S03) |
 | Net worth hero: "+3% vs Oct", "You owe X% of what you have", 6-month trend, assets/liabilities split bar | `feature/wallets/WalletsScreen.kt` | Full | Free | Understand your position, not just your balance | High | Hero (S03) |
 | Card view and row view (remembered) | `feature/wallets/WalletsScreen.kt` | Full | Free | Personal, tactile overview | High (card wall) | Hero (S03) |
@@ -97,13 +101,13 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 
 | Feature | Where | Status | Plan | User benefit | Marketing potential | Film |
 |---|---|---|---|---|---|---|
-| **Composer, "Add transactions"**: write naturally; every transaction in the message becomes an editable row. Type, category, date and wallet are inferred; competing amounts appear as one-tap chips; one tap saves the batch atomically (one idempotency key per row) | `feature/capture/TransactionComposerScreen.kt`, `domain/capture/TransactionInterpreter.kt` | Full | Free | Log a whole day in one sentence | Very high | Hero (S04) |
+| **Composer, "Add transactions"**: write naturally; every transaction in the message becomes an editable row. Type, category, date and wallet are inferred; competing amounts appear as one-tap chips; one tap saves the batch atomically (one idempotency key per row). "Into" chips put the default wallet first (a credit card can be the default); with no active wallet it asks "Select wallet to use" | `feature/capture/TransactionComposerScreen.kt`, `ComposerViewModel.kt`, `domain/capture/TransactionInterpreter.kt` | Full | Free | Log a whole day in one sentence | Very high | Hero (S04) |
 | On-device reading: amounts ("1.5k", "₱250", number words), dates ("yesterday", "last friday", "October 12"), wallets ("using my cash wallet"), transfers, fees. English, rules, **not AI** | `domain/capture/QuickEntryParser.kt`, `BatchEntryParser.kt`, `NumberWords.kt` | Full | Free | Works offline, no account | High (truthfully framed) | Hero (S04) |
 | **Many at once**: up to 30 rows per message; rows from several messages and scans stack into one save | `domain/capture/BatchEntryParser.kt` (`MAX_ROWS`) | Full (limit not shown in UI) | Free | No repeated forms | Very high | Hero (S04) |
 | **Voice entry**: "Listening…", live words, listens through pauses (each pause becomes a row), stops after 3.5 s of quiet or on Done; offline by default, "Try online voice" opt-in; no recording kept | `feature/capture/VoiceCapture.kt`, `VoiceSession.kt`, `ListeningSheet.kt` | Full | Free | Hands busy? Just say it | Very high | Hero (S04) |
 | Receipt scan: one expense for the amount due, shop name, date, currency; ML Kit bundled on the phone | `feature/capture/ReceiptOcr.kt`, `domain/capture/ReceiptParser.kt` | Full | Free | Snap the receipt, done | High | Later (own video) |
 | **Statement / e-wallet history scan**: one row per line (up to 60), money in/out checked against the running balance, likely duplicates flagged | `domain/capture/StatementParser.kt` | Full | Free | A month of entries from one screenshot | Very high (overlooked) | Later (own video) |
-| Smarter reading (Gemini, through Lucento's proxy): better at messy messages; every reply labelled "Read by Gemini" or "Read on this phone" | `data/ai/HybridTransactionInterpreter.kt` | Full | Pro, opt-in, signed in | Handles the messiest messages | Medium | No (keeps the AI story clean) |
+| Smarter reading (Gemini, through Lucento's proxy): better at messy messages; every reply labelled "Read by Gemini" or "Read on this phone". Since 0.5.10 the switch lives only in Settings (with a "slower" warning), not in the composer | `data/ai/HybridTransactionInterpreter.kt`, `domain/entitlement/ProGates.kt` (`smartReadingAllowed`) | Full | Pro, opt-in, signed in | Handles the messiest messages | Medium | No (keeps the AI story clean) |
 | Philippine vocabulary: Jollibee, GrabFood, Meralco, PLDT, jeepney, MRT/LRT, "sweldo", "palengke", "merienda", "load" | `domain/capture/QuickEntryParser.kt` | Full | Free | It speaks your language | High (PH launch) | Montage (S04: "Grab", "load") |
 | Home-screen widgets: **Quick add** (scan · mic · field) and **Safe to spend**; follow Hide amounts and App lock | `feature/widget/` | Full | Free | Add or check without opening the app | High (overlooked) | Later |
 | Transactions page: search (notes, categories, wallets, amounts), filters, day groups, Income / Expenses / Net inflow cards, view, edit, delete | `feature/transactions/` | Full (no undo) | Free | Find anything | Medium | Montage (S07) |
@@ -119,7 +123,8 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 | Budget conveniences: "Only Nov" or "Nov onward", "Use the usual ₱X", Safe per day, a one-time "You stayed within October's budget" | `feature/budget/BudgetChange.kt`, `BudgetDaily.kt` | Full | Free | Less fiddling every month | Medium | Later |
 | Category management: add, from presets, rename, reorder, deactivate (archived, history kept), restore | `feature/budget/CategoryScreens.kt` | Full (no custom icons/colours) | Free | Make it yours without losing history | Medium | Montage |
 | Savings goals: 8 suggestions, automatic icons, your own photo, add money / take out, "₱X a month", "At your pace: <date>", milestones | `feature/plan/GoalsScreen.kt`, `domain/Goal.kt` | Full | Free 2 active; Pro 20 | Watch the trip come closer | High (emotional) | Support (S05) |
-| Scheduled: bills, income, debt payments, collections; once/weekly/monthly/yearly; Mark paid (editable amount), Skip, Pause; never posted automatically | `feature/plan/RecurringScreen.kt`, `domain/Recurring.kt` | Full | Free | See every bill coming | High | Support (S05) |
+| Scheduled: bills, income, debt payments, collections and transfers between your own accounts; once/weekly/monthly/yearly; Mark paid (editable amount), Skip, Pause; never posted automatically | `feature/plan/RecurringScreen.kt`, `domain/Recurring.kt` | Full | Free | See every bill coming | High | Support (S05) |
+| Scheduled bulk edit (0.5.14): long-press for Select mode, then Change day, Change amount, Pause or Delete for many at once; a duplicate warning ("Adjust existing") when a new schedule repeats one | `feature/plan/ScheduleBulkUi.kt`, `RecurringEditorScreen.kt` | Full | Free | Tidy every bill in one go | Medium | Later |
 | Reminders | `feature/home` (bell, Upcoming) | Partial: in-app only. **No notifications** (no POST_NOTIFICATIONS; Settings says "Reminder notifications aren't available yet.") | — | — | Don't imply alerts | No push imagery |
 | Budget suggestions from spending; a short first run with categories applied automatically | — | Not built (reverted 2026-10-29) | — | — | — | No |
 
@@ -127,11 +132,11 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 
 | Feature | Where | Status | Plan | User benefit | Marketing potential | Film |
 |---|---|---|---|---|---|---|
-| Insights, "Income and expenses": money in/out, "You kept ₱X · N% of what came in", monthly bars | `feature/insights/InsightsScreen.kt` | Full | Free 3 months; Pro 6 and 12 months | See your money flow | High | Support (S06) |
+| Insights, "Income and expenses": money in/out, "You kept ₱X · N% of what came in", monthly bars. Insights now opens with an Ask Lucento card and the Reports list above the charts | `feature/insights/InsightsScreen.kt` | Full | Free 3 months, plus a preview of 6 and 12 months (your own shape, figures hidden); Pro 6 and 12 months | See your money flow | High | Support (S06) |
 | "Where your money went" donut and "Net worth over time" line | `feature/insights/InsightsScreen.kt` | Full | Free | Understand the shape of your spending | High | Support (S06) |
 | Reports: Wallet statement, Cash flow, Net worth, Budget vs actual, Debts & loans, Top spending categories; one month at a time (24 back); "How this was calculated" | `feature/reports/ReportViews.kt`, `domain/ask/Reports.kt` | Full | Free on screen; PDF save/share Pro | Real statements without a spreadsheet | High | Support (S06) |
-| **Ask Lucento, on the phone**: "Ask me about your money"; five report questions, purchase check ("Can I afford…?" → "Yes, it fits" / "You can, but from savings" / "I'd wait"), off-topic questions refused offline | `feature/ask/AskLucentoScreen.kt`, `domain/ask/Ask.kt` | Full | Free, unlimited, offline | Answers in plain words, in seconds | Very high | Hero (S06) |
-| Ask Lucento AI answers (Gemini through Lucento's server): advice chips, consent sheet, "Answered by Gemini · bold figures worked out on this phone" | `data/ai/AskLucentoClient.kt` | Full | Opt-in, signed in; Free 10 a month, Pro 50 a day | Advice that can't make up numbers | High, needs careful copy | Later (own video) |
+| **Ask Lucento, on the phone**: "Ask me about your money"; five report questions, purchase check ("Can I afford…?" → "Yes, it fits" / "You can, but from savings" / "I'd wait"), off-topic questions refused offline; questions can be typed or spoken (the composer's mic, since 0.5.10) | `feature/ask/AskLucentoScreen.kt`, `domain/ask/Ask.kt`, `feature/capture/VoiceInput.kt` | Full | Free, unlimited, offline | Answers in plain words, in seconds | Very high | Hero (S06) |
+| Ask Lucento AI answers (Gemini through Lucento's server): advice chips, "Answered by Gemini · bold figures worked out on this phone". Since 0.5.12 they are on by default once signed in, and nothing is sent until the person confirms what is sent (once); they can be turned off | `data/ai/AskLucentoClient.kt`, `data/preferences/UserPreferencesRepository.kt` (`askAiConfirmed`) | Full | Signed in; Free 10 a month, Pro 50 a day | Advice that can't make up numbers | High, needs careful copy | Later (own video) |
 
 ### 3.7 Togetherness
 
@@ -143,7 +148,7 @@ Paths are relative to `app/src/main/java/com/lucento/app/`.
 
 | Feature | Where | Status | Plan | User benefit | Marketing potential | Film |
 |---|---|---|---|---|---|---|
-| Five themes, each with its own landscape: Sunrise, Midnight (free); Grove, Mono, Aurora (Pro). System / Light / Dark | `core/designsystem/theme/Themes.kt`, `feature/profile/ThemePicker.kt` | Full | Free 2, Pro 5 | It feels like yours | High | Hero (S08) |
+| Five themes, each with its own landscape: Sunrise, Midnight (free); Grove, Mono, Aurora (Pro). System / Light / Dark. On Free a Pro theme can be tried on while the picker is open (nothing is saved) | `core/designsystem/theme/Themes.kt`, `feature/profile/ThemePicker.kt` | Full | Free 2, Pro 5 | It feels like yours | High | Hero (S08) |
 | Profile name and photo (or the Google photo), kept on the phone | `feature/profile/` | Full | Free | Personal | Low | No |
 | Enabled features: 8 modules on or off; "Turning one off never deletes anything" | `feature/settings/` | Full | Free | Only what you need | Medium | Later |
 | App lock (fingerprint, face or screen lock; after 1 minute away), Hide in recent apps (also blocks screenshots) | `feature/lock/` | Full | Free | Privacy | Medium | Montage (S08) |
@@ -175,6 +180,10 @@ The film shows Pro features (multicurrency, Shared, three themes, 6/12-month Ins
 features require Lucento Pro." That matches the Play listing, which labels Multicurrency and Shared "Pro".
 Prices are not in the app (Google Play supplies them) and are not confirmed live, so the film shows none.
 
+The limits are unchanged in 0.5.14 (`domain/entitlement/PlanCatalog.kt`). What changed is how Free meets them: at a
+limit, one dialog states the plan fact and offers "See Lucento Plan"; repeat taps in the same session get a short
+snackbar; Insights previews 6 and 12 months with the figures hidden; Pro themes can be tried on.
+
 | | Free | Pro |
 |---|---|---|
 | Money wallets / cards and loans | 3 / 2 | No limit |
@@ -184,7 +193,7 @@ Prices are not in the app (Google Play supplies them) and are not confirmed live
 | PDF statements | — | ✓ |
 | Themes | 2 | All 5 |
 | Cloud sync and restore | — | ✓ |
-| AI adviser questions | 10 a month | 50 a day |
+| AI adviser questions | 5 a month | 45 a month |
 | Smarter reading | — | ✓ |
 | Lucento Shared | — | 1 Partner |
 
@@ -207,6 +216,9 @@ These are commercially valuable and the brief didn't list them:
 12. **409 bank and e-wallet faces bundled offline** in 48 countries (display only; no bank connection).
 13. **Free backup and restore**, even from the welcome screen; Pro limits never delete anything when Pro ends.
 14. **Budget changes for one month or onward**, and "Use the usual" amounts.
+15. **Two limits on one card (0.5.14):** the budget card weighs what the budget allows against what the spending
+    wallets can really cover, and Safe to spend takes the lower.
+16. **Scheduled bulk edit (0.5.14):** change the day or amount of many bills at once, and a warning before a duplicate.
 
 ## 5. Claims to keep out of all marketing
 
@@ -214,6 +226,7 @@ These are commercially valuable and the brief didn't list them:
 |---|---|---|
 | "AI reads your messages / receipts" (default experience) | The composer uses on-device rules; ML Kit only extracts text. AI is Smarter reading (Pro, opt-in) | "Type it like a message." "Read on your phone." |
 | "Free AI entry" | Smarter reading is Pro | — |
+| "AI is opt-in" / "AI is off unless you turn it on" | Since 0.5.12 Ask Lucento's AI answers are on by default once signed in (nothing is sent until the person confirms what is sent, once). Smarter reading is the opt-in one | "Ask Lucento answers on your phone; AI answers are there when you sign in." Scope and link the Privacy Policy |
 | "Automatic categorisation / auto-logging / bills paid automatically" | Every row is reviewed and saved by you; schedules never post themselves | "Lucento fills in the details; you confirm." |
 | Bank sync, bank connections, SMS/CSV import | None exist; bank faces are display only | "No bank login." |
 | Push notifications, bill alerts, reminder pop-ups | No notification permission or code; reminders are the in-app bell and Upcoming card | "See every bill coming." Owner decision (2026-11-14): "Never miss a bill" may describe Scheduled transactions (also the app's own onboarding wording), without notification imagery |
@@ -230,20 +243,50 @@ These are commercially valuable and the brief didn't list them:
 
 ## 6. Issues found during discovery (for the owner, outside the film)
 
+Status re-checked on 0.5.14 (2026-11-19) after each item.
+
 1. **Free users can spend their Ask Lucento allowance on Smarter reading.** In the local copy of the website repo the
    interpret proxy counts a request before rejecting non-Pro users (`src/pages/api/interpret.ts` around lines 154–166
    with `consume_ai_request`). A free user who switches Smarter reading on may use up their 10 monthly questions and
-   get no Gemini reading. Verify against what's deployed.
-2. Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1409`),
-   which is no longer true with multicurrency.
-3. The Ask Lucento hero types "What's my top 5 spending categories?"; the chip reads "What are my top 5…".
-4. The AI counter says "N left today" even though Free's allowance is per month.
-5. Onboarding's "Never miss a bill" leans on in-app reminders only (no notifications). The owner accepts this wording
-   (2026-11-14) and the film uses it for Scheduled transactions.
-6. Onboarding's "Sync with an account (Recommended)" and the summary's "Synced with your account" don't say sync is
-   Pro; on Free, sync stays off after setup.
-7. The plan page says debts are free "with no limits", but Free tracks 2 cards or loans.
-8. The editor allows "No category" while the composer requires one.
-9. Rows beyond 30 in one message are dropped without a message.
+   get no Gemini reading. **0.5.14: no longer reachable from the app.** Smarter reading is Pro-gated on the phone
+   (`ProGates.smartReadingAllowed` in `ComposerViewModel` and Settings), so a Free phone never calls the proxy. The
+   server's counting order wasn't re-checked.
+2. Home's info tooltip still says "Nothing is converted between currencies." (`feature/home/HomeScreen.kt:1428`),
+   which is no longer true with multicurrency. **Fixed in #116** (merged 2026-11-19; not in a release build yet).
+3. The Ask Lucento hero types "What's my top 5 spending categories?" (`feature/ask/AskLucentoHero.kt:51`, now also on
+   Insights); the chip reads "What are my top 5…". **Fixed in #116.**
+4. The AI counter said "N left today" even though Free's allowance is per month. **Fixed:** "N left this month" on
+   Free, "N left today" on Pro (`feature/ask/AskAiCopy.kt:21`).
+5. Onboarding's "Never miss a bill" (`domain/Features.kt:86`) leans on in-app reminders only (no notifications). The
+   owner accepts this wording (2026-11-14) and the film uses it for Scheduled transactions. **Unchanged.**
+6. The onboarding summary's "Synced with your account" (`feature/onboarding/OnboardingScreen.kt:1571`) doesn't say
+   sync is Pro; on Free, sync stays off after setup. **Fixed in #116.**
+7. The plan page says debts are "free on every plan, with no limits" (`feature/pro/ProScreen.kt:187`), but Free tracks
+   2 cards or loans (`PlanCatalog.FREE_DEBT_ACCOUNTS`). **Fixed in #116.**
+8. The editor allows "No category" while the composer requires one. **Confirmed on 0.5.14; fixed in #116.**
+9. Rows beyond 30 in one message are dropped without a message (`BatchEntryParser.kt:37`). **Fixed in #116.**
 10. README and CHANGELOG are stale: the "Short first run" was reverted on 2026-10-29; Lucento Shared is merged; Ask's AI
     answers include the last 60 days of transactions (consent v2); Insights no longer shows net worth by account type.
+    **Fixed in #116.**
+
+## 7. What changed for the film between 0.5.8 and 0.5.14
+
+The film was refreshed with 0.5.14 captures on 2026-11-19. Its timing is unchanged and every claim in `copy.ts` still
+holds. The owner's notes the same day changed three things: captions are centred in the vertical version; "Every asset."
+became "Every asset and debt." (it left out what is owed); and "And there's more" shows all its features at once, now
+twelve (Installments tracking, Statement scanning, Receipt scanning, Home-screen widgets and Backups added; each checked
+in the code: installments are counted on loans and money owed to you, the Quick add widget opens the composer, backups
+are free JSON files). On screen:
+
+- **Home (S01, S02, S08):** the redesigned budget card (gauge, the two limits, Safe to spend, To watch) and the hero's
+  "Assets" and "Debts & loans" labels. S02 now scrolls until the whole budget card shows.
+- **Composer (S04, S07):** the note under the examples now reads "Your messages are read on this phone, so their rows
+  appear straight away." The Listening sheet sits 48 px lower and, in the default offline mode, says "Your words are
+  turned into text on this phone." The reply cards are unchanged.
+- **Insights (S01, S06):** the charts sit below the new Ask card and Reports list, so the film uses deeper scroll
+  positions. The 6 months tab is shown (Pro), covered by the end note.
+- **Budget and Scheduled (S05):** the Budget tab's matching hero, "Unspent of your ₱25,900.00 budget"; Scheduled's
+  rows now wrap their details instead of cutting them off.
+- **Ask Lucento (S06):** the input bar has the mic ("Ask about your money…").
+- Wallets, Goals, the onboarding presets, Transactions and the themes are pixel-identical to 0.5.8, and so is the Visa
+  card's hero, the only part of that screen the film shows.

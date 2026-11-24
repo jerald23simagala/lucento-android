@@ -1,0 +1,46 @@
+{
+  "id": "cn-receipt-familymart-01",
+  "country": "CN",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "CJK",
+  "noise": false,
+  "today": "2026-10-23",
+  "pages": [
+    [
+      "全家 FamilyMart",
+      "上海市黄浦区南京东路299号",
+      "门店号 0217  收银机 02  收银员 1088",
+      "2026-10-23 08:41:05",
+      "商品名称  数量  单价  金额",
+      "饭团 金枪鱼  1  6.50  6.50",
+      "关东煮 萝卜  2  2.50  5.00",
+      "农夫山泉 550ml  1  2.00  2.00",
+      "三明治 火腿芝士  1  12.80  12.80",
+      "雀巢咖啡 268ml  1  6.50  6.50",
+      "合计  ¥32.80",
+      "支付宝  32.80",
+      "找零  0.00",
+      "会员积分 +32",
+      "谢谢惠顾 欢迎再次光临"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "FamilyMart",
+        "total": "32.80",
+        "currency": "CNY",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-23",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "convenience",
+        "paymentInstrument": "Alipay",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Chinese convenience-store receipt: ¥ is shared by CNY and JPY; the Shanghai address and simplified Chinese make it CNY. Paid by Alipay (支付宝)."
+}

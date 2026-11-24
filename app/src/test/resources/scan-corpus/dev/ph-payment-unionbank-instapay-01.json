@@ -1,0 +1,48 @@
+{
+  "id": "ph-payment-unionbank-instapay-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "8:23",
+      "UnionBank",
+      "Transfer successful!",
+      "PHP 8,000.00",
+      "Sent to",
+      "CARLO M. REYES",
+      "BDO Unibank, Inc.",
+      "**** **** 5521",
+      "From",
+      "Regular Savings  ****7734",
+      "Transfer type  InstaPay",
+      "Service fee  PHP 0.00",
+      "Total amount  PHP 8,000.00",
+      "Purpose  Rent share",
+      "Reference no.  UB2026110387654",
+      "Date and time  Nov 3, 2026 08:22 AM",
+      "Save as favorite  Share receipt"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "8000.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "UnionBank",
+        "instrumentLast4": "7734"
+      }
+    ]
+  },
+  "notes": "InstaPay transfer to a person at another bank; paid from UnionBank savings ending 7734 (the recipient account ends 5521)."
+}

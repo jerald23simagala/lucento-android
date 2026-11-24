@@ -79,7 +79,7 @@ class SafeToSpendWidget : GlanceAppWidget() {
             schedules = container.recurring.observeSchedules().first(),
             features = prefs.features,
         )
-        return SafeToSpendWidgetModel.from(home, onboarded = true, appLock = false, hideAmounts = prefs.hideAmounts)
+        return SafeToSpendWidgetModel.from(home, onboarded = true, appLock = false, hideAmounts = prefs.hideAmounts, showCents = prefs.showCents)
     }
 }
 

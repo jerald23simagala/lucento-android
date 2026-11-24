@@ -1,7 +1,11 @@
 package com.lucento.app.domain.capture
 
+import com.lucento.app.domain.CategoryKind
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.Wallet
+import com.lucento.app.domain.capture.merchant.CategoryIntents
+import com.lucento.app.domain.capture.merchant.MerchantMemory
+import com.lucento.app.domain.capture.merchant.MerchantRecognizer
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.util.Locale
@@ -28,21 +32,33 @@ object BatchEntryParser {
     const val MAX_ROWS = 30
     const val MAX_INPUT = 2_000
 
-    fun parse(text: String, context: InterpretationContext): List<TransactionCandidate> {
+    /**
+     * One message read: [items] (at most [MAX_ROWS]), how many more transactions it held past that limit ([leftOut]),
+     * and whether text past [MAX_INPUT] characters went unread ([inputCut]). The composer says so instead of dropping
+     * them silently ([CaptureLimits.note]).
+     */
+    data class Message(val items: List<TransactionCandidate>, val leftOut: Int = 0, val inputCut: Boolean = false)
+
+    fun parse(text: String, context: InterpretationContext): List<TransactionCandidate> = parseMessage(text, context).items
+
+    fun parseMessage(text: String, context: InterpretationContext): Message {
+        val inputCut = text.length > MAX_INPUT
         val input = QuickEntryParser.asciiDigits(NumberWords.normalize(text.take(MAX_INPUT)), context.decimalSeparator).trim()
-        if (input.isBlank()) return emptyList()
-        val raws = segments(input, context.today)
+        if (input.isBlank()) return Message(emptyList())
+        val relevant = segments(input, context.today)
             .map { read(it, context) }
             .filter { it.relevant }
-            .take(MAX_ROWS)
-        if (raws.isEmpty()) return emptyList()
+        val raws = relevant.take(MAX_ROWS)
+        if (raws.isEmpty()) return Message(emptyList())
 
         val explicitDates = raws.mapNotNull { it.explicitDate }.distinct()
         val shared = explicitDates.singleOrNull()
         var carriedDate: LocalDate? = null
         var previousType: TransactionType? = null
         var previous: TransactionCandidate? = null
-        return raws.map { raw ->
+        // The person's habits per business, from their own ledger, built only if a row's words name no category.
+        val habits = lazy { MerchantMemory.build(context.history, context.directory, context.today) }
+        val items = raws.map { raw ->
             val date = raw.explicitDate ?: shared ?: carriedDate ?: context.today
             if (raw.explicitDate != null) carriedDate = raw.explicitDate
             val transfer = previous?.takeIf { it.type.isTransfer }
@@ -55,11 +71,12 @@ object BatchEntryParser {
                     ?: context.typeHint?.takeIf { !it.isTransfer }
                     ?: TransactionType.EXPENSE
                 if (!type.isTransfer) previousType = type
-                build(raw, type, date, context)
+                build(raw, type, date, context, habits)
             }
             previous = candidate
             candidate
         }
+        return Message(items, leftOut = relevant.size - raws.size, inputCut = inputCut)
     }
 
     private val FEE = Regex("\\b(fee|fees|charge|charges|service charge)\\b")
@@ -166,10 +183,39 @@ object BatchEntryParser {
         return Raw(segment.trim(), clean, lower, explicitDate, amount, options, flag, check && amount != null, explicitType, inferred, relevant)
     }
 
-    private fun build(raw: Raw, type: TransactionType, date: LocalDate, context: InterpretationContext): TransactionCandidate {
+    /**
+     * The category a scan would give the business a row names, when the row's own words (category names, keywords) name none (owner, 2026-11-23:
+     * Gemini is for Ask Lucento, so typed and spoken messages should know what scans know). First the person's usual
+     * category for that business, learned from their own recent entries ([MerchantMemory]: chosen at least twice and
+     * for most of them), then the dictionary's for it ("Jollibee" → dining, [MerchantRecognizer], [CategoryIntents]).
+     * An unknown business still asks for a category; nothing is created.
+     */
+    private fun merchantCategory(text: String, type: TransactionType, context: InterpretationContext, habits: Lazy<MerchantMemory>): Long? {
+        val kind = when (type) {
+            TransactionType.EXPENSE -> CategoryKind.EXPENSE
+            TransactionType.INCOME -> CategoryKind.INCOME
+            else -> return null
+        }
+        habits.value.habit(text, type, context.directory)?.usualCategory
+            ?.takeIf { id -> context.categories.any { it.id == id && it.kind == kind && !it.archived } }
+            ?.let { return it }
+        // The dictionary knows businesses people pay, not why money came in.
+        if (type != TransactionType.EXPENSE) return null
+        val payee = MerchantRecognizer.descriptor(text, context.directory).payee ?: return null
+        return CategoryIntents.resolve(payee.category, kind, context.categories)
+    }
+
+    private fun build(
+        raw: Raw,
+        type: TransactionType,
+        date: LocalDate,
+        context: InterpretationContext,
+        habits: Lazy<MerchantMemory> = lazyOf(MerchantMemory.EMPTY),
+    ): TransactionCandidate {
         // Account mentions, transfer roles and the named currency come from the single-entry parser.
         val proposal = QuickEntryParser.parse(raw.clean, context.wallets, context.categories, context.today)
-        val defaultWallet = context.wallets.firstOrNull { it.id == context.defaultWalletId }?.id ?: context.wallets.firstOrNull()?.id
+        // A card default takes expenses; income and transfers go to a money account (InterpretationContext.walletFor).
+        val defaultWallet = context.walletFor(type)
         var walletId: Long?
         var toWalletId: Long? = null
         if (type.isTransfer) {
@@ -179,7 +225,10 @@ object BatchEntryParser {
         } else {
             walletId = proposal.walletId ?: defaultWallet
         }
-        val categoryId = if (type.isTransfer) null else QuickEntryParser.detectCategory(raw.lower, type, context.categories)
+        val categoryId = if (type.isTransfer) null else {
+            QuickEntryParser.detectCategory(raw.lower, type, context.categories)
+                ?: merchantCategory(raw.clean, type, context, habits)
+        }
         val flags = buildSet {
             raw.amountFlag?.let { add(it) }
             if (raw.amountCheck) add(CandidateFlag.AMOUNT_UNVERIFIED)

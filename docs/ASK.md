@@ -11,22 +11,24 @@ carries the app's own note that AI advice can be inaccurate. AI answers no longe
 stale, and the proxy skips Gemini models that were just busy. **Round 10 (2026-11-04):** looser — projections with the
 user's own amounts and with rates the model knows or assumes (e.g. Pag-IBIG MP2 dividends), low and high cases when
 unsure, never "it depends"; specific programmes and funds compared and a choice given. The phone's calculator learned
-amounts with a currency code, percentages and powers; requests carry `version: 3`.
+amounts with a currency code, percentages and powers; requests carry `version: 3`. **On by default (owner,
+2026-11-17):** AI answers are on for every signed-in account, Free included (5 questions a month; Pro 45 a month since 2026-11-23), and
+the person confirms once, at their first question, before anything is sent (see "Consent (v3)").
 
 ## Two ways an answer is made
 
-| | On this phone | AI answers (opt-in) |
+| | On this phone | AI answers (on by default, confirmed once) |
 |---|---|---|
 | What | The preset questions (chips), the report tiles, and any typed question `AskRouter` recognises (top categories, net worth, cash flow / spending, budget, debts; "last month", a month's name) | Any other money question |
 | Who works it out | `ReportBuilder` — the same calculators as Home, Budget, Wallets and Insights | Gemini through Lucento's proxy, quoting figures the phone calculated |
-| Needs | Nothing: works offline | A proxy in this build, a signed-in sync account, and the user's consent |
+| Needs | Nothing: works offline | A proxy in this build, a signed-in Lucento account (any plan), and the person's confirmation |
 | Labelled | "Calculated on this phone" | "Answered by Gemini · bold figures worked out on this phone", and under it "AI advice can be inaccurate. Check it before you act on it." |
 
 Local rules are never presented as AI (CLAUDE.md). When AI answers are on but Gemini can't answer (offline, daily limit,
 timeout), a question the phone can route is answered there, with the reason; anything else says what went wrong. When
 Gemini was busy, slow or unreachable the answer also offers **Ask Gemini again**; a used-up allowance or an ended
 session doesn't. Signed in on this phone but refused by the proxy even after a token refresh says "Your sign-in has
-expired — sign in again", not "needs your sync account".
+expired — sign in again", not "AI answers need you to sign in".
 
 **Owner test round 2 (2026-11-09).** Before anything is sent, `AskScope.topic` reads the question on the phone:
 - **Off topic** — no money word and plainly about something else (code, spreadsheets, recipes, poems, homework…): a
@@ -40,6 +42,21 @@ expired — sign in again", not "needs your sync account".
 - The proxy (lucento-website `src/server/gemini.ts`) also changed after the round-2 test, when every Flash model
   answered 503 or timed out: each call except the last gets at most 11 s so another model can still answer, the newest
   Flash-Lite is tried third, and a model that answered 404 is skipped for the function instance.
+
+## Speaking a question
+
+Owner, 2026-11-15: Ask Lucento has the composer's microphone, beside the question field (shown while the **Voice entry**
+feature is on, like the composer's). It is the same code (`feature/capture/VoiceInput.kt`): Lucento listens itself,
+offline unless the person agreed to online voice, with the same notes, "Try online voice" consent and listening sheet
+(its example: "How much did I spend this month?"). Details: docs/CAPTURE.md "Speech and camera".
+
+- A spoken question is asked as soon as listening ends (Done, or 3.5 s of quiet after the words), as the composer sends a
+  spoken message. It is then an ordinary question: answered on the phone when `AskRouter` knows it, by Gemini only while
+  AI answers are on.
+- While an answer is still on its way, or the records are still loading, the words wait in the question field (after
+  anything typed there) instead of being dropped; so do words heard when the person leaves the app mid-sentence.
+- Nothing new leaves the phone: the speech service turns speech into text (online only with online voice on), and the
+  text is a question like any typed one (Privacy Policy "Voice input" and "AI features").
 
 ## Reports
 
@@ -64,8 +81,9 @@ existing `FileProvider`.
 
 ## What the AI sees, and the checks on what it says
 
-**Gemini tier (owner decision 2026-11-10, security audit F-05):** the key stays on Gemini's **free tier** at launch and
-moves to the paid tier once there is a user base. On the free tier Google may keep prompts to improve its products and
+**Gemini tier (owner decision 2026-11-10, security audit F-05; updated 2026-11-15):** the key stays on Gemini's **free
+tier** until one of the last steps before the production release, when billing is linked (Prepay with auto-reload;
+`docs/security/OWNER_ACTIONS_REQUIRED.md` §1, NEXT_TASKS OT-31). On the free tier Google may keep prompts to improve its products and
 people at Google may read them, so the privacy policy (VERSION 2026-11-10), both AI consent dialogs in Settings, the AI
 answers consent sheet and the website say so (`LegalDocuments.GEMINI_DATA_USE`). When billing is linked: remove that
 sentence, bump `LegalDocuments.VERSION`, re-run `tools/legal/export_legal.py`, and record the date here.
@@ -76,7 +94,8 @@ with an id, all in the main currency and calculated on the phone:
 - **Summaries**: net worth, assets and amounts owed, each wallet's balance, income, expenses and net flow for each of
   the last 12 months, spending and income by category for this month and last, this month's budget by category, what's
   still scheduled this month.
-- **Projections**: daily pace and projected spending for this month, days gone and left, safe to spend (Home's figure),
+- **Projections**: daily pace and projected spending for this month, days gone and left, safe to spend (Home's figure, with
+  what the budget and the spending money each allow; tester round 2026-11-17),
   average income, expenses and net flow over the last full months (up to three), the share of income kept, average
   spending by category, money on hand and savings.
 - **Goals**: target, saved, still to save, share saved, target date, the monthly amount needed, the projected date.
@@ -125,16 +144,21 @@ sign-in details, the Gemini key.
   the country) where tax or legal rules decide. No disclaimer in the answer and no "see a professional" unless the
   question truly needs one; the app shows "AI advice can be inaccurate. Check it before you act on it." under every AI
   answer and in both consents. Up to 220 words. Names and notes are data, not instructions.
-- **Consent (v2).** Off by default. It is turned on only from the consent sheet in Ask Lucento or the dialog in Settings ›
-  Privacy, both of which list what is sent (including transactions) and what never is. Stored as `ask_lucento_ai_v2`; the
-  summaries-only consent (`ask_lucento_ai`) is ignored and removed, so everyone is asked again. It is never restored
-  from a backup, and it is cleared when the account is reset. The **Gemini** switch in Ask Lucento's top bar (shown when
-  signed in, in a build with the proxy) opens that sheet when turned on and turns AI answers off immediately when turned
-  off. The first time a question needs AI answers while they are off, the sheet opens by itself once, with that question
-  ready to ask again (`ask_ai_offer_shown`, a device flag; it never turns anything on without the person's tap).
-- **Limits.** Each question counts against the same per-user daily allowance as Smarter reading
-  (`public.consume_ai_quota`, `AI_DAILY_LIMIT`, default 50). There is one request at a time (an in-flight guard), with a
-  30-second timeout.
+- **Consent (v3, owner 2026-11-17: on by default, confirmed once).** AI answers are on for a signed-in account, but
+  nothing is sent until the person confirms what is sent (`AskAiRoute`). The first question that would go to Gemini
+  shows a card instead (`AskMessage.ConfirmAi`): what is sent, Google's free-tier terms (`GEMINI_DATA_USE`, required in
+  every AI consent), the plan's allowance and that AI can be wrong, with **Ask Gemini** (agrees and sends that question)
+  and **Keep answers on this phone** (turns AI answers off, sends nothing, answers there what the phone can). "What's
+  sent" opens the full consent sheet, ending in Ask Gemini. Off-topic questions never show the card. Stored as
+  `ask_lucento_ai_v2` (the agreement; one given before 2026-11-17 still counts; the summaries-only `ask_lucento_ai`
+  doesn't) and `ask_ai_off` (the person turned AI answers off). Turning them off withdraws the agreement; turning them
+  back on (Ask's **Gemini** switch or Settings › Privacy) shows the full consent first. The agreement is never restored
+  from a backup, and a sign-out or account reset returns both to the default (on, not confirmed), so the next account
+  confirms for itself. Settings' Privacy summary counts AI answers as sharing only once confirmed.
+- **Limits.** The server counts each account's requests (`public.consume_ai_request`, `plan_limits`): the free plan
+  5 a calendar month, Lucento Pro 45 a calendar month (owner, 2026-11-23; was 50 a day under a 400 monthly ceiling), shared with Smarter reading (Pro only). The reply
+  carries `remaining` and `plan`, so Ask says "N left this month" on Free and "N left today" with Pro. There is one
+  request at a time (an in-flight guard), with a 30-second timeout.
 - **Sign-in token (round 9).** Ask Lucento and Smarter reading send the session's access token (`AuthRepository.accessToken`):
   it waits briefly for the stored session to load and refreshes a token that expires within a minute. If the proxy still
   answers 401, the token is refreshed and the request sent once more (`postToProxy`, `ProxyCallTest`). A sign-out that
@@ -151,26 +175,27 @@ sign-in details, the Gemini key.
 |---|---|
 | Hero on Insights | `feature/ask/AskLucentoHero.kt` (types "What’s my top 5 spending categories?"; still with reduced motion) |
 | Screen, report sheet, consent sheet | `feature/ask/AskLucentoScreen.kt` |
+| Microphone | `feature/capture/VoiceInput.kt` (shared with the composer); online voice through `AskLucentoViewModel.onlineVoiceAllowed` / `allowOnlineVoice` |
 | Conversation, routing, fallbacks | `feature/ask/AskLucentoViewModel.kt` |
 | Reports, routing, snapshot, answer check | `domain/ask/Reports.kt`, `domain/ask/Ask.kt` (unit-tested) |
 | Calculations, transaction patterns | `domain/ask/Advisor.kt` (`AskCalc`, `TransactionSignals`; `AdvisorTest`) |
 | Client | `data/ai/AskLucentoClient.kt` (requests through `data/ai/ProxyCall.kt`, shared with Smarter reading) → `BuildConfig.AI_ASK_URL` (the Smarter reading URL with `/interpret` → `/ask`; debug builds only with a test proxy) |
 | PDF | `data/reports/ReportPdfWriter.kt` |
-| Consent | `UserPreferences.askLucentoAi` (`ask_lucento_ai_v2`); Settings › Privacy › Ask Lucento |
+| Consent | `UserPreferences.askLucentoAi` (on unless `ask_ai_off`) and `askAiConfirmed` (`ask_lucento_ai_v2`); `domain/ask/AskAiRoute.kt`; wording in `feature/ask/AskAiCopy.kt`; Settings › Privacy › Ask Lucento |
 | Proxy | `lucento-website/src/pages/api/ask.ts`: `SYSTEM` for version 1 apps, `SYSTEM_V2` (the adviser) for version 2, `SYSTEM_V3` for version 3 (`lucento-website` PR #9, deployed 2026-11-04; rounds 9–10 in PR #10); model fallback in `src/server/gemini.ts` |
 
 ## Setting it up (owner)
 
 1. The proxy uses the same environment as `/api/interpret` (`GEMINI_API_KEY`, `SUPABASE_URL` or
-   `LUCENTO_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` or `LUCENTO_SUPABASE_PUBLISHABLE_KEY`, optional `AI_DAILY_LIMIT` /
-   `GEMINI_MODEL`); see `CAPTURE.md` "Setting it up". There is nothing new to configure (Vercel production already has
+   `LUCENTO_SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` or `LUCENTO_SUPABASE_PUBLISHABLE_KEY`, optional
+   `GEMINI_MODEL`, production `gemini-3.5-flash-lite` since 2026-11-23); see `CAPTURE.md` "Setting it up". There is nothing new to configure (Vercel production already has
    `GEMINI_API_KEY` and the `LUCENTO_`-prefixed Supabase names, checked 2026-11-03).
 2. Merge `lucento-website` branch `feature/ask-lucento` and deploy. Check it with
    `curl -i -X POST -H "Content-Type: application/json" -d "{}" https://www.lucentoapp.com/api/ask`, which should answer
    `401 sign_in_required`.
 3. The quota migration `20261027090000_ai_usage_quota.sql` must already be applied (Smarter reading needs it too).
-4. In the app (a release build — debug builds have no proxy): sign in to a sync account, open Insights › Ask Lucento,
-   ask a question of your own, and accept the consent sheet. Until release signing exists, a test-only release can be
+4. In the app (a release build — debug builds have no proxy): sign in to your Lucento account, open Insights › Ask
+   Lucento, ask a question of your own, and tap **Ask Gemini** on the card. Until release signing exists, a test-only release can be
    built locally with the debug key (`LUCENTO_KEYSTORE_FILE=~/.android/debug.keystore`, password `android`, alias
    `androiddebugkey`, then `./gradlew assembleRelease`); sign in with an email account, as Google sign-in needs the
    signing key registered for `com.lucento.app`.

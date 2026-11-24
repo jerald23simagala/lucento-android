@@ -5,13 +5,13 @@ package com.lucento.app.domain.entitlement
  * [com.lucento.app.domain.Feature], the person's own module toggles: a module can be on and locked.
  */
 enum class ProFeature(val requires: Capability) {
-    /** Cash, bank, e-wallet and savings wallets (Free: a count). */
+    /** Cash, bank, e-wallet, savings and investment wallets (Free: a count). */
     MONEY_WALLETS(Capability.LOCAL_PRO),
     /** Credit cards and loans (Free: a count). */
     DEBT_ACCOUNTS(Capability.LOCAL_PRO),
     /** Money someone owes the person. */
     RECEIVABLES(Capability.LOCAL_PRO),
-    /** A home, a car, investments at a value the person sets. */
+    /** A home, a car, jewellery at a value the person sets (investments are a money wallet). */
     VALUED_ASSETS(Capability.LOCAL_PRO),
     /** A wallet in a currency other than the main one. */
     FOREIGN_CURRENCY_WALLETS(Capability.LOCAL_PRO),
@@ -41,8 +41,6 @@ sealed interface Limit {
     data class Count(val max: Int) : Limit
     /** At most [max] uses per calendar month (server-counted). */
     data class PerMonth(val max: Int) : Limit
-    /** At most [max] uses per day (server-counted). */
-    data class PerDay(val max: Int) : Limit
 
     /** Whether one more is allowed when [used] are already in use (active items, or uses in the period). */
     fun allows(used: Int): Boolean = when (this) {
@@ -50,7 +48,6 @@ sealed interface Limit {
         None -> false
         is Count -> used < max
         is PerMonth -> used < max
-        is PerDay -> used < max
     }
 
     /** The bare number, for copy ("the most on the free plan is 3"); null for [Unlimited] and [None]. */
@@ -59,6 +56,5 @@ sealed interface Limit {
             Unlimited, None -> null
             is Count -> max
             is PerMonth -> max
-            is PerDay -> max
         }
 }

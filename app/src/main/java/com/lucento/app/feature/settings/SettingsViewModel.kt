@@ -54,6 +54,10 @@ data class SettingsUiState(
     val walletCount: Int,
     val transactionCount: Int,
     val cloudSync: CloudSyncUiState,
+    /** Lucento Pro: this phone's plan doesn't include Smarter reading ([com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed]). */
+    val smartReadingLocked: Boolean = false,
+    /** The AI allowance is Pro's rather than the free plan's ([com.lucento.app.domain.entitlement.ProGates.aiProAllowance]). */
+    val aiProAllowance: Boolean = false,
 )
 
 /** Everything the "Cloud sync" section needs, kept separate so the rest of Settings never depends on it. */
@@ -91,6 +95,11 @@ data class CloudSyncUiState(
      * for good: the sign-in panel says so first (owner decision 2026-11-14).
      */
     val purchaseWithoutAccount: Boolean = false,
+    /**
+     * The account signs in with an email and password. False for a Google-only account, which hides the Password
+     * section (it has no password to update); null when unknown, which keeps it.
+     */
+    val usesPassword: Boolean? = null,
 )
 
 class SettingsViewModel(
@@ -146,6 +155,7 @@ class SettingsViewModel(
             partnerOfSpace,
             deletion,
             purchaseWithoutAccount,
+            auth.observeUsesPassword(),
         ) { values ->
             val prefs = values[0] as UserPreferences
             val w = values[1] as List<*>
@@ -160,11 +170,16 @@ class SettingsViewModel(
             val partner = values[10] as Boolean
             val deleting = values[11] as com.lucento.app.feature.account.DeleteAccountPrompt?
             val heldWithoutAccount = values[12] as Boolean
+            val usesPassword = values[13] as Boolean?
             val lockedByPlan = plan != null && !com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partner, System.currentTimeMillis())
             SettingsUiState(
                 preferences = prefs,
                 walletCount = w.size,
                 transactionCount = transactionTotal,
+                smartReadingLocked = plan != null &&
+                    !com.lucento.app.domain.entitlement.ProGates.smartReadingAllowed(plan, System.currentTimeMillis()),
+                aiProAllowance = plan != null &&
+                    com.lucento.app.domain.entitlement.ProGates.aiProAllowance(plan, System.currentTimeMillis()),
                 cloudSync = CloudSyncUiState(
                     configured = SupabaseModule.isConfigured,
                     googleSignInConfigured = SupabaseModule.isGoogleSignInConfigured,
@@ -177,6 +192,7 @@ class SettingsViewModel(
                     lockedByPlan = lockedByPlan,
                     deletion = deleting,
                     purchaseWithoutAccount = heldWithoutAccount,
+                    usesPassword = usesPassword,
                 ),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -476,7 +492,7 @@ class SettingsViewModel(
     private suspend fun enableSyncAndRun() {
         // Lucento Pro: the account stays connected (free AI allowance, Shared invitations); only the upload waits for a plan.
         if (!planAllowsSyncNow()) {
-            syncMessage.value = "Cloud sync is part of Lucento Pro. You’re signed in, and everything stays on this phone; a backup file is always free."
+            syncMessage.value = syncLockedNote(paused = false)
             return
         }
         syncPreferences.setEnabled(true)
@@ -487,6 +503,11 @@ class SettingsViewModel(
     private suspend fun planAllowsSyncNow(): Boolean {
         val plan = entitlements?.value ?: return true
         return com.lucento.app.domain.entitlement.ProGates.syncAllowedByPlan(plan, partnerOfSpace.first(), System.currentTimeMillis())
+    }
+
+    private fun syncLockedNote(paused: Boolean): String {
+        val plan = entitlements?.value?.displayPlan(System.currentTimeMillis()) ?: com.lucento.app.domain.entitlement.DisplayPlan.FREE
+        return com.lucento.app.feature.pro.ProCopy.syncLockedNote(paused = paused, plan = plan)
     }
 
     /** Email accounts only. Length and the breach check run before the password is sent. */
@@ -510,7 +531,11 @@ class SettingsViewModel(
             syncing.value = true
             // Never synced from this phone (for example, the merge question was left unanswered): ask the same first-sync
             // question as at sign-in, so "Sync now" can't upload this phone's records into an account without consent.
-            if (syncPreferences.syncedUserId() == null && auth.currentUserId() != null) firstSyncCheck() else runSyncNow()
+            when (syncNowStep(planAllowsSyncNow(), syncPreferences.syncedUserId() == null, auth.currentUserId() != null)) {
+                SyncNowStep.PLAN_LOCKED -> syncMessage.value = syncLockedNote(paused = syncPreferences.isEnabled())
+                SyncNowStep.FIRST_SYNC_CHECK -> firstSyncCheck()
+                SyncNowStep.SYNC -> runSyncNow()
+            }
             syncing.value = false
         }
     }
@@ -543,6 +568,11 @@ class SettingsViewModel(
     /** Multicurrency: "Get exchange rates online" (Settings › Money). */
     fun setFxRatesOnline(enabled: Boolean) {
         viewModelScope.launch { preferences.setFxRatesOnline(enabled) }
+    }
+
+    /** Settings › Money › "Show cents" (tester round, 2026-11-17): a display choice, nothing recorded changes. */
+    fun setShowCents(enabled: Boolean) {
+        viewModelScope.launch { preferences.setShowCents(enabled) }
     }
 
     /** Switching a module never touches its data; it only changes what is shown. */

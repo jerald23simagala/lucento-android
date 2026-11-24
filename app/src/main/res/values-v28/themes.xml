@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 9–10: draw into a notch on the short edges (beside it in landscape) instead of letterboxing. -->
+    <style name="Theme.Lucento" parent="Base.Theme.Lucento">
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+</resources>

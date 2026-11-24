@@ -1,0 +1,315 @@
+{
+  "id": "us-bank-wellsfargo-long-02",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "WELLS FARGO",
+      "Everyday Checking",
+      "Account number: 7730192288  October 1, 2026 - October 31, 2026  Page 1 of 2",
+      "CARLOS MENDEZ",
+      "4417 N 19TH AVE",
+      "PHOENIX AZ 85015-3302",
+      "Questions?",
+      "1-800-TO-WELLS (1-800-869-3557)",
+      "Activity summary",
+      "Beginning balance on 10/1  $2,486.10",
+      "Deposits/Additions  6,100.16",
+      "Withdrawals/Subtractions  - 2,356.04",
+      "Ending balance on 10/31  $6,230.22",
+      "Overdraft Protection",
+      "Your account is linked to the following for Overdraft Protection: Savings - 000000000008841",
+      "Transaction history",
+      "Check  Deposits/  Withdrawals/  Ending daily",
+      "Date  Number  Description  Additions  Subtractions  balance",
+      "10/1  Recurring Transfer to Mendez C Way2Save Savings Ref #Op0Ab12C3D xxxxxx8841  200.00",
+      "10/1  Purchase authorized on 09/30 Fry's Food #0681 Phoenix AZ S586273901234567 Card 6603  112.47  2,173.63",
+      "10/2  Bill Pay APS Electric On-Line xxxxx34560 on 10-02  143.20  2,030.43",
+      "10/3  Desert Sun Solar Payroll 100326 xxxxx8823 Carlos Mendez  2,105.66",
+      "10/3  Purchase authorized on 10/02 Circle K 2741 Phoenix AZ S306275112345678 Card 6603  38.55  4,097.54",
+      "10/6  Purchase authorized on 10/04 Chick-Fil-A #01234 Phoenix AZ  14.27",
+      "S466277801234567 Card 6603",
+      "10/6  Purchase authorized on 10/05 The Home Depot #0401 Phoenix AZ  63.84  4,019.43",
+      "S386278912345678 Card 6603",
+      "10/7  ATM Withdrawal authorized on 10/07 1 E Washington St Phoenix AZ 0006127 ATM ID 0331F Card 6603  140.00  3,879.43",
+      "10/8  Mobile Deposit : Ref Number :210089731456  325.00  4,204.43",
+      "10/9  Recurring Payment authorized on 10/08 Netflix.Com Netflix.Com CA S466281901234567 Card 6603  17.99  4,186.44",
+      "10/10  Zelle to Mendez Sofia on 10/10 Ref #Rp0Q7Zb2Lm Groceries  80.00  4,106.44",
+      "10/13  WT Fed#04712 Jpmorgan Chase Ban /Org=Hector Mendez Srf# 0055123498 Trn#261013078812  1,000.00",
+      "Rfb# 000000133",
+      "10/13  Wire Trans Svc Charge - Sequence: 261013078812 Srf# 0055123498 Trn#261013078812 Rfb#  15.00  5,091.44",
+      "000000133",
+      "10/14  Purchase authorized on 10/12 Costco Whse #0427 Phoenix AZ S586285112345678 Card 6603  187.33  4,904.11",
+      "Sheet Seq = 0418823",
+      "Sheet 00001 of 00002"
+    ],
+    [
+      "Account number: 7730192288  October 1, 2026 - October 31, 2026  Page 2 of 2",
+      "Transaction history (continued)",
+      "Check  Deposits/  Withdrawals/  Ending daily",
+      "Date  Number  Description  Additions  Subtractions  balance",
+      "10/15  Purchase Return authorized on 10/14 The Home Depot #0401 Phoenix AZ  63.84  4,967.95",
+      "S616288012345678 Card 6603",
+      "10/16  Cox Comm Phx Cox Pymt 101626 001234567 Carlos Mendez  89.99  4,877.96",
+      "10/17  Desert Sun Solar Payroll 101726 xxxxx8823 Carlos Mendez  2,105.66",
+      "10/17  Recurring Transfer to Mendez C Way2Save Savings Ref #Op0Ac93F1E xxxxxx8841  200.00  6,783.62",
+      "10/20  Purchase authorized on 10/18 Harkins Theatres Phoenix AZ S306291412345678 Card 6603  32.50  6,751.12",
+      "10/21  Geico Auto 102126 012345678 Carlos Mendez  118.60  6,632.52",
+      "10/22  Purchase authorized on 10/21 Walgreens #3361 Phoenix AZ S466294812345678 Card 6603  27.14  6,605.38",
+      "10/23  Venmo Payment 1029384710 Carlos Mendez  45.00  6,560.38",
+      "10/24  Purchase authorized on 10/23 Uber *Trip Help.Uber.Com CA S586296712345678 Card 6603  22.81  6,537.57",
+      "10/27  Online Transfer to Mendez C Visa Signature Card xxxx2290 Ref #Ib0Kp4Wz9T on 10/27/26  650.00  5,887.57",
+      "10/28  City of Phoenix Water Pmt 102826 8812345 Carlos Mendez  61.20  5,826.37",
+      "10/29  Purchase authorized on 10/28 Fry's Food #0681 Phoenix AZ S586301912345678 Card 6603  96.15  5,730.22",
+      "10/30  Edeposit IN Branch/Store 10/30/26 01:22:11 Pm 2 E Camelback Rd Phoenix AZ 6603  500.00  6,230.22",
+      "Ending balance on 10/31  6,230.22",
+      "Totals  $6,100.16  $2,356.04",
+      "Monthly service fee summary",
+      "Fee period 10/01/2026 - 10/31/2026  Standard monthly service fee $10.00  You paid $0.00",
+      "Wells Fargo Bank, N.A. Member FDIC",
+      "Sheet Seq = 0418824",
+      "Sheet 00002 of 00002"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Wells Fargo",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "2486.10",
+        "closingBalance": "6230.22",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Recurring Transfer to Mendez C Way2Save",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-01",
+            "description": "Fry's Food #0681",
+            "amount": "112.47",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Fry's Food"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "APS Electric",
+            "amount": "143.20",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "APS"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "Desert Sun Solar Payroll",
+            "amount": "2105.66",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-03",
+            "description": "Circle K 2741",
+            "amount": "38.55",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Circle K"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "Chick-Fil-A #01234",
+            "amount": "14.27",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chick-fil-A"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "10/05 The Home Depot #0401",
+            "amount": "63.84",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Home Depot"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "ATM Withdrawal authorized on 10/07",
+            "amount": "140.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-08",
+            "description": "Mobile Deposit",
+            "amount": "325.00",
+            "direction": "IN",
+            "kind": "DEPOSIT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-09",
+            "description": "Netflix.Com",
+            "amount": "17.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "Zelle to Mendez Sofia",
+            "amount": "80.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-13",
+            "description": "WT Fed#04712",
+            "amount": "1000.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-13",
+            "description": "Wire Trans Svc Charge",
+            "amount": "15.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-14",
+            "description": "Costco Whse #0427",
+            "amount": "187.33",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Costco"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Purchase Return authorized on 10/14",
+            "amount": "63.84",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "The Home Depot"
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Cox Comm Phx",
+            "amount": "89.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Cox"
+          },
+          {
+            "date": "2026-10-17",
+            "description": "Desert Sun Solar Payroll",
+            "amount": "2105.66",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-17",
+            "description": "Recurring Transfer to Mendez C Way2Save",
+            "amount": "200.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "Harkins Theatres",
+            "amount": "32.50",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Harkins Theatres"
+          },
+          {
+            "date": "2026-10-21",
+            "description": "Geico Auto",
+            "amount": "118.60",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "GEICO"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Walgreens #3361",
+            "amount": "27.14",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-23",
+            "description": "Venmo Payment",
+            "amount": "45.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-24",
+            "description": "Uber *Trip",
+            "amount": "22.81",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber"
+          },
+          {
+            "date": "2026-10-27",
+            "description": "Visa Signature Card xxxx2290",
+            "amount": "650.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-28",
+            "description": "City of Phoenix",
+            "amount": "61.20",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "City of Phoenix"
+          },
+          {
+            "date": "2026-10-29",
+            "description": "Fry's Food #0681",
+            "amount": "96.15",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Fry's Food"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Edeposit IN Branch/Store",
+            "amount": "500.00",
+            "direction": "IN",
+            "kind": "DEPOSIT",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "27 transactions over 2 pages with ending-daily-balance column; incoming wire plus its service charge; a purchase return of an earlier Home Depot charge; wrapped description lines. The fee summary ($10 standard, $0 paid) is not a fee."
+}

@@ -198,6 +198,7 @@ internal fun NewGoalSheet(
         photos = photos,
         onSave = { d, money, done -> viewModel.saveGoal(d.id, d.name, money, d.targetDate, d.walletId, d.sceneKey, d.photoPath, done) },
         onDismiss = onDismiss,
+        inSetup = true,
     )
 }
 
@@ -235,6 +236,19 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
         viewModel.archiveGoal(id) { result -> if (result == GoalRepository.ArchiveResult.Archived) haptics.confirm() }
     }
 
+    // Add: the goal sheet while the plan holds one more active goal, otherwise the Pro dialog (owner, 2026-11-18). At the
+    // most any plan allows the sheet opens and says so, as before.
+    val goalPlan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val openGoalPro = com.lucento.app.feature.pro.LocalOpenPro.current
+    var goalWall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
+    val startGoal: () -> Unit = {
+        val access = com.lucento.app.domain.entitlement.EntitlementEvaluator.access(
+            goalPlan, com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, state.goals.size, System.currentTimeMillis(),
+        )
+        val met = com.lucento.app.feature.pro.ProWall.of(access)
+        if (met != null) goalWall = met else editing = GoalDraft(currencyCode = state.primaryCurrency)
+    }
+
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
@@ -245,7 +259,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                     if (canEdit && (state.goals.isNotEmpty() || archived.isNotEmpty())) {
                         com.lucento.app.core.designsystem.component.AddPillButton(
                             "Add",
-                            onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
+                            onClick = startGoal,
                             contentDescription = "Add goal",
                         )
                     }
@@ -274,7 +288,7 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
                         action = if (canEdit) ({
                             LucentoPrimaryButton(
                                 text = "Create a goal",
-                                onClick = { editing = GoalDraft(currencyCode = state.primaryCurrency) },
+                                onClick = startGoal,
                             )
                         }) else null,
                     )
@@ -353,6 +367,17 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
 
     val open = progress.firstOrNull { it.goal.id == openGoalId } ?: archived.firstOrNull { it.goal.id == openGoalId }
     var restoreLimit by remember(openGoalId) { mutableStateOf<GoalRepository.RestoreResult.LimitReached?>(null) }
+    goalWall?.let { met ->
+        com.lucento.app.feature.pro.ProWallDialog(
+            met,
+            onDismiss = { goalWall = null },
+            // A goal's sheet closes first, then the plan page opens.
+            open = { feature ->
+                openGoalId = null
+                openGoalPro(feature)
+            },
+        )
+    }
     if (open != null) {
         GoalDetailSheet(
             progress = open,
@@ -366,9 +391,15 @@ fun GoalsScreen(onBack: () -> Unit, viewModel: PlanViewModel = viewModel(factory
             onRestore = {
                 viewModel.restoreGoal(open.goal.id) { result ->
                     if (result is GoalRepository.RestoreResult.LimitReached) {
-                        // Lucento Pro: the goal stays archived, history intact; the sheet says why and how.
+                        // Lucento Pro: the goal stays archived, history intact. A limit Pro lifts is the dialog (owner,
+                        // 2026-11-18); the most any plan allows is said in the sheet.
                         haptics.reject()
-                        restoreLimit = result
+                        val feature = com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS
+                        if (com.lucento.app.feature.pro.ProCopy.upgradeHelps(feature, result.limit)) {
+                            goalWall = com.lucento.app.feature.pro.ProWall(feature, result.used, result.limit)
+                        } else {
+                            restoreLimit = result
+                        }
                     } else {
                         haptics.confirm()
                         restoreLimit = null
@@ -731,16 +762,10 @@ private fun GoalDetailSheet(
                 )
                 Spacer(Modifier.height(Spacing.sm))
                 LucentoPrimaryButton(text = "Restore goal", onClick = onRestore)
+                // Only at the most any plan allows: a limit Pro lifts opens the dialog instead (owner, 2026-11-18).
                 restoreNote?.let { note ->
                     Spacer(Modifier.height(Spacing.sm))
-                    if (com.lucento.app.feature.pro.ProCopy.upgradeHelps(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
-                            com.lucento.app.domain.entitlement.PlanCatalog.limit(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
-                                com.lucento.app.feature.pro.LocalEntitlements.current, System.currentTimeMillis()))
-                    ) {
-                        com.lucento.app.feature.pro.ProNote(note, from = com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS)
-                    } else {
-                        InfoNote(note)
-                    }
+                    InfoNote(note)
                 }
             } else {
                 if (progress.reached) {
@@ -900,8 +925,12 @@ private fun GoalEditorSheet(
     onSave: (GoalDraft, Money, (GoalRepository.SaveResult) -> Unit) -> Unit,
     onDismiss: () -> Unit,
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
+    /** The guided setup: a limit is said plainly, never as Pro (owner, 2026-11-18). */
+    inSetup: Boolean = false,
 ) = AmountsShown {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var wall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
+    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
     val scope = rememberCoroutineScope()
     val separator = remember { MoneyFormatter.decimalSeparator() }
     var draft by remember { mutableStateOf(initial) }
@@ -911,6 +940,19 @@ private fun GoalEditorSheet(
     var photoError by remember { mutableStateOf<String?>(null) }
     var saved by remember { mutableStateOf(false) }
     var addingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current
+
+    /** Whether the plan holds a new savings wallet in the goal's currency (no early answer while the list loads). */
+    fun keptInAccess(): com.lucento.app.domain.entitlement.Access =
+        if (walletsState.loading) {
+            com.lucento.app.domain.entitlement.Access.Allowed
+        } else {
+            com.lucento.app.domain.entitlement.ProGates.walletAccess(
+                WalletType.SAVINGS, draft.currencyCode, null, walletsState.primaryCurrency, walletsState.wallets,
+                plan.capabilities(System.currentTimeMillis()),
+            )
+        }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             scope.launch {
@@ -933,6 +975,20 @@ private fun GoalEditorSheet(
 
     fun close() {
         scope.launch { sheetState.hide() }.invokeOnCompletion { dismiss() }
+    }
+
+    wall?.let { met ->
+        com.lucento.app.feature.pro.ProWallDialog(
+            met,
+            onDismiss = { wall = null },
+            // The sheet closes first (an unsaved photo copy is removed), then the plan page opens.
+            open = { feature ->
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    dismiss()
+                    openPro(feature)
+                }
+            },
+        )
     }
 
     fun chooseIcon(icon: GoalIcon) {
@@ -1020,13 +1076,24 @@ private fun GoalEditorSheet(
                 keptIn.forEach { w ->
                     WalletChoicePill(w, selected = draft.walletId == w.id, onClick = { draft = draft.copy(walletId = w.id) })
                 }
-                ChoicePill(
-                    label = "Add wallet",
-                    selected = false,
-                    leadingIcon = Icons.Filled.Add,
-                    role = Role.Button,
-                    onClick = { addingWallet = WalletDraft(type = WalletType.SAVINGS, currencyCode = draft.currencyCode) },
-                )
+                // A new savings wallet to keep it in, while the plan holds one: the guided setup leaves the pill out at the
+                // Free numbers (no mention of Pro); elsewhere the dialog answers the tap (owner, 2026-11-18).
+                if (!inSetup || keptInAccess() == com.lucento.app.domain.entitlement.Access.Allowed) {
+                    ChoicePill(
+                        label = "Add wallet",
+                        selected = false,
+                        leadingIcon = Icons.Filled.Add,
+                        role = Role.Button,
+                        onClick = {
+                            val met = com.lucento.app.feature.pro.ProWall.of(keptInAccess()).takeIf { !inSetup }
+                            if (met != null) {
+                                wall = met
+                            } else {
+                                addingWallet = WalletDraft(type = WalletType.SAVINGS, currencyCode = draft.currencyCode)
+                            }
+                        },
+                    )
+                }
             }
 
             IconFieldHeader(Icons.Outlined.Category, "Icon", Modifier.padding(top = Spacing.xs))
@@ -1040,21 +1107,13 @@ private fun GoalEditorSheet(
             photoError?.let {
                 Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
             }
+            // A plain note where no dialog applies: the guided setup, or the most any plan allows (20 goals).
             planLimit?.let { limit ->
-                val note = com.lucento.app.feature.pro.ProCopy.limitReachedLine(
-                    com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, limit.used, limit.limit,
-                )
                 Spacer(Modifier.height(Spacing.sm))
-                if (com.lucento.app.feature.pro.ProCopy.upgradeHelps(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, limit.limit)) {
-                    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
-                    com.lucento.app.feature.pro.ProNote(
-                        note,
-                        from = com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS,
-                        open = { feature -> close(); openPro(feature) },
-                    )
-                } else {
-                    InfoNote(note)
-                }
+                InfoNote(
+                    if (inSetup) GOALS_LATER
+                    else com.lucento.app.feature.pro.ProCopy.limitReachedLine(com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, limit.used, limit.limit),
+                )
             }
             Spacer(Modifier.height(Spacing.xs))
             LucentoPrimaryButton(
@@ -1081,8 +1140,17 @@ private fun GoalEditorSheet(
                             GoalRepository.SaveResult.CurrencyLocked -> amountError = "A goal’s currency can’t change."
                             GoalRepository.SaveResult.NotFound -> close()
                             GoalRepository.SaveResult.NotPermitted -> nameError = "Only the Shared Space’s owner can change this."
-                            // Lucento Pro: not a mistake in the form; said by the button, with the way out.
-                            is GoalRepository.SaveResult.LimitReached -> planLimit = result
+                            // Lucento Pro: the dialog at the tap (owner, 2026-11-18); a plain note in setup or at 20 goals.
+                            is GoalRepository.SaveResult.LimitReached -> {
+                                val met = com.lucento.app.feature.pro.ProWall(
+                                    com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, result.used, result.limit,
+                                ).takeIf {
+                                    !inSetup && com.lucento.app.feature.pro.ProCopy.upgradeHelps(
+                                        com.lucento.app.domain.entitlement.ProFeature.SAVINGS_GOALS, result.limit,
+                                    )
+                                }
+                                if (met != null) wall = met else planLimit = result
+                            }
                         }
                     }
                 },
@@ -1096,6 +1164,16 @@ private fun GoalEditorSheet(
 
     // Add wallet from "Kept in": a savings wallet in the goal's currency by default; once saved it is the one chosen.
     addingWallet?.let { walletDraft ->
+        // The plan page from the wallet editor opens over Goals: this sheet closes too, not only the wallet's (QA M1).
+        androidx.compose.runtime.CompositionLocalProvider(
+            com.lucento.app.feature.pro.LocalOpenPro provides { feature ->
+                addingWallet = null
+                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                    dismiss()
+                    openPro(feature)
+                }
+            },
+        ) {
         WalletEditorSheet(
             initial = walletDraft,
             onSave = { d, sep, done ->
@@ -1106,7 +1184,11 @@ private fun GoalEditorSheet(
             },
             onDelete = null,
             onDismiss = { addingWallet = null },
+            activeWallets = walletsState.planWallets,
+            mainCurrency = walletsState.planMainCurrency,
+            inSetup = inSetup,
         )
+        }
     }
 }
 
@@ -1196,3 +1278,7 @@ internal fun rememberGoalPhoto(path: String?): ImageBitmap? {
     }
     return bitmap
 }
+
+/** The guided setup's plain words when the plan holds no more active goals (owner, 2026-11-18: no mention of Pro). */
+private val GOALS_LATER =
+    "Setup adds up to ${com.lucento.app.domain.entitlement.PlanCatalog.FREE_ACTIVE_GOALS} goals. You can edit them any time in Goals."

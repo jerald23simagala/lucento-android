@@ -38,6 +38,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Language
@@ -99,6 +100,9 @@ enum class ProfileDestination {
 
     /** Settings › Account & sync, with the sign-out confirmation already open (signed in only). */
     SIGN_OUT,
+
+    /** Lucento's social channels ([FollowSheet]). */
+    FOLLOW,
 }
 
 /**
@@ -283,11 +287,19 @@ fun ProfileSheet(
                 runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
             }
             FieldHeader("Community", Modifier.padding(top = Spacing.lg))
+            // The Group is where people ask and suggest; news and tips now come from the channels under Follow Lucento.
             NavRow(
                 icon = Icons.Outlined.Forum,
                 title = "Lucento Community",
-                summary = "Tips, questions and updates on Facebook",
+                summary = "Questions, ideas and help, in our Facebook group",
                 onClick = { browse(com.lucento.app.core.LucentoLinks.COMMUNITY) },
+            )
+            Hairline(inset = inset)
+            NavRow(
+                icon = Icons.Outlined.Campaign,
+                title = "Follow Lucento",
+                summary = "Facebook, Instagram, TikTok and YouTube",
+                onClick = { open(ProfileDestination.FOLLOW) },
             )
             Hairline(inset = inset)
             NavRow(

@@ -1,0 +1,52 @@
+{
+  "id": "ph-receipt-grab-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-04",
+  "pages": [
+    [
+      "Grab",
+      "Your Grab E-Receipt",
+      "Hope you enjoyed your ride!",
+      "GrabCar",
+      "Total Paid  ₱ 286.00",
+      "Booking ID: A-7YXKQ2WGWB3E",
+      "Picked up on 03 Nov 2026",
+      "Pick-up time  6:42 PM",
+      "From: SM Megamall, Doña Julia Vargas Ave., Mandaluyong City",
+      "To: Mahogany Place 2, Acacia Estates, Taguig City",
+      "Distance 9.8 km  Duration 41 min",
+      "Ride fare  ₱ 241.00",
+      "Platform & Partner Fee  ₱ 20.00",
+      "Toll fee  ₱ 25.00",
+      "Total Paid  ₱ 286.00",
+      "Paid by  GCash",
+      "Passenger: Rachel T.",
+      "Driver: Ronaldo  NBC 4421  Toyota Vios",
+      "MyTaxi.PH, Inc.  VAT REG TIN 008-476-219-00000",
+      "This is not an official receipt.",
+      "Need help? Visit help.grab.com"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Grab",
+        "total": "286.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-03",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "taxi",
+        "paymentInstrument": "GCash",
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Ride e-receipt. Fare + platform fee + toll = total paid."
+}

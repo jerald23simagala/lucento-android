@@ -10,32 +10,50 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
-## What works today (0.5.0)
+## What works today (0.5.19)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
-  **transaction composer**; Insights, Savings goals, Scheduled transactions and Debts & loans open from Home's Quick
-  links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
+  **transaction composer**; Insights, Savings goals, Milestones, Scheduled transactions and Debts & loans open from
+  Home's Quick links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
 - **Onboarding**: welcome → focus → features → **choose your spending categories** (≈90 presets in 10 groups,
   search, custom categories; required) → review → currency & appearance → confirmation. On a new phone,
   **I already have an account** (when sync is available) reminds you to sync the old phone first, signs in, downloads
-  the account and goes straight to Home — no story, no guided setup; an empty account continues with the normal setup.
-- **Home**: a working header (sync status, month selector, profile); the **Budget pace** card — % of budget used,
-  budget used vs month elapsed, a verdict in words and Lucento, the mascot, whose look follows it; **net worth** as
-  assets − liabilities with shortcuts to goals, scheduled transactions, debts and categories; the savings goal closest
-  to done; **scheduled transactions** (tap to review and mark paid).
-- **Wallets** include manually valued assets (home, car, investments): a valuation you update, counted in net worth,
-  never used for transactions.
+  the account — records and settings — and goes straight to Home: no story, no guided setup; an empty account continues
+  with the normal setup.
+- **Home**: a working header (sync status, month selector, profile); the **Monthly budget** card — % of budget used on
+  a gauge, budget used vs month elapsed with a verdict in words, then Budget remaining, Spendable wallets and Safe to
+  spend; **net worth** as assets − liabilities with Quick links to goals, Insights, Milestones, debts and scheduled
+  transactions; the savings goal closest to done; **scheduled transactions** (tap to review and mark paid).
+- **Wallets** include **investments** (stocks, funds, MP2, time deposits and more, each with a kind and an icon):
+  money moves in and out with transfers, and **Update value** records growth or loss as a balance adjustment, never as
+  income or spending. **Property & valuables** (home, car, jewellery) are valued by hand and never used for
+  transactions. Both count in net worth.
+- **Safe to spend** is the lower of what the budget allows and what your **spending money** allows: the wallets you
+  count as spending money (cash, bank and e-wallet by default; savings and investments when you switch them on; part of
+  a card's credit if you choose), less bills, loan and card payments and transfers out due this month. An (i) shows
+  both figures line by line. See [docs/CALCULATIONS.md](docs/CALCULATIONS.md).
 - **Budget**: the total is always the **sum of category amounts**; per-category spent/left/status; spending outside
-  the budget shown transparently; amounts per month and currency; manage categories (add, rename, reorder,
-  deactivate, restore). Existing users keep their categories and can personalise them from presets.
-- **Insights**: income and expenses over 3/6/12 months (transfers excluded, with the change against the period before)
-  and net-worth composition by account type.
-- **Ask Lucento** (from Insights): questions about your money and four statements — net worth, cash flow, budget vs
-  actual, debts & loans — calculated on the phone, saved or shared as PDFs. Optional AI answers (Gemini through
-  Lucento's proxy) only with consent, sending summaries of your figures, never transactions or notes. See
-  [docs/ASK.md](docs/ASK.md).
+  the budget shown transparently; amounts per month and currency, planned up to a year ahead; manage categories (add,
+  rename, reorder, deactivate, restore). Existing users keep their categories and can personalise them from presets.
+- **Monthly check-in**: from a month's last 3 days to the 7th of the next, a card on Home asks to plan the coming month
+  (a birthday, an event, a yearly bill): the plan page shows that month's budget, hints from your own records (yearly
+  costs due, the same month last year, last month's overspending) and sets one-off amounts for that month only.
+- **Milestones** (from Home's Quick links): the budget year, twelve squares coloured by how each month's budget went,
+  with the year's totals (Pro, previewed on Free); a month's square opens its recap — what was kept, the budget, where
+  the money went, the biggest change, net worth, goals, debts and days recorded (free). Its Awards card opens the award
+  cabinet, including Steady Month, Goal Reached and Loan Cleared.
+- **Insights**: the Ask Lucento card and the Reports list, then income and expenses over 3/6/12 months (transfers
+  excluded, with the change against the period before; 6 and 12 months are Pro, previewed with the figures hidden on
+  Free), where your money went, and net worth over time.
+- **Ask Lucento** (from Insights): questions about your money, typed or spoken, and six statements — wallet statement,
+  cash flow, net worth, budget vs actual, debts & loans, top spending categories — calculated on the phone, saved or
+  shared as PDFs. AI answers (Gemini through Lucento's
+  proxy) for a signed-in account, confirmed before the first question is sent: the question with a summary of your
+  finances, including recent transactions; "Keep answers on this phone" turns them off. See [docs/ASK.md](docs/ASK.md).
 - **Transactions**: search, filters (date, type incl. transfers, wallet, category), day groups, edit/delete.
-- **Transfers** between your own accounts (two linked legs, atomic, never income or spending).
-- **Wallets**: cash, bank, e-wallet, savings, credit card and loan; a brand-blue net-worth card (assets above liabilities),
+- **Transfers** between your own accounts (two linked legs, atomic, never income or spending). From and To open one
+  account picker — grouped into Everyday money, Set aside and growing, Things you own and What you owe, with balances,
+  and search and recent accounts once there are more than six — also used by the transaction editor and the composer.
+- **Wallets**: cash, bank, e-wallet, savings, investment, credit card, loan, money owed to you and property; a brand-blue net-worth card (assets above liabilities),
   assets and liabilities in separate cards (Debts & loans linked from Liabilities), each wallet shown as a bank-style card, warnings for balances that can't be right, and
   **Adjust balance** (the gap is recorded as a visible Balance adjustment, never income or spending); account detail with history.
   A wallet can show its bank or provider's logo and colours: 409 institutions in 48 countries are bundled offline (36 in
@@ -44,41 +62,54 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 - **Savings goals**, **Debts & loans** (optional interest rate; loans: one-time or monthly amortization with an
   instalment bar and payment reminders; credit cards: credit limit, available credit, statement and due days with an
   amount-due reminder that is never counted in Safe to spend),
-  **Scheduled transactions** (bills, income and debt payments split into principal and interest; every bill and income
-  has a category; mark paid / skip / pause — never auto-posted). The Scheduled page lists every dated occurrence with
+  **Scheduled transactions** (bills, income, debt payments split into principal and interest, and transfers between
+  your own accounts such as a monthly MP2 contribution; every bill and income has a category; mark paid / skip / pause —
+  never auto-posted). The Scheduled page lists every dated occurrence with
   Transactions-style filters and a From–To range, summed up in the Transactions page's cards (income, expenses and net
-  flow, with card and loan transfers apart).
+  flow, with card and loan transfers apart). All schedules has a Select mode: change the day or amount of several
+  plans, pause or resume them, or delete them, in one step; the editor warns when a card or loan already has a
+  payment plan.
 - **Transaction composer** (replaces the old Manual/Scan/Speak/Type it sheet): type, speak or scan, and every
   transaction in the message appears at once as an editable row ("Lunch 250, groceries 800, salary 35000" → three
   rows). Type, category, date and account are inferred; fix anything inline; save the batch with one tap (atomic,
-  idempotent). Interpretation runs on the phone — no AI service, no network. See [docs/CAPTURE.md](docs/CAPTURE.md).
+  idempotent). Interpretation runs on the phone, with no network; Smarter reading (Pro, switched on in Settings)
+  sends the message to Gemini through Lucento's proxy instead. See [docs/CAPTURE.md](docs/CAPTURE.md).
+- **Lucento Scan** (2026-11-22): scan paper with the Document Scanner (several pages, flattened), take a photo, pick
+  images or import a PDF (its text, or OCR; locked PDFs ask for the password once). Receipts, bills, invoices,
+  payment confirmations, refunds and bank, card and e-wallet statements from the Philippines, the United States and
+  20 other countries become rows: the business paid (never the payment app), the document's own currency and dates,
+  the account that paid, the person's usual category. Statements are checked against the ledger — lines already
+  saved are held back, near matches marked, the balance compared — and nothing saved is ever changed. All on the
+  phone. See [docs/SCAN.md](docs/SCAN.md).
 - **Home-screen widgets**: **Quick add** (the composer's own scan · mic · field bar — one tap into Type, Speak or Scan)
-  and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures and words as Home; they follow
+  and **Safe to spend** (Home's Monthly budget card in brief, with Add). Same figures as Home, in its words; they follow
   Hide amounts, App lock and the chosen theme; home screen only; no permission, no network. Add them from Settings ›
   Home-screen widgets or the launcher's widget list. See [docs/WIDGETS.md](docs/WIDGETS.md).
 - **Appearance** (profile menu): five curated themes — Sunrise (the brand), Midnight (always dark), Grove, Mono and
   Aurora — each with its own landscape, every one contrast-checked (WCAG AA) with colour-blind-safe chart colours, plus
   System / Light / Dark. Switching is instant; money colours (income, spending, warnings) never change between themes.
-- **Settings**: main currency, Enabled features, CSV export, JSON backup and restore, privacy facts, an
+  Home's five shortcut tiles take each theme's own hues, measured to stay clear of those money colours.
+- **Settings**: main currency, **Show cents** (off rounds every amount you read to whole units; where you type an
+  amount, and in a transaction's own view, it stays exact), Enabled features, CSV export, JSON backup and restore,
+  privacy facts, an
   optional app lock (fingerprint, face or screen lock) and Hide in recent apps. Signed in, **Delete account** removes the
   account and its cloud data (docs/ACCOUNT_DELETION.md); the Terms of Use and Privacy Policy open from Settings ›
   Privacy & security (docs/LEGAL.md).
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones; awards as medals presented by the mascot — bundled and
   reduced-motion aware.
-- Exact money math in minor units; 497 JVM unit tests; an emulator screenshot tour in CI.
+- Exact money math in minor units; more than 1,500 JVM unit tests; an emulator screenshot tour in CI.
 - **Optional cloud sync** (Google Sign-In + Supabase, row-level security): off until you connect an account; every
-  core feature works offline without it, and signing out keeps local data. See [docs/SYNC.md](docs/SYNC.md) —
-  sign-in needs the Google OAuth setup listed there.
-- **Lucento Shared** (on `feature/lucento-shared`, awaiting product testing): one person's finances shared with a
-  Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
+  core feature works offline without it, and signing out keeps local data. Your settings and customisations (theme,
+  features, name, default wallet…) follow the account too; consents and the app lock stay on each phone. See
+  [docs/SYNC.md](docs/SYNC.md) — sign-in needs the Google OAuth setup listed there.
+- **Lucento Shared**: one person's finances shared with a Partner who signs in with their own account. Both see everything and add, edit or delete transactions; the Owner
   manages wallets, budgets, goals, categories and schedules. Built on cloud sync; needs its Supabase migrations on the
   project. See [docs/shared/](docs/shared/).
 - Android cloud backup disabled.
 
 ## Not yet
-Reminder notifications, cross-currency transfers, automatic principal/interest
-split, budget periods other than calendar months. See the roadmap.
+Reminder notifications and budget periods other than calendar months. See the roadmap.
 
 ## Tech
 Kotlin · Jetpack Compose · Material 3 · Room · DataStore · ViewModel · Coroutines/Flow · Navigation Compose (type-safe).

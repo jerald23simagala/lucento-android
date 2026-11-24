@@ -10,6 +10,7 @@ import com.lucento.app.domain.DebtPaymentLink
 import com.lucento.app.domain.Frequency
 import com.lucento.app.domain.RecurringMath
 import com.lucento.app.domain.RecurringSchedule
+import com.lucento.app.domain.ScheduleBulk
 import com.lucento.app.domain.TransactionType
 import com.lucento.app.domain.WalletType
 import kotlinx.coroutines.flow.Flow
@@ -46,7 +47,10 @@ class RecurringRepository(
         val interval: Int,
         val startDate: LocalDate,
         val endDate: LocalDate?,
-        /** A debt payment: the card or loan paid from [walletId]. [amount] is then the part against the debt. */
+        /**
+         * A debt payment: the card or loan paid from [walletId]. [amount] is then the part against the debt. A scheduled
+         * transfer ([type] TRANSFER_OUT): the account the money goes to.
+         */
         val toWalletId: Long? = null,
         /** The interest part of a debt payment (user input; zero when none). */
         val interest: Money? = null,
@@ -68,6 +72,8 @@ class RecurringRepository(
         data object CategoryRequired : SaveResult
         /** A debt payment must go from a money account to a card or loan in the same currency, with interest >= 0. */
         data object InvalidDebt : SaveResult
+        /** A scheduled transfer moves money between two different money accounts in the same currency, no category. */
+        data object InvalidTransfer : SaveResult
         data object NotFound : SaveResult
     }
 
@@ -92,13 +98,24 @@ class RecurringRepository(
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val name = input.name.trim().take(MAX_NAME)
         if (name.isEmpty()) return SaveResult.BlankName
-        if (input.type.isTransfer) return SaveResult.InvalidType
+        // Income, an expense, or a transfer between the person's own accounts (TRANSFER_OUT, tester round 2026-11-17).
+        if (input.type.isTransfer && input.type != TransactionType.TRANSFER_OUT) return SaveResult.InvalidType
+        if (input.type.isAdjustment) return SaveResult.InvalidType
         if (input.amount.amountMinor <= 0L) return SaveResult.AmountNotPositive
         if (input.interval !in 1..MAX_INTERVAL) return SaveResult.InvalidInterval
         if (input.endDate != null && input.endDate.isBefore(input.startDate)) return SaveResult.EndBeforeStart
         val wallet = wallets.getById(input.walletId)
         if (wallet == null || !wallet.acceptsTransactions) return SaveResult.WalletNotFound
         if (wallet.currencyCode != input.amount.currencyCode) return SaveResult.CurrencyMismatch
+        if (input.type == TransactionType.TRANSFER_OUT) {
+            val to = input.toWalletId?.let { wallets.getById(it) }
+            if (to == null || !to.acceptsTransactions || to.id == wallet.id || to.currencyCode != wallet.currencyCode ||
+                !isMoneyAccount(wallet.type) || !isMoneyAccount(to.type) || input.categoryId != null ||
+                (input.interest != null && !input.interest.isZero)
+            ) {
+                return SaveResult.InvalidTransfer
+            }
+        }
         // A debt payment's category is only for its interest, filled in for the user (PlanViewModel.saveSchedule).
         if (input.categoryId == null && input.toWalletId == null) return SaveResult.CategoryRequired
         if (input.categoryId != null) {
@@ -106,7 +123,9 @@ class RecurringRepository(
             if (category.kind != input.type.name) return SaveResult.CategoryMismatch
         }
         val interest = input.interest ?: Money.zero(input.amount.currencyCode)
-        if (input.toWalletId != null) {
+        if (input.type == TransactionType.TRANSFER_OUT) {
+            // Checked above.
+        } else if (input.toWalletId != null) {
             val debt = wallets.getById(input.toWalletId)
             val debtType = debt?.let { runCatching { WalletType.valueOf(it.type) }.getOrNull() }
             // A debt payment (expense) goes to a card or loan; a collection (income, owner round 10) comes from a
@@ -195,6 +214,9 @@ class RecurringRepository(
         }
         if (schedule.isCollection) {
             return markCollected(entity, schedule, index, amount ?: schedule.amount, interest ?: schedule.interest, date ?: due)
+        }
+        if (schedule.isTransfer) {
+            return markTransferred(entity, schedule, index, amount ?: schedule.amount, date ?: due)
         }
         return runner.run {
             val result = transactions.save(
@@ -327,6 +349,41 @@ class RecurringRepository(
         }
     }
 
+    /**
+     * A scheduled transfer (tester round, 2026-11-17): one transfer of [amount] from the schedule's account into
+     * [RecurringSchedule.toWalletId], keyed by the occurrence so a second tap can't double it, and the schedule's advance,
+     * in one database transaction. Never income or spending.
+     */
+    private suspend fun markTransferred(
+        entity: RecurringEntity,
+        schedule: RecurringSchedule,
+        index: Int,
+        amount: Money,
+        date: LocalDate,
+    ): PayResult {
+        val toId = schedule.toWalletId ?: return PayResult.NotFound
+        return try {
+            runner.run {
+                val moved = transactions.saveTransfer(
+                    TransactionRepository.TransferInput(
+                        group = null,
+                        clientUuid = schedule.occurrenceKey(index),
+                        fromWalletId = schedule.walletId,
+                        toWalletId = toId,
+                        amount = amount,
+                        date = date,
+                        note = schedule.name,
+                    )
+                )
+                if (moved !is TransactionRepository.TransferResult.Saved) throw Rollback(PayResult.Rejected(moved))
+                dao.update(entity.copy(nextIndex = maxOf(entity.nextIndex, index + 1), updatedAt = clock()))
+                PayResult.Recorded(null)
+            }
+        } catch (e: Rollback) {
+            e.result
+        }
+    }
+
     /** Skips the waiting occurrence without recording a transaction. */
     suspend fun skip(id: Long) {
         if (!access.canManageStructure()) return
@@ -345,12 +402,108 @@ class RecurringRepository(
         if (access.canManageStructure()) dao.deleteById(id)
     }
 
+    // ------------------------------------------------------------------ several at once (tester round, 2026-11-18)
+
+    /** What a change to several plans did. */
+    sealed interface BulkResult {
+        /** [changed] plans took the change; [skipped] couldn't (a weekly plan offered only a day of the month, say). */
+        data class Done(val changed: Int, val skipped: Int) : BulkResult
+
+        /** A Partner's phone: schedules are changed by the Shared Space's Owner. Nothing was written. */
+        data object NotPermitted : BulkResult
+
+        /** The write failed and its one transaction was rolled back: nothing changed (reported by the view model). */
+        data object Failed : BulkResult
+    }
+
+    /**
+     * Moves the plans in [ids] to a new day, in one step: weekly ones to [weekday], every other one to [monthDay]
+     * ([ScheduleBulk.onWeekday], [ScheduleBulk.onMonthDay]). Each restarts from its next occurrence, moved to that day in
+     * the same week or month; a plan whose day wasn't given, or that has ended, is skipped.
+     */
+    suspend fun moveDay(
+        ids: Collection<Long>,
+        monthDay: Int?,
+        weekday: java.time.DayOfWeek?,
+        /** Where the phone’s week starts, so a weekday stays in the week the person sees (as the sheet draws it). */
+        firstDayOfWeek: java.time.DayOfWeek = java.time.DayOfWeek.MONDAY,
+    ): BulkResult = bulk(ids) { schedule ->
+        if (ScheduleBulk.takesWeekday(schedule)) {
+            weekday?.let { ScheduleBulk.onWeekday(schedule, it, firstDayOfWeek) }
+        } else {
+            monthDay?.let { ScheduleBulk.onMonthDay(schedule, it) }
+        }
+    }
+
+    /** Gives the plans in [ids] one new [amount], in one step; plans in another currency, or ended, are skipped. */
+    suspend fun setAmount(ids: Collection<Long>, amount: Money): BulkResult = bulk(ids) { ScheduleBulk.withAmount(it, amount) }
+
+    /** Pauses or resumes the plans in [ids], in one step; ended plans and those already that way are skipped. */
+    suspend fun setPaused(ids: Collection<Long>, paused: Boolean): BulkResult = bulk(ids) { ScheduleBulk.withPaused(it, paused) }
+
+    /** Deletes the plans in [ids] in one step; every transaction they already recorded stays. */
+    suspend fun delete(ids: Collection<Long>): BulkResult {
+        if (!access.canManageStructure()) return BulkResult.NotPermitted
+        return runner.run {
+            var deleted = 0
+            for (id in ids.distinct()) {
+                if (dao.getById(id) == null) continue
+                dao.deleteById(id)
+                deleted++
+            }
+            BulkResult.Done(deleted, ids.distinct().size - deleted)
+        }
+    }
+
+    private suspend fun bulk(ids: Collection<Long>, change: (RecurringSchedule) -> RecurringSchedule?): BulkResult {
+        if (!access.canManageStructure()) return BulkResult.NotPermitted
+        return runner.run {
+            var changed = 0
+            var skipped = 0
+            for (id in ids.distinct()) {
+                // Gone already (another phone deleted it): skipped and counted, as delete counts it.
+                val entity = dao.getById(id)
+                if (entity == null) {
+                    skipped++
+                    continue
+                }
+                val next = entity.toDomainOrNull()?.let(change)
+                if (next == null) {
+                    skipped++
+                    continue
+                }
+                dao.update(
+                    entity.copy(
+                        startOn = next.startDate.toEpochDay(),
+                        endOn = next.endDate?.toEpochDay(),
+                        nextIndex = next.nextIndex,
+                        amountMinor = next.amount.amountMinor,
+                        interestMinor = next.interest.amountMinor,
+                        paused = next.paused,
+                        updatedAt = clock(),
+                    ),
+                )
+                changed++
+            }
+            BulkResult.Done(changed, skipped)
+        }
+    }
+
     suspend fun countForWallet(walletId: Long): Int = dao.countForWallet(walletId)
 
     companion object {
         const val MAX_NAME = 40
         const val MAX_INTERVAL = 52
     }
+}
+
+/**
+ * An account a scheduled transfer can move money between: one money moves through that the person owns — not a card,
+ * loan or receivable (their payments and collections have their own schedules), nor a valued asset.
+ */
+private fun isMoneyAccount(type: String): Boolean {
+    val walletType = WalletType.entries.firstOrNull { it.name == type } ?: return false
+    return walletType.acceptsTransactions && !walletType.isLiability && walletType != WalletType.RECEIVABLE
 }
 
 internal fun RecurringEntity.toDomainOrNull(): RecurringSchedule? = runCatching {

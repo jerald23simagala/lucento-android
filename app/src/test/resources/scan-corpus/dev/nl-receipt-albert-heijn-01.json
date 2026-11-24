@@ -1,0 +1,58 @@
+{
+  "id": "nl-receipt-albert-heijn-01",
+  "country": "NL",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-08",
+  "pages": [
+    [
+      "Albert Heijn",
+      "AH Amsterdam Rozengracht",
+      "Rozengracht 81, 1016 LV Amsterdam",
+      "Tel. 020-6248770",
+      "AANTAL  OMSCHRIJVING  PRIJS  BEDRAG",
+      "1  AH HALFVOLLE MELK  1,09",
+      "1  AH BANANEN  1,79",
+      "2  AH VOLKORENBROOD  1,59  3,18",
+      "1  HEINEKEN 6X33CL  6,49",
+      "1  STATIEGELD  0,90",
+      "1  DREFT AFWASMIDDEL  2,39",
+      "BONUS AH BANANEN  -0,40",
+      "SUBTOTAAL  15,44",
+      "TOTAAL  15,44",
+      "PINNEN  15,44",
+      "BTW  OVER  EUR",
+      "9%  5,19  0,47",
+      "21%  7,34  1,54",
+      "TOTAAL  13,43  2,01",
+      "Bonuskaart: xxxxxxxxxx1185",
+      "Je bespaarde  0,40",
+      "Datum: 07-11-2026  Tijd: 17:55",
+      "Terminal 7H2X09  Merchant 1006412",
+      "DEBIT MASTERCARD",
+      "Kaart: xxxx xxxx xxxx 9026",
+      "Autorisatiecode: 3F7Q21",
+      "Bedankt en tot ziens"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Albert Heijn",
+        "total": "15.44",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-07",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "groceries",
+        "paymentInstrument": "Mastercard",
+        "instrumentLast4": "9026"
+      }
+    ]
+  },
+  "notes": "No euro sign next to any amount; the ISO code appears only in the BTW table header ('BTW OVER EUR'). 07-11-2026 is 7 November (Dutch day-first; Amsterdam address). Bottle deposit (statiegeld) carries no BTW."
+}

@@ -1,5 +1,7 @@
 package com.lucento.app.feature.transactions
 
+import com.lucento.app.core.designsystem.component.AccountPickerSheet
+import com.lucento.app.core.designsystem.component.AccountField
 import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
@@ -272,11 +274,16 @@ fun TransactionEditorScreen(
                     categories = choices,
                     selectedId = draft.categoryId,
                     type = draft.type,
+                    isError = error is TransactionDraftError.CategoryRequired,
                     onSelect = { id ->
                         haptics.tick()
                         draft = draft.copy(categoryId = id)
+                        if (error is TransactionDraftError.CategoryRequired) error = null
                     },
                 )
+                if (error is TransactionDraftError.CategoryRequired) {
+                    Text("Choose a category.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
 
                 SectionDivider()
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -404,36 +411,46 @@ private fun FieldLabel(text: String) {
 }
 
 /**
- * Category as a full-width dropdown: the field shows the chosen category's tile and name (or "No category"); the menu
- * lists every choice with its tile, plus "No category" to clear it. The menu matches the field's width.
+ * Category as a full-width dropdown: the field shows the chosen category's tile and name; the menu lists every choice
+ * with its tile and matches the field's width. Every income and expense needs a category (owner, 2026-11-04), so there
+ * is no "No category" choice; an older transaction without one asks for it on save ([isError]).
  */
 @Composable
 private fun CategoryDropdown(
     categories: List<Category>,
     selectedId: Long?,
     type: TransactionType,
-    onSelect: (Long?) -> Unit,
+    isError: Boolean,
+    onSelect: (Long) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val density = LocalDensity.current
     var expanded by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val selected = categories.firstOrNull { it.id == selectedId }
-    val border by animateColorAsState(if (expanded) colors.primary else colors.outlineVariant, tween(160), label = "cat-field")
+    val border by animateColorAsState(
+        when {
+            isError -> colors.error
+            expanded -> colors.primary
+            else -> colors.outlineVariant
+        },
+        tween(160),
+        label = "cat-field",
+    )
 
     Box(Modifier.fillMaxWidth()) {
         Surface(
             onClick = { expanded = true },
             shape = MaterialTheme.shapes.small,
             color = colors.surfaceContainerLowest,
-            border = BorderStroke(if (expanded) 1.5.dp else 1.dp, border),
+            border = BorderStroke(if (expanded || isError) 1.5.dp else 1.dp, border),
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 56.dp)
                 .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                 .semantics {
                     role = Role.DropdownList
-                    contentDescription = "Category, ${selected?.name ?: "none"}"
+                    contentDescription = "Category, ${selected?.name ?: "not chosen yet"}"
                 },
         ) {
             Row(
@@ -444,9 +461,9 @@ private fun CategoryDropdown(
                 Spacer(Modifier.width(Spacing.md))
                 // The label rides inside the field (like the Note field's), saving a header row.
                 Column(Modifier.weight(1f)) {
-                    Text("Category · optional", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
+                    Text("Category", style = MaterialTheme.typography.labelSmall, color = if (isError) colors.error else colors.onSurfaceVariant, maxLines = 1)
                     Text(
-                        selected?.name ?: "No category",
+                        selected?.name ?: "Choose a category",
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (selected != null) colors.onSurface else colors.onSurfaceVariant,
                         maxLines = 1,
@@ -461,15 +478,6 @@ private fun CategoryDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.width(fieldWidth).heightIn(max = 360.dp),
         ) {
-            DropdownMenuItem(
-                text = { Text("No category") },
-                leadingIcon = { CategoryTile(category = null, type = type, size = 28.dp) },
-                trailingIcon = if (selectedId == null) ({ Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary) }) else null,
-                onClick = {
-                    expanded = false
-                    onSelect(null)
-                },
-            )
             categories.forEach { category ->
                 DropdownMenuItem(
                     text = { Text(category.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -498,87 +506,26 @@ private fun WalletDropdown(
     isError: Boolean,
     onSelect: (Long) -> Unit,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val density = LocalDensity.current
-    var expanded by remember { mutableStateOf(false) }
-    var fieldWidth by remember { mutableStateOf(0.dp) }
-    val selected = wallets.firstOrNull { it.id == selectedId }
-    val mixedCurrencies = wallets.map { it.currencyCode }.distinct().size > 1
-    val border by animateColorAsState(
-        when {
-            isError -> colors.error
-            expanded -> colors.primary
-            else -> colors.outlineVariant
-        },
-        tween(160),
-        label = "wallet-field",
+    // Tester round (2026-11-17): the same account picker as transfers and the composer — grouped, with balances.
+    var picking by remember { mutableStateOf(false) }
+    AccountField(
+        wallet = wallets.firstOrNull { it.id == selectedId },
+        onClick = { picking = true },
+        label = label,
+        placeholder = "Choose a wallet",
+        isError = isError,
     )
-    fun detail(w: Wallet) = if (mixedCurrencies) "${w.type.label} · ${w.currencyCode}" else w.type.label
-
-    Box(Modifier.fillMaxWidth()) {
-        Surface(
-            onClick = { expanded = true },
-            shape = MaterialTheme.shapes.small,
-            color = colors.surfaceContainerLowest,
-            border = BorderStroke(if (expanded || isError) 1.5.dp else 1.dp, border),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
-                .semantics {
-                    role = Role.DropdownList
-                    contentDescription = "$label, ${selected?.name ?: "none chosen"}"
-                },
-        ) {
-            Row(
-                Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (selected != null) {
-                    WalletIdentityTile(selected, size = 32.dp)
-                } else {
-                    IconTile(Icons.Outlined.AccountBalanceWallet, size = 32.dp, content = colors.onSurfaceVariant, shape = RoundedCornerShape(8.dp))
-                }
-                Spacer(Modifier.width(Spacing.md))
-                Column(Modifier.weight(1f)) {
-                    Text(label, style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant, maxLines = 1)
-                    Text(
-                        selected?.name ?: "Choose a wallet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (selected != null) colors.onSurface else colors.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                selected?.let {
-                    Text(detail(it), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant, maxLines = 1)
-                    Spacer(Modifier.width(Spacing.xs))
-                }
-                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = colors.onSurfaceVariant)
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            modifier = Modifier.width(fieldWidth).heightIn(max = 360.dp),
-        ) {
-            wallets.forEach { w ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(w.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(detail(w), style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
-                        }
-                    },
-                    leadingIcon = { WalletIdentityTile(w, size = 28.dp) },
-                    trailingIcon = if (w.id == selectedId) ({ Icon(Icons.Filled.Check, contentDescription = "Selected", tint = colors.primary) }) else null,
-                    onClick = {
-                        expanded = false
-                        onSelect(w.id)
-                    },
-                )
-            }
-        }
+    if (picking) {
+        AccountPickerSheet(
+            title = "Which wallet?",
+            wallets = wallets,
+            selectedId = selectedId,
+            onPick = {
+                picking = false
+                onSelect(it.id)
+            },
+            onDismiss = { picking = false },
+        )
     }
 }
 

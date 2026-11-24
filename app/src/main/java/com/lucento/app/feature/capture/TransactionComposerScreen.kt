@@ -4,14 +4,7 @@ import com.lucento.app.feature.fx.FxOfflineChoice
 import com.lucento.app.core.designsystem.component.AmountsShown
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import com.lucento.app.core.designsystem.component.SheetHeader
-import android.app.Activity
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.speech.RecognizerIntent
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -43,12 +36,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.KeyboardVoice
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.PictureAsPdf
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -78,7 +71,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.ConfirmDialog
@@ -101,7 +93,6 @@ import com.lucento.app.domain.capture.CaptureSource
 import com.lucento.app.domain.capture.ReviewRow
 import com.lucento.app.domain.capture.RowEdit
 import com.lucento.app.feature.wallets.WalletRow
-import java.io.File
 import java.time.Instant
 import java.time.ZoneOffset
 import com.lucento.app.core.designsystem.component.ChatDayDivider
@@ -122,18 +113,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.material3.Button
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import android.Manifest
-import android.content.pm.PackageManager
-import android.speech.SpeechRecognizer
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.compose.LifecycleStartEffect
-import java.util.Locale
-import kotlinx.coroutines.launch
 
 /** How the composer opens: ready to type, listening, or taking a receipt photo. */
 enum class ComposerStart { TYPE, SPEAK, SCAN }
+
+/** The longest message the field takes, typed or spoken. */
+private const val MESSAGE_LIMIT = 1_000
 
 /**
  * Lucento's only way to add transactions: describe what happened — typed, spoken or as a receipt photo — and every
@@ -167,11 +152,8 @@ fun TransactionComposerScreen(
     var pickingDateFor by remember { mutableStateOf<String?>(null) }
     var confirmDiscard by remember { mutableStateOf(false) }
     var started by rememberSaveable { mutableStateOf(false) }
-    var pendingPhoto by remember { mutableStateOf<File?>(null) }
     var scanMenu by remember { mutableStateOf(false) }
-    var askingSmartReading by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(walletId, typeHint, transfersEnabled) { viewModel.configure(walletId, typeHint, transfersEnabled) }
     // Several accounts and nothing to go on (no entry wallet, no default): ask once, up front.
@@ -191,138 +173,30 @@ fun TransactionComposerScreen(
         notice = null
     }
 
-    // ---------------------------------------------------------------- speech
-    // Lucento listens itself (VoiceCapture) when the phone has a speech service and the microphone is allowed: it waits
-    // while people think before they speak. Otherwise the speech service's own window, which needs no permission here.
-    // Both stay offline unless the person agreed to online voice (SpeechRequest). Saveable: a result can arrive after a
-    // rotation.
-    var listenedOffline by rememberSaveable { mutableStateOf(false) }
-    var askingOnlineVoice by rememberSaveable { mutableStateOf(false) }
-    val recognizer = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        when {
-            // Cancelled and "Voice search isn't available" both come back here; offline, offer online voice.
-            result.resultCode != Activity.RESULT_OK ->
-                notice = if (listenedOffline) SpeechRequest.OFFLINE_FAILED else "Listening stopped. You can type it instead."
-            heard.isNullOrBlank() -> notice = "Nothing was recognised. Try again, or type it."
-            else -> {
-                notice = null
-                viewModel.send(heard, CaptureSource.SPOKEN)
-            }
-        }
-    }
+    // ---------------------------------------------------------------- speech (VoiceInput, shared with Ask Lucento)
+    // Spoken messages are sent as soon as listening ends; "Edit message" fixes the wording. Words heard when the person
+    // leaves mid-sentence go back into the field, unsent.
+    val voice = rememberVoiceInput(
+        example = "Dinner 450, parking 90",
+        onlineAllowed = viewModel::onlineVoiceAllowed,
+        onAllowOnline = viewModel::allowOnlineVoice,
+        onNotice = { notice = it },
+        onHeard = { heard -> viewModel.send(heard, CaptureSource.SPOKEN) },
+        onLeft = { heard -> input = SpeechRequest.intoField(input, heard, MESSAGE_LIMIT) },
+    )
 
-    fun launchRecognizer(online: Boolean) {
-        listenedOffline = !online
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            // The interpreter understands English: the phone's own English, or US English.
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, SpeechRequest.languageTag(Locale.getDefault()))
-            // True means offline only: phones without an offline pack then can't listen at all.
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, !online)
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say something like “Dinner 450, parking 90”")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-        }
-        try {
-            recognizer.launch(intent)
-        } catch (e: ActivityNotFoundException) {
-            notice = "This phone has no speech recogniser available. Type it instead — it works the same way."
-        }
-    }
-
-    val onVoiceEnd by rememberUpdatedState<(VoiceCommand) -> Unit> { command ->
-        when (command) {
-            is VoiceCommand.Finish -> {
-                val heard = command.text
-                if (heard == null) {
-                    notice = SpeechRequest.NOTHING_HEARD
-                } else {
-                    notice = null
-                    haptics.tick()
-                    viewModel.send(heard, CaptureSource.SPOKEN)
-                }
-            }
-            is VoiceCommand.Fail -> notice = SpeechRequest.failureNotice(command.reason)
-            else -> Unit
-        }
-    }
-    val voice = remember { VoiceCapture(context) { onVoiceEnd(it) } }
-    // Leaving the app or the composer stops listening; words already heard go back into the field, unsent.
-    LifecycleStartEffect(voice) {
-        onStopOrDispose {
-            voice.cancel()?.let { heard -> if (input.isBlank()) input = heard }
-        }
-    }
-
-    fun startListening(online: Boolean) {
-        listenedOffline = !online
-        notice = null
-        voice.start(online, SpeechRequest.languageTag(Locale.getDefault()))
-    }
-
-    // The mode the microphone was asked for: the online-voice consent may still be being saved when the answer comes.
-    var micForOnline by rememberSaveable { mutableStateOf(false) }
-    val askMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        // Refused: the speech service's own window still works without it.
-        if (granted) startListening(micForOnline) else launchRecognizer(micForOnline)
-    }
-
-    fun listenWith(online: Boolean) {
-        when {
-            voice.listening -> Unit
-            !SpeechRecognizer.isRecognitionAvailable(context) -> launchRecognizer(online)
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED ->
-                startListening(online)
-            else -> {
-                micForOnline = online
-                askMicrophone.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        }
-    }
-
-    fun listen() {
-        haptics.tick()
-        scope.launch { listenWith(online = viewModel.onlineVoiceAllowed()) }
-    }
-
-    // ---------------------------------------------------------------- receipts (system camera or photo picker; read on this phone)
-    val takePicture = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
-        val file = pendingPhoto
-        pendingPhoto = null
-        if (saved && file != null) {
-            viewModel.readReceipt(context.applicationContext, FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file), cleanup = file)
-        } else {
-            file?.delete()
-        }
-    }
-    val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.readReceipt(context.applicationContext, uri, cleanup = null)
-    }
-
-    fun launchCamera() {
-        val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
-        val file = File(dir, "receipt-${System.currentTimeMillis()}.jpg")
-        pendingPhoto = file
-        try {
-            takePicture.launch(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
-        } catch (e: ActivityNotFoundException) {
-            pendingPhoto = null
-            file.delete()
-            viewModel.receiptUnavailable("No camera app is available. Choose an image instead.")
-        }
-    }
-
-    fun launchPicker() {
-        try {
-            pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        } catch (e: ActivityNotFoundException) {
-            viewModel.receiptUnavailable("No photo picker is available on this phone.")
-        }
-    }
+    // ---------------------------------------------------------------- documents (Document Scanner, camera, images, PDF; read on this phone)
+    // A locked PDF waits here for its password: the file, and whether a password was already tried and refused.
+    var lockedPdf by remember { mutableStateOf<Pair<android.net.Uri, Boolean>?>(null) }
+    val scan = rememberScanLaunchers(
+        viewModel,
+        onPdfLocked = { uri, wrong -> lockedPdf = uri to wrong },
+        onNotice = { notice = it },
+    )
 
     fun begin(mode: ComposerStart) = when (mode) {
-        ComposerStart.SPEAK -> if (voiceEnabled) listen() else Unit
-        ComposerStart.SCAN -> if (scanEnabled) launchCamera() else Unit
+        ComposerStart.SPEAK -> if (voiceEnabled) voice.listen() else Unit
+        ComposerStart.SCAN -> if (scanEnabled) scan.scanDocument() else Unit
         ComposerStart.TYPE -> Unit
     }
 
@@ -428,7 +302,7 @@ fun TransactionComposerScreen(
                 item(key = "r${message.id}") {
                     // Lucento's reply card holds its one-line answer and every row it found, each a tinted panel.
                     val rows = state.rows.filter { it.messageId == message.id }
-                    Response(message, rows, state.statuses.filterKeys { k -> rows.any { it.key == k } }.count { !it.value.ready }) {
+                    Response(message, rows, state.statuses.filterKeys { k -> rows.any { it.key == k } }.count { !it.value.ready }, state.geminiReads) {
                         rows.forEach { row ->
                             ReviewRowItem(
                                 row = row,
@@ -448,6 +322,10 @@ fun TransactionComposerScreen(
                                 modifier = Modifier.padding(top = Spacing.sm),
                                 fx = state.fx[row.key],
                             )
+                        }
+                        // A scan checked against the ledger: what was held back, the balance, fees, a card's figures.
+                        (message.state as? MessageState.Read)?.takeIf { it.held.isNotEmpty() || it.statements.isNotEmpty() }?.let { read ->
+                            StatementCheck(read, state.wallets, onAddHeld = { index -> viewModel.addHeld(message.id, index) })
                         }
                     }
                 }
@@ -485,7 +363,7 @@ fun TransactionComposerScreen(
                 text,
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = Spacing.xs),
                 actionLabel = if (offerOnline) SpeechRequest.TRY_ONLINE else null,
-                onAction = if (offerOnline) ({ askingOnlineVoice = true }) else null,
+                onAction = if (offerOnline) voice::offerOnline else null,
             )
         }
         if (state.editingMessageId != null) {
@@ -511,27 +389,9 @@ fun TransactionComposerScreen(
             }
         }
 
-        // ---------------------------------------------------------------- Smarter reading (owner test 2026-11-09)
-        // Next to where the message is typed, since that's what it changes. On asks for the same consent as Settings.
-        if (state.smartReadingOffered) {
-            Row(
-                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(start = Spacing.gutter, end = Spacing.gutter - Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    SmartReadingCopy.status(state.smartReading),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
-                )
-                com.lucento.app.core.designsystem.component.CompactSwitch(
-                    label = "Smarter reading",
-                    icon = Icons.Outlined.AutoAwesome,
-                    checked = state.smartReading,
-                    onCheckedChange = { on -> if (on) askingSmartReading = true else viewModel.setSmartReading(false) },
-                )
-            }
-        }
+        // Smarter reading has no switch here (owner, 2026-11-15): Gemini makes every message wait, and new users expect
+        // rows at once. It is turned on in Settings › Privacy & security, which says so; the intro note and the
+        // "Gemini is reading…" reply say when it is on.
 
         // ---------------------------------------------------------------- composer
         // One raised bar: scan and voice as soft tiles, the message field, and send — every control the same height.
@@ -542,33 +402,51 @@ fun TransactionComposerScreen(
         ) {
             if (scanEnabled) {
                 Box {
-                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt or statement", onClick = { scanMenu = true })
+                    ChatToolButton(Icons.Outlined.DocumentScanner, "Scan a receipt, bill or statement", onClick = { scanMenu = true })
                     DropdownMenu(expanded = scanMenu, onDismissRequest = { scanMenu = false }) {
+                        // The Document Scanner flattens paper and takes several pages; the plain camera stays for phones
+                        // where it can't run, and for a quick single photo.
+                        DropdownMenuItem(
+                            text = { Text("Scan pages") },
+                            leadingIcon = { Icon(Icons.Outlined.DocumentScanner, contentDescription = null) },
+                            onClick = {
+                                scanMenu = false
+                                scan.scanDocument()
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("Take a photo") },
                             leadingIcon = { Icon(Icons.Outlined.CameraAlt, contentDescription = null) },
                             onClick = {
                                 scanMenu = false
-                                launchCamera()
+                                scan.takePhoto()
                             },
                         )
                         DropdownMenuItem(
-                            text = { Text("Choose an image") },
+                            text = { Text("Choose images") },
                             leadingIcon = { Icon(Icons.Outlined.PhotoLibrary, contentDescription = null) },
                             onClick = {
                                 scanMenu = false
-                                launchPicker()
+                                scan.chooseImages()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Import a PDF") },
+                            leadingIcon = { Icon(Icons.Outlined.PictureAsPdf, contentDescription = null) },
+                            onClick = {
+                                scanMenu = false
+                                scan.importPdf()
                             },
                         )
                     }
                 }
             }
             if (voiceEnabled) {
-                ChatToolButton(Icons.Outlined.KeyboardVoice, "Speak transactions", onClick = ::listen)
+                ChatToolButton(Icons.Outlined.KeyboardVoice, "Speak transactions", onClick = voice::listen)
             }
             ChatMessageField(
                 value = input,
-                onValueChange = { input = it.take(1_000) },
+                onValueChange = { input = it.take(MESSAGE_LIMIT) },
                 onSend = { submit() },
                 placeholder = "Type a transaction…",
                 description = "Describe transactions",
@@ -576,19 +454,6 @@ fun TransactionComposerScreen(
             )
             ChatSendButton(enabled = input.isNotBlank() && state.loaded && state.wallets.isNotEmpty(), onClick = { submit() })
         }
-    }
-
-    if (askingSmartReading) {
-        com.lucento.app.core.designsystem.component.ConfirmDialog(
-            title = SmartReadingCopy.CONSENT_TITLE,
-            text = SmartReadingCopy.CONSENT_TEXT,
-            confirmLabel = "Turn on",
-            onConfirm = {
-                askingSmartReading = false
-                viewModel.setSmartReading(true)
-            },
-            onDismiss = { askingSmartReading = false },
-        )
     }
 
     pickingDateFor?.let { key ->
@@ -635,26 +500,17 @@ fun TransactionComposerScreen(
         )
     }
 
-    if (askingOnlineVoice) {
-        ConfirmDialog(
-            title = SpeechRequest.CONSENT_TITLE,
-            text = SpeechRequest.CONSENT_TEXT,
-            confirmLabel = "Use online voice",
-            dismissLabel = "Not now",
-            onConfirm = {
-                askingOnlineVoice = false
-                notice = null
-                viewModel.allowOnlineVoice()
-                haptics.tick()
-                // They tapped the mic to speak: listen again straight away, online this time.
-                listenWith(online = true)
-            },
-            onDismiss = { askingOnlineVoice = false },
-        )
-    }
+    VoiceInputSheets(voice)
 
-    voice.state?.let { session ->
-        ListeningSheet(state = session, level = { voice.level }, onDone = voice::done, onCancel = { voice.cancel() })
+    lockedPdf?.let { (uri, wrong) ->
+        PdfPasswordDialog(
+            wrong = wrong,
+            onUnlock = { password ->
+                lockedPdf = null
+                viewModel.readPdf(context.applicationContext, uri, password) { again -> lockedPdf = uri to again }
+            },
+            onDismiss = { lockedPdf = null },
+        )
     }
 
     if (confirmDiscard) {
@@ -778,7 +634,7 @@ private fun WalletChip(
     }
 }
 
-/** "Where should these go?" — asked when there are several accounts and no default or entry wallet. */
+/** "Select wallet to use": asked when there are several accounts and no default or entry wallet. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -> Unit, onDismiss: () -> Unit) {
@@ -786,7 +642,7 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
     LucentoBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter).navigationBarsPadding()) {
             SheetHeader(
-                title = "Where should these go?",
+                title = "Select wallet to use",
                 subtitle = "New transactions go to this wallet unless you name another. You can switch any time from the wallet bar.",
                 icon = Icons.Outlined.AccountBalanceWallet,
             )
@@ -795,14 +651,14 @@ private fun WalletPickerSheet(wallets: List<Wallet>, onChoose: (Long, Boolean) -
                 WalletRow(
                     wallet = wallet,
                     modifier = Modifier.clickable(role = Role.Button, onClickLabel = "Use this wallet") {
-                        onChoose(wallet.id, remember && wallet.type.isSpendable)
+                        onChoose(wallet.id, remember && wallet.type.canBeDefault)
                     },
                 )
             }
             Spacer(Modifier.height(Spacing.sm))
             SwitchRow(
                 title = "Remember as my default",
-                description = "Cash, bank and e-wallets can be the default. You can change it in the wallet’s settings.",
+                description = "Cash, bank, e-wallets and credit cards can be the default. You can change it in the wallet’s settings.",
                 checked = remember,
                 onCheckedChange = { remember = it },
             )
@@ -822,6 +678,10 @@ private fun ComposerBanner(mood: MascotMood, transfersAllowed: Boolean) {
     )
 }
 
+/**
+ * The examples to try. Owner, 2026-11-23: the composer says nothing about Smarter reading (Gemini is for Ask Lucento);
+ * when someone has turned it on in Settings, each reply says who read it and how many AI questions are left.
+ */
 @Composable
 private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit) {
     Column(Modifier.fillMaxWidth()) {
@@ -835,12 +695,6 @@ private fun ComposerIntro(transfersAllowed: Boolean, onExample: (String) -> Unit
         examples.forEach { example ->
             LucentoTextButton(text = "“$example”", onClick = { onExample(example) })
         }
-        Spacer(Modifier.height(Spacing.sm))
-        Text(
-            "Nothing is sent unless you turn on cloud sync, crash reports, or Smarter reading.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 
@@ -900,9 +754,16 @@ private fun timeOf(epochMillis: Long): String =
 /**
  * Lucento's reply: its avatar and a card with one short line — "Got it! Here are 3 transactions I’ll add:" — then the
  * rows it found ([rows]), and who read the message when it wasn't plain on-device reading. Its time sits beneath.
+ * While Smarter reading is on ([geminiReads]) the wait says it is Gemini's, so a slower reply has a reason.
  */
 @Composable
-private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAttention: Int, rowsContent: @Composable () -> Unit) {
+private fun Response(
+    message: ComposerMessage,
+    rows: List<ReviewRow>,
+    needsAttention: Int,
+    geminiReads: Boolean,
+    rowsContent: @Composable () -> Unit,
+) {
     val live = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
     val reading = message.state is MessageState.Reading
     LucentoReply(
@@ -918,7 +779,11 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                 TypingDots(description = "Reading")
                 Spacer(Modifier.width(Spacing.sm))
                 Text(
-                    if (message.source == CaptureSource.RECEIPT) "Reading the scan on this phone…" else "Reading…",
+                    when {
+                        message.source == CaptureSource.RECEIPT -> "Reading the scan on this phone…"
+                        geminiReads -> SmartReadingCopy.READING
+                        else -> "Reading…"
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -926,6 +791,8 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
             is MessageState.Read -> {
                 val text = when {
                     rows.isEmpty() && s.saved > 0 -> if (s.saved == 1) "Saved." else "Saved all ${s.saved}."
+                    // Every line of the scan is saved already (or waiting above): nothing new to add.
+                    rows.isEmpty() && s.found == 0 && s.held.isNotEmpty() -> "Everything here is already in Lucento — nothing new to add."
                     rows.isEmpty() -> "Removed."
                     needsAttention == 0 -> if (rows.size == 1) "Got it! Here’s the transaction I’ll add:" else "Got it! Here are ${rows.size} transactions I’ll add:"
                     needsAttention == 1 -> if (rows.size == 1) "Here’s what I read — it needs a look:" else "Here are ${rows.size} transactions — 1 needs a look:"
@@ -933,7 +800,7 @@ private fun Response(message: ComposerMessage, rows: List<ReviewRow>, needsAtten
                 }
                 Text(text, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), modifier = live)
                 // A scan says what it was read as (one receipt, or a statement's lines) and what to check.
-                if (rows.isNotEmpty()) {
+                if (rows.isNotEmpty() || s.held.isNotEmpty()) {
                     s.note?.let { note ->
                         Text(
                             note,
@@ -1027,8 +894,9 @@ private fun BatchBar(summary: BatchSummary, saving: Boolean, onSave: () -> Unit)
 
 private fun totalsLine(summary: BatchSummary): String? {
     val parts = ArrayList<String>()
-    if (summary.expenses.isNotEmpty()) parts += "Expenses " + summary.expenses.joinToString(" + ") { MoneyFormatter.formatSigned(-it, showPlus = true) }
-    if (summary.income.isNotEmpty()) parts += "Income " + summary.income.joinToString(" + ") { MoneyFormatter.formatSigned(it, showPlus = true) }
+    // Entries about to be saved are always shown exactly, whatever Settings › Money › Show cents says.
+    if (summary.expenses.isNotEmpty()) parts += "Expenses " + summary.expenses.joinToString(" + ") { MoneyFormatter.formatSigned(-it, showPlus = true, wholeUnits = false) }
+    if (summary.income.isNotEmpty()) parts += "Income " + summary.income.joinToString(" + ") { MoneyFormatter.formatSigned(it, showPlus = true, wholeUnits = false) }
     if (summary.transfers > 0) parts += if (summary.transfers == 1) "1 transfer" else "${summary.transfers} transfers"
     return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }

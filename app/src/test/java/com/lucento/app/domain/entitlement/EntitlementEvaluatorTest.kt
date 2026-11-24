@@ -29,7 +29,7 @@ class EntitlementEvaluatorTest {
         assertEquals(Access.Allowed, EntitlementEvaluator.access(EntitlementState.FREE, ProFeature.MONEY_WALLETS, used = 2, now = now))
         assertEquals(Access.Allowed, EntitlementEvaluator.access(EntitlementState.FREE, ProFeature.DEBT_ACCOUNTS, used = 1, now = now))
         assertEquals(Access.Allowed, EntitlementEvaluator.access(EntitlementState.FREE, ProFeature.SAVINGS_GOALS, used = 1, now = now))
-        assertEquals(Access.Allowed, EntitlementEvaluator.access(EntitlementState.FREE, ProFeature.AI_ADVISER, used = 9, now = now))
+        assertEquals(Access.Allowed, EntitlementEvaluator.access(EntitlementState.FREE, ProFeature.AI_ADVISER, used = 4, now = now))
     }
 
     @Test fun free_user_at_a_count_gets_limit_reached_with_the_upgrade_limit() {
@@ -107,7 +107,7 @@ class EntitlementEvaluatorTest {
         assertEquals(Access.Allowed, EntitlementEvaluator.access(checkedLately, ProFeature.FOREIGN_CURRENCY_WALLETS, 0, farFuture))
         assertEquals(Access.Allowed, EntitlementEvaluator.access(checkedLately, ProFeature.MONEY_WALLETS, 40, farFuture))
         assertEquals(Access.Locked(ProFeature.CLOUD_SYNC, Capability.CLOUD), EntitlementEvaluator.access(lifetimeOnly, ProFeature.CLOUD_SYNC, 0, now))
-        assertEquals(Limit.PerMonth(10), PlanCatalog.limit(ProFeature.AI_ADVISER, lifetimeOnly, now))
+        assertEquals(Limit.PerMonth(5), PlanCatalog.limit(ProFeature.AI_ADVISER, lifetimeOnly, now))
         assertEquals(DisplayPlan.LIFETIME, checkedLately.displayPlan(farFuture))
     }
 
@@ -157,7 +157,7 @@ class EntitlementEvaluatorTest {
         val services = row(EntitlementSource.PLAY_LIFETIME_SERVICES, setOf(Capability.CLOUD, Capability.AI_PRO, Capability.SHARED), expiresAt = now + 300 * day)
         val state = EntitlementState(lifetimeOnly.entitlements + services)
         assertEquals(DisplayPlan.LIFETIME_WITH_SERVICES, state.displayPlan(now))
-        assertEquals(Limit.PerDay(50), PlanCatalog.limit(ProFeature.AI_ADVISER, state, now))
+        assertEquals(Limit.PerMonth(45), PlanCatalog.limit(ProFeature.AI_ADVISER, state, now))
         // The year ends: back to Lifetime, LOCAL_PRO intact (confirmed within the month, L-2).
         val later = now + 400 * day
         val checked = EntitlementState(state.entitlements.map { it.copy(checkedAtMillis = later - day) })

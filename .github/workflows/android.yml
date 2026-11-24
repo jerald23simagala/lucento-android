@@ -148,7 +148,7 @@ jobs:
           fi
           ./gradlew --stacktrace assembleRelease bundleRelease
 
-      - name: Inspect release artifacts (permissions, debuggable, application id, size)
+      - name: Inspect release artifacts (permissions, required features, debuggable, application id, deprecated APIs, size)
         run: |
           AAPT2="$ANDROID_HOME/build-tools/35.0.0/aapt2"
           RELEASE_APK=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
@@ -170,11 +170,32 @@ jobs:
           if [ -n "$UNEXPECTED" ]; then
             echo "::error::release APK requests unreviewed permissions: $UNEXPECTED"; exit 1
           fi
+          # Required hardware features decide which devices Google Play offers the app to. Only the default (faketouch)
+          # may be required. A library activity locked to one orientation implies android.hardware.screen.portrait or
+          # .landscape (0.5.15: ML Kit's document scanner; Play dropped 23 devices, mostly Chromebooks), and some
+          # permissions imply hardware (RECORD_AUDIO: the microphone). Declare such a feature android:required="false" in
+          # AndroidManifest.xml once the app works without it, as for the microphone and the portrait screen.
+          REQUIRED_OK="android.hardware.faketouch"
+          REQUIRED=$(grep -E "^[[:space:]]*uses-feature: name=" badging.txt | sed -E "s/.*name='([^']+)'.*/\1/" | grep -vxE "$REQUIRED_OK" || true)
+          if [ -n "$REQUIRED" ]; then
+            echo "::error::release APK requires hardware that narrows the devices Play offers it to: $REQUIRED"; exit 1
+          fi
           "$AAPT2" dump badging "$DEBUG_APK" | grep -q "package: name='com.lucento.app.debug'" || { echo "::error::debug application id is not com.lucento.app.debug"; exit 1; }
           # Only a publishable key may ship: no secret or service-role key text in either APK's code.
           for APK in "$RELEASE_APK" "$DEBUG_APK"; do
             if unzip -p "$APK" 'classes*.dex' | grep -a -q -E 'sb_secret_|service_role'; then echo "::error::$APK contains a server-only key"; exit 1; fi
           done
+          # Edge to edge without the window APIs Android 15 deprecated: Play Console flags any release whose code calls
+          # them (0.5.10, all from androidx.activity's enableEdgeToEdge). SystemBars.kt and the themes replace them; the
+          # theme, never code, sets the cutout mode. A failure here usually means a library update brought them back.
+          rm -rf release-dex && unzip -q -o "$RELEASE_APK" 'classes*.dex' -d release-dex
+          for DEX in release-dex/classes*.dex; do "$ANDROID_HOME/build-tools/35.0.0/dexdump" -d "$DEX"; done > release-dex/dump.txt
+          # An empty or broken dump would pass the check below silently, so first make sure it holds the app's code.
+          grep -q "Class descriptor  : 'Lcom/lucento/app/MainActivity;'" release-dex/dump.txt || { echo "::error::dexdump produced no usable output for the release APK"; exit 1; }
+          DEPRECATED=$(grep -o -E 'Landroid/view/Window;\.(setStatusBarColor|setNavigationBarColor|setNavigationBarDividerColor|setStatusBarContrastEnforced)|iput[^,]*, [^,]*, Landroid/view/WindowManager\$LayoutParams;\.layoutInDisplayCutoutMode' release-dex/dump.txt | sed -E 's/^iput.*/layoutInDisplayCutoutMode (written in code)/' | sort | uniq -c || true)
+          if [ -n "$DEPRECATED" ]; then
+            echo "::error::release code uses edge-to-edge APIs deprecated in Android 15 (Play Console flags them):"; echo "$DEPRECATED"; exit 1
+          fi
           {
             echo "### Lucento build"
             echo "| Artifact | Size |"
@@ -334,7 +355,8 @@ jobs:
             ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.feature.capture.ScanOcrTest
             # The Pro welcome's deck pressed with injected finger taps that drift a pixel or two, as real ones do
             # (performClick never moves, which hid the old tour's dead buttons on real phones; KNOWN_ISSUES PW-1).
-            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ProWelcomeRealTapTest,com.lucento.app.feature.pro.welcome.ProRevealDeckFingerTest
+            # Ask Lucento's AI answers, on by default: nothing is requested until the person confirms the first question.
+            ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ProWelcomeRealTapTest,com.lucento.app.feature.pro.welcome.ProRevealDeckFingerTest,com.lucento.app.feature.ask.AskAiConfirmTest
             ./gradlew --stacktrace connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.lucento.app.ScreenshotTourTest || echo "SCREENSHOT_TOUR_FAILED=true" >> "$GITHUB_ENV"
             mkdir -p app/build/screenshots && adb pull /data/local/tmp/lucento-shots/. app/build/screenshots/ || true
 

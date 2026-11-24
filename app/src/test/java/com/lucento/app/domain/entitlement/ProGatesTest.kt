@@ -41,6 +41,23 @@ class ProGatesTest {
         assertTrue(ProGates.pdfAllowed(lifetimeOnly, now))
     }
 
+    @Test fun smart_reading_needs_the_online_ai_service() {
+        assertFalse("Free: the server would refuse every message", ProGates.smartReadingAllowed(free, now))
+        assertFalse("Lifetime after its included year", ProGates.smartReadingAllowed(lifetimeOnly, now))
+        assertTrue(ProGates.smartReadingAllowed(pro, now))
+        assertTrue("AI_PRO alone is enough", ProGates.smartReadingAllowed(state(Capability.AI_PRO), now))
+        // A plan that has ended no longer covers it, once its offline grace is over.
+        assertFalse(ProGates.smartReadingAllowed(pro, now + 1_000_000 + Entitlement.OFFLINE_GRACE_MILLIS))
+    }
+
+    @Test fun ai_allowance_is_pros_with_the_online_ai_service_and_the_free_plans_otherwise() {
+        // Free still gets AI answers (5 a month, docs §3.6); Pro gets 45 a month. Both run per calendar month.
+        assertFalse("Free: the free plan's allowance", ProGates.aiProAllowance(free, now))
+        assertFalse("Lifetime after its included year: back to the free allowance", ProGates.aiProAllowance(lifetimeOnly, now))
+        assertTrue(ProGates.aiProAllowance(pro, now))
+        assertTrue("AI_PRO alone is enough", ProGates.aiProAllowance(state(Capability.AI_PRO), now))
+    }
+
     @Test fun sunrise_and_midnight_are_free_the_other_three_are_pro() {
         assertEquals(setOf("GROVE", "MONO", "AURORA"), ProGates.PRO_THEME_IDS)
         for (t in listOf("SUNRISE", "MIDNIGHT", "GROVE", "MONO", "AURORA")) {

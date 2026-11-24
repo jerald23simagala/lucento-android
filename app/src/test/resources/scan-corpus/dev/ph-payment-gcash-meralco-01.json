@@ -1,0 +1,45 @@
+{
+  "id": "ph-payment-gcash-meralco-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-26",
+  "pages": [
+    [
+      "10:05",
+      "GCash",
+      "Bills Payment",
+      "Paid to",
+      "MERALCO",
+      "Successfully paid!",
+      "Account Number  0123 4567 89",
+      "Account Name  R*** S****",
+      "Amount  2,846.35",
+      "Convenience Fee  0.00",
+      "Total Amount  ₱2,846.35",
+      "Ref No. 2012 846 351902",
+      "Oct 26, 2026 9:15 AM",
+      "Your payment will be posted within 3 business days.",
+      "Done"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Meralco",
+        "total": "2846.35",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-10-26",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "utilities",
+        "paymentInstrument": "GCash",
+        "instrumentLast4": null
+      }
+    ]
+  }
+}

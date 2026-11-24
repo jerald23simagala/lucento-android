@@ -24,7 +24,7 @@ long as the phone runs the app.
 |---|---|---|
 | **Free** | A complete offline budgeting app with a small number of count limits | ₱0 |
 | **Pro Subscription** | Everything Lucento does, including the online services (cloud sync, cloud restore, AI adviser, Lucento Shared), while subscribed | ₱149 / month · ₱1,190 / year (7-day trial on annual) |
-| **Pro Lifetime** | Permanent ownership of every **local** Pro feature, plus 12 months of the online services; after that the online services are an optional add-on | **₱3,490 once** (recommended; see §4.3) + optional **Lucento Cloud** add-on ₱59 / month or ₱490 / year |
+| **Pro Lifetime** | Permanent ownership of every **local** Pro feature, plus 12 months of the online services; after that the online services are an optional add-on | **₱2,490 once** (lowered from ₱3,490 on 2026-11-21; see §4.3) + optional **Lucento Cloud** add-on ₱59 / month or ₱490 / year |
 
 **The one idea that makes Lifetime honest**: entitlements are split into four groups, and Lifetime buys group A
 outright.
@@ -33,7 +33,7 @@ outright.
 |---|---|---|---|---|
 | **A. Local Pro features** (run on the phone, cost Lucento nothing per use) | unlimited money wallets, unlimited debt accounts, receivables, manually valued assets, 20 active goals, 12-month Insights and net-worth composition, wallets in other currencies, statements as PDF, all themes, every future local Pro feature | limits | ✔ while subscribed | **✔ forever, offline** |
 | **B. Cloud services** (Supabase) | cloud sync, cloud restore on a new phone | — | ✔ | 12 months included, then Lucento Cloud add-on |
-| **C. AI services** (Gemini via the Vercel proxy) | AI adviser allowance, Smarter reading | 10 questions / month | 50 / day | 12 months at Pro allowance, then Free allowance or Lucento Cloud add-on |
+| **C. AI services** (Gemini via the Vercel proxy) | AI adviser allowance, Smarter reading | 5 questions / month | 45 / month | 12 months at Pro allowance, then Free allowance or Lucento Cloud add-on |
 | **D. Lucento Shared** (needs B) | invite one Partner | — | ✔ | while B is active |
 
 **What changed from v1 and why** (each is a decision in §7):
@@ -191,10 +191,10 @@ Why no "advanced historical views" tier: nothing exists to sell; history is one 
 
 | Feature | Status | F | S | L | Offline | Gate |
 |---|---|---|---|---|---|---|
-| **Money wallets** (cash, bank, e-wallet, savings; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too |
+| **Money wallets** (cash, bank, e-wallet, savings, investments — added 2026-11-17, tester round; 409 institutions) | Shipped | **3 active** (recommended; owner proposed 2 — D-1) | Unlimited | Unlimited | Yes | `WalletRepository.create` when `type in {CASH, BANK, E_WALLET, SAVINGS, INVESTMENT}` → `SaveResult.LimitReached(used, limit)`; `update` that changes type *into* a money type counts too. An investment counts like savings: money the person moves in and out (`ProGates.walletFeature`) |
 | **Debt accounts** (credit cards, loans) with terms, cycles, amount due, payment reminders | Shipped | **2 active** (D-2) | Unlimited | Unlimited | Yes | same call, `type in {CREDIT_CARD, LOAN}` |
 | **Receivables** (money owed to you, instalments, interest) | Shipped | — | ✔ | ✔ | Yes | same call, `type == RECEIVABLE` → `ProRequired` |
-| **Manually valued assets** (home, car, investments) | Shipped | — | ✔ | ✔ | Yes | same call, `type == OTHER_ASSET` → `ProRequired` |
+| **Manually valued assets** (home, car, jewellery; investments are a money wallet since 2026-11-17) | Shipped | — | ✔ | ✔ | Yes | same call, `type == OTHER_ASSET` → `ProRequired` |
 | Adjust balance, institution logos and card faces, reorder | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | **Wallets in another currency** (FX valuation, realized gains, cross-currency transfers) | Shipped (v13) | — (main currency only) | ✔ | ✔ | Yes (rates optional) | `WalletRepository.create` with `currency != main`, `WalletChangePolicy` currency change → `ProRequired` |
 | Month-end FX revaluation | **Planned** (stage 2) | — | ✔ when built | ✔ when built | Yes | — |
@@ -231,6 +231,9 @@ Pro-sized life.
 | Ask Lucento: on-phone answers, four statements on screen (net worth, cash flow, budget vs actual, debts), top categories | Shipped | ✔ | ✔ | ✔ | Yes | none |
 | Ask Lucento: **statements as PDF** (save / share) | Shipped | — | ✔ | ✔ | Yes | `AskLucentoViewModel` PDF actions → `ProRequired` |
 | Category breakdown on Budget / Home | Shipped | ✔ | ✔ | ✔ | Yes | none |
+| Milestones ("Progress" until 2026-11-23): each month's recap on its own page (kept, budget, where it went, the biggest change, net worth, goals, debts, days recorded), opened from the month's square on every plan or from the check-in card, and the Awards page | Shipped (owner, 2026-11-23) | ✔ any month | ✔ | ✔ | Yes | none |
+| Milestones: **the budget year** (the calendar year as 12 squares coloured by how each month's budget went, the share used, the year's totals) | Shipped (owner, 2026-11-23) | Preview: the person's own months as grey squares, every result hidden | ✔ | ✔ | Yes | `ProGates.insightsPeriodAllowed(12)`, the same gate and wall as Insights' 12 months (`ProFeature.INSIGHTS_LONG_PERIODS`) |
+| Monthly check-in: the Home card, the plan page, planning months ahead | Shipped (owner, 2026-11-23) | ✔ | ✔ | ✔ | Yes | none |
 
 Why this split and not "all Insights free" (v1): the owner wants analytics as a Pro reason, and the period selector is
 a natural, honest depth line — a Free person still sees where this quarter's money went. Why not "all Insights Pro":
@@ -242,7 +245,7 @@ bait-and-switch in onboarding.
 | Feature | Status | F | S | L | L+C | Offline | Gate |
 |---|---|---|---|---|---|---|---|
 | Everything stored on the phone (Room), no account needed | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none |
-| JSON backup file and restore (merge or replace) | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none — portability is never sold |
+| JSON backup file and restore (merge or replace) | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none — portability is never sold. A file's records aren't counted against the Free limits, hand-edited files included (owner decision 2026-11-23, KNOWN_ISSUES LP-K16) |
 | CSV export | Shipped | ✔ (D-9: recommended **yes**) | ✔ | ✔ | ✔ | Yes | none |
 | Sign in (Google or email) | Shipped | ✔ | ✔ | ✔ | ✔ | Needs internet once | none — identity for the free AI allowance, Shared invitations, entitlement recovery |
 | **Cloud sync** across phones, upload after every write | Shipped | — | ✔ | **first 12 months**, then — | ✔ | No (service) | `SyncPreferences.setEnabled(true)` and `backgroundSyncAllowed(enabled, onboarded, entitled)` |
@@ -253,7 +256,7 @@ bait-and-switch in onboarding.
 
 | Feature | Status | F | S | L | L+C | Offline | Gate |
 |---|---|---|---|---|---|---|---|
-| AI adviser (Gemini): plans, recommendations, projections over the person's own figures | Shipped | **10 questions / calendar month** (signed in, consent) | **50 / day**, soft monthly ceiling 400 (abuse guard, remote-configured) | first 12 months as S; then **10 / month** | as S | No | proxy reads plan from `entitlements`; app displays `remaining` |
+| AI adviser (Gemini): plans, recommendations, projections over the person's own figures | Shipped | **5 questions / calendar month** (signed in, consent) | **45 / calendar month**, shared with Smarter reading (owner, 2026-11-23; was 50 / day under a 400 monthly ceiling) | first 12 months as S; then **5 / month** | as S | No | proxy reads plan from `entitlements`; app displays `remaining` |
 | Smarter reading (Gemini reads the composer message) | Shipped | — (on-phone reading) | ✔ | first 12 months; then — | ✔ | No | proxy answers `403 pro_required`; consent switch shows the lock |
 | On-phone reading, scanning (ML Kit), voice entry | Shipped | ✔ | ✔ | ✔ | ✔ | Yes | none |
 
@@ -296,7 +299,17 @@ cannot do automatically).
 ₱149 / month, ₱1,190 / year (≈ ₱99 / month, 33% off), 7-day trial on annual. Reasoning as v1 §4.2; unchanged. USD
 template $3.99 / $29.99.
 
-### 4.3 Lifetime price — recommended ₱3,490 (USD $79.99)
+**Regional prices (owner decision 2026-11-21).** Every price comes in four income tiers. The USD figures in this
+section are tier 1, the Philippine prices are tier 3, and Play converts each tier's base for its regions. The method,
+the country lists and the tool are in [monetization/REGIONAL_PRICING.md](monetization/REGIONAL_PRICING.md). The
+per-region table Play holds is [monetization/REGIONAL_PRICES.md](monetization/REGIONAL_PRICES.md).
+
+### 4.3 Lifetime price — ₱2,490 (USD $59.99), lowered from ₱3,490 (USD $79.99) on 2026-11-21
+
+**2026-11-21 (owner):** lowered to stay competitive with the apps closest to Lucento by features. Their one-time
+prices are ₱1,290–₱1,790 and $19.99–$29.99, and Spendee's is ₱2,990 / $119.99 (monetization/COMPETITOR_PRICING_2026-11.md).
+Lifetime is now 2.1 × yearly in the Philippines and 2.0 × in the US. Every tier moved in proportion
+(monetization/REGIONAL_PRICING.md). The reasoning below is the original case for ₱3,490.
 
 Commercial reasoning:
 
@@ -315,7 +328,8 @@ Commercial reasoning:
 Alternatives considered: ₱2,990 (too close to 2.5 × annual: at a 7-day trial on annual, a sizeable share of annual
 buyers would switch, and the included services year makes it a near-giveaway); ₱4,490 (3.8 ×; converts fewer and
 needs a launch promo to move at all). A **launch "founder" price** (₱2,990 for the first 60 days, then ₱3,490) is a
-Play Console action, not an app change, and is recommended as the launch tactic (D-10).
+Play Console action, not an app change, and is recommended as the launch tactic (D-10). **Dropped by the owner on
+2026-11-21:** Lifetime launches at its full price, with no founder offer in Play.
 
 ### 4.4 Lucento Cloud add-on — ₱59 / month, ₱490 / year (USD $1.49 / $12.99)
 
@@ -327,24 +341,29 @@ withheld.
 
 ### 4.5 Cost model behind the AI and cloud numbers (verify against current price lists before launch)
 
+Measured 2026-11-23 on Gemini 3.5 Flash-Lite ($0.30 / M input, $2.50 / M output), the production model since that day
+(`GEMINI_MODEL` on Vercel), with the app's own summary of a made-up household:
+
 | Item | Assumption | Per unit |
 |---|---|---|
-| Gemini Flash-class request (adviser): ~8k input tokens (figures, 60 days of transactions, system prompt) + ~600 output | $0.30 / M input, $2.50 / M output (verify) | ≈ **$0.004** (₱0.23) |
-| Smarter reading request: ~1.5k in + 200 out | same | ≈ $0.001 |
-| Free: 10 adviser questions / month | | ≤ $0.04 / user / month |
-| Pro: 50 / day, soft ceiling 400 / month | worst case 400 | ≤ $1.60 / user / month (≈ ₱90 — survivable against ₱149; the realistic median is far lower) |
-| Pro without a monthly ceiling | 1,500 / month | $6 / user / month — **more than the subscription**; hence the ceiling |
+| Ask Lucento question: ~11.5k input tokens (figures, 60 days of transactions, system prompt) + ~670 output (thinking included) | measured | ≈ **$0.005** (₱0.30) |
+| Smarter reading message: ~1k in + ~100 out | measured | ≈ $0.0005 |
+| Free: 5 adviser questions / month | | ≤ $0.03 / user / month |
+| Pro: 45 / calendar month, shared with Smarter reading | worst case 45 Ask questions | ≤ $0.23 / user / month (≈ ₱13 against ₱149 a month or ₱1,190 a year) |
+| The same 45 on Gemini Flash (3.6 / 3.8) | $0.75 / $3.75 per M, doubling on 1 Jan 2027 | ≈ $0.50, ≈ $1.00 from January |
 | Supabase sync storage and egress per user | tens of KB to a few MB | < $0.01 / user / month at current plan pricing; the fixed Supabase plan is the real cost |
 | Vercel function invocations | per request | negligible at launch scale |
 
-So: 50 / day is fine as the *daily* promise; the *monthly* soft ceiling (remote-configured, default 400, shown only
-when hit: "You've used this month's adviser allowance") is what keeps a single heavy user from costing more than they
-pay. Lifetime without Cloud gets the Free allowance (10 / month), which costs nothing meaningful and keeps the
-adviser discoverable.
+Owner, 2026-11-23: $2 a month (the earlier 400-question ceiling) was too much against the subscription, so every plan
+now runs per calendar month — Free 5, Pro 45 — and Gemini is for Ask Lucento, not for adding transactions (Smarter
+reading stays a Pro opt-in in Settings and uses the same allowance). Lifetime without Cloud gets the Free allowance
+(5 / month), which costs nothing meaningful and keeps the adviser discoverable. Production AI use before the change
+(aggregate): November to the 23rd, 7 accounts, 70 requests, median 7, most 34 in the month.
 
 ### 4.6 Promotions and future tiers
 
-Play promo codes, introductory prices and the founder price are Play Console offers; no app change. Server `GRANT`
+Play promo codes, introductory prices and launch offers are Play Console offers; no app change (the founder price was
+dropped on 2026-11-21). Server `GRANT`
 rows (with expiry) cover founders, testers, giveaways and goodwill. A future Pro Plus / Family is a new `Plan` and a
 `max_partners` change (PRODUCT_SPEC §7); the matrix is data (`PlanCatalog`), not code paths.
 
@@ -483,7 +502,7 @@ public.purchase_links (          -- one Play purchase ↔ one Lucento account, e
   purchase_token_hash text pk, order_id text, product_id text, user_id uuid references auth.users,
   obfuscated_account_id text null, linked_at timestamptz, relinked_count int default 0)
 lucento_private.plan_limits (    -- remote configuration; read by security-definer functions and the proxy
-  key text pk, value_int int, updated_at)   -- 'ai_free_monthly'=10, 'ai_pro_daily'=50, 'ai_pro_monthly_ceiling'=400, 'max_partners_pro'=1
+  key text pk, value_int int, updated_at)   -- 'ai_free_monthly'=5, 'ai_pro_monthly'=45 (20261123120000), 'max_partners_pro'=1
 ```
 
 Functions: `lucento_private.max_partners(owner)` → `1` when the owner has an active entitlement granting `SHARED`,
@@ -528,8 +547,8 @@ remembered first, so no "your plan has ended" notice follows.
 
 ### 5.5 Plan-aware AI on the proxy
 
-`ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; Free → monthly limit; Pro / Cloud → daily limit plus
-the monthly ceiling; Smarter reading → `403 pro_required` without `AI_PRO`. Limits come from `plan_limits` with env
+`ask.ts` / `interpret.ts`: after auth, call `ai_allowance()`; every plan → a calendar-month limit (owner, 2026-11-23;
+Pro / Cloud had a daily limit under a monthly ceiling until then); Smarter reading → `403 pro_required` without `AI_PRO`. Limits come from `plan_limits` with env
 vars as fallback, so quotas change with one SQL update, no deploy. Responses keep `remaining` and add `period`
 (`day` | `month`) and `resetsAt` so the app's copy is a display of the server's decision.
 
@@ -556,9 +575,53 @@ entitlement is DataStore, server state is new Supabase tables.
 
 ### 6.1 Tone and placement
 
-No launch interstitials, no repeated popups, no countdowns, no red badges, no pre-checked boxes. The upgrade sheet
-opens only from the tap that would have used the locked thing. "Not now" is remembered per place per session. A
-dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the only place that *initiates* selling.
+No launch interstitials, no repeated popups, no countdowns, no red badges, no pre-checked boxes.
+
+**Every Pro wall is one dialog at the tap** (owner, 2026-11-18: "anyone hitting a Pro wall should be prompted with a
+dialog to be directed to the Lucento Plan page"; it replaced the inline lock notes, `ProNote`). `ProWallDialog`
+(`feature/pro/ProWall.kt`) opens only from the tap that would have crossed the wall: Add on a full count (Wallets,
+Debts, Goals, a goal's Restore), a locked wallet type or currency in the wallet editor, Save as PDF / Share on a
+statement, Sync now, turning on Smarter reading, creating or inviting in Lucento Shared, and a question past the free AI
+allowance. (Insights' 6 and 12 months and a locked theme are previews instead, below.) Its title says what the Free plan includes ("The Free
+plan includes 3 money wallets") or what is Pro ("Grove is part of Lucento Pro"); its body gives the person's own number
+for a count, then what Pro adds and what stays free, never the title again (`ProCopy.wallTitle` / `wallBody`, customer
+copy D-0). Buttons: **See Lucento Plan** (the Lucento Pro page, naming the feature) and **Not now**, which closes it and
+changes nothing. **A wall met again in the same app session is a short message** (owner, 2026-11-19): the first tap
+on a feature in a session is the dialog, a later one the plan fact as a snackbar with **Unlock** (the same as See
+Lucento Plan), in the app or inside the open sheet (`ProWallMemory` in memory, `MessageHosts`; nothing stored, reset
+when Lucento restarts). So no control goes dead and no dialog repeats. Two walls are previews instead of a dialog
+(owner, 2026-11-19): **Insights' 6 and 12 months** show the person's own income and expenses for that period, softened
+with every figure hidden, under the plan fact (never made-up numbers), and **a Pro theme is tried on** while the profile
+sheet is open, never saved; taken to the plan page from the try-on note and bought, it becomes the theme once Pro
+arrives (owner, 2026-11-19; in memory, the real plan decides). Audit, matrix and decisions: `docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md`. Where
+Pro would not help (20 active goals is the most on any plan) there is no dialog, only a plain
+note. Add wallet (Wallets, Home) opens the editor on Cash while money wallets fit; when they are full but a card or
+loan still fits, it opens the type sheet first (money types marked `ProBadge`, picking one opens the dialog), never a
+form that silently starts as a card; the dialog when nothing fits (`ProGates.addWalletStart`). Retyping an existing
+wallet into another kind counts as a new one of that kind (cash into a receivable, a third card or loan, a fourth money
+wallet out of a receivable kept from Pro): on the screen, where those types carry the badge, and in
+`WalletRepository.update` (QA 2026-11-19; the repository had only checked a move into another currency). The words
+follow what the person holds: a Pro Lifetime owner without Lucento Cloud meets "Cloud sync comes with Lucento Cloud",
+not "the Free plan" (`ProCopy.cloudWall`, keyed on `DisplayPlan.LIFETIME`, the plan the plan page offers Lucento Cloud
+to; customer copy D-0), and so do the plain notes beside those walls (Settings' sync and Smarter reading notes, the
+message after signing in, Home's paused sync sheet, whose button is now "See Lucento Plan" too). With every wallet kind
+full, Add names both counts in one dialog. Statements say "Save as PDF · Pro" and "Share · Pro" before the tap, like
+"6 months · Pro", and a marked wallet type reads its plan fact to TalkBack ("The Free plan includes 3 money wallets"),
+not "Lucento Pro feature".
+
+**Free limits in onboarding and the guided setup** (owner, 2026-11-18). Setting up past the Free numbers never shows the
+dialog and never mentions Pro. At the Free numbers (3 money wallets, 2 cards or loans) the accounts steps hide their
+add options, say "You can edit these any time in Wallets." (owner, 2026-11-19: setup promises nothing the Free plan
+doesn't give) and carry on. The goal step adds one goal, under the free two; its "Kept in" Add wallet is left out at
+three money wallets, and a goal save in setup that meets the count anyway says "Setup adds up to 2 goals. You can edit
+them any time in Goals." The wallet editor
+opened from setup (also from the goal sheet's Kept in) hides locked types, and a currency or count it can't take is
+answered with a quiet line naming which (`WalletEditorSheet(inSetup = true)`, `GoalEditorSheet(inSetup = true)`). The
+check is `ProGates.walletAccess` / `firstAddableWalletType`, the repository's own rule, so the screen and the save
+agree; while the wallet list is still loading the screen gives no early answer and the save decides. (A returning account whose plan doesn't include restoring still gets its own page in onboarding, with
+the plan page one tap away: that is not a limit, it explains why the data stays in the account.)
+
+A dedicated **Lucento Pro** page lives in the profile menu and Settings; it is the only place that *initiates* selling.
 The mascot appears on that page, and in the welcome after a purchase (§6.5). Badges (`ProBadge`, "Pro") sit inline next to labels; a person who holds the
 capability never sees them. All copy is in `CUSTOMER_COPY.md` D.
 
@@ -568,8 +631,10 @@ button on every main screen — inside the 48dp button, clear of the Shared pill
 (`MemberChip`) after their name in the profile menu, whose Lucento Plan tile turns gold. The coin is never the blue
 `ProBadge`, which means "locked". TalkBack reads the plan in words. Only the person's own plan counts
 (`ProCopy.memberMark`). On the free plan with no purchase waiting, the profile menu shows a **Lucento Pro card**
-(`ProInviteCard`: what Pro adds, one "See Lucento Pro" button) in place of the plain plan row (`ProCopy.offersPro`).
-No prices on it; nothing on Home (option G, a Home card, was not chosen).
+(`ProInviteCard`: what Pro adds, one "See Lucento Plan" button; the one label for every way to the plan page since the
+owner's 2026-11-19 call, the plan-ended sheet included) in place of the plain plan row (`ProCopy.offersPro`).
+No prices on it; nothing on Home (option G, a Home card, was not chosen; the owner kept it so on 2026-11-19 when the
+monetization brief asked for one).
 
 ### 6.2 Plan indicator
 
@@ -585,7 +650,10 @@ Cloud until 6 Nov 2027" · "Pro Lifetime · Cloud ended" · "Courtesy access unt
 2. Only **creation** (and un-archive, and type/currency changes into a gated kind) is refused, with the count and the
    way out shown.
 3. Insights 6 / 12 months and composition become locked previews; the 3-month view keeps working.
-4. Themes: a locked theme already selected stays until the person changes it; the picker shows it as Pro.
+4. Themes: a locked theme already selected stays until the person changes it; the picker shows it as Pro. The rule is
+   per phone: when a different account signs in, a Pro theme the phone already shows stays too (owner decision
+   2026-11-23, KNOWN_ISSUES LP-K18). The picker checks the plan at the tap, so a plan that ends while Lucento is open
+   unlocks nothing, and settings sync and a Replace restore apply a Pro theme only where this phone's plan allows it.
 5. PDF: the on-screen statement stays; Save / Share show the lock.
 6. Data paths stay alive: foreign wallets keep quoting and translating, FX results keep showing, AI consent stays stored.
 7. The person is told **once**, on the first start after the change, which things are now restricted — one sheet,
@@ -614,7 +682,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
 `domain/entitlement/ProWelcome.kt` (JVM-tested); screens: `feature/pro/welcome/`.
 
 1. **The deck.** The owner chose "Deck, unwrapped" on 2026-11-12, after the spotlight tour's buttons failed on real
-   phones (KNOWN_ISSUES PW-1). It shows up to ten cards in five chapters, one per thing Pro opened, held in a gold band
+   phones (KNOWN_ISSUES PW-1). It shows up to nine cards in five chapters (ten until 2026-11-23, when the owner dropped Smarter reading's card: Gemini is for Ask Lucento), one per thing Pro opened, held in a gold band
    with the Lucento symbol.
    - "Open your Pro deck" slides the band off and turns the first card, with the welcome's only burst. After that it's
      one card at a time:
@@ -656,8 +724,9 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - on a Partner's phone, the wallets and Lucento Shared cards.
    - **Signed-out buyers** still see the Gemini, sync and Lucento Shared cards. They say plainly that the feature uses a
      Lucento account, and where to sign in.
-   - **Opt-in stays opt-in.** Smarter reading and AI answers say where to turn them on. They say "On" only when the
-     person has turned them on.
+   - **Opt-in stays opt-in.** Smarter reading says where to turn it on, and "On" only when the person has turned it on.
+     AI answers are on by default for a signed-in account (owner, 2026-11-17; docs/ASK.md "Consent (v3)"), so they say
+     "On" unless the person turned them off; nothing is sent until the first question is confirmed.
    - **Where a service stands comes first**, right under the card's title: "Off · needs your Lucento account", "Waiting
      for your account to confirm Pro", "Off until you turn it on" or "On". At large text the condition is never hidden
      under "More" while a number shows.
@@ -665,9 +734,10 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      - "Included until Nov 12, 2027" for a Lifetime's included year, with the date read from its entitlement;
      - "While you subscribe" for a subscription;
      - "With Lucento Cloud" for the add-on.
-   - **The AI card** says "50 a day until Nov 12, 2027, then 10 a month": the allowance falls back to the free plan's;
-     it doesn't stop. It shows the allowance (10 a month → 50 a day) only once the server has confirmed the plan, and
-     until then it says "Included until …" like the other services.
+   - **The AI card** says "45 a month until Nov 12, 2027, then 5 a month": the allowance falls back to the free plan's;
+     it doesn't stop. It shows the allowance (5 a month → 45 a month) only once the server has confirmed the plan. Until
+     then it says "Pro allowance until …", because only the Pro allowance ends on that date (owner, 2026-11-22, OT-48
+     call 4 B). The other services keep "Included until …".
    - **What runs on the phone** never carries a term: it's owned.
    - **Back:** the system Back key goes to the collection.
    - **No side effects:** nothing in the deck changes data or consents, and it never moves through the app's screens.
@@ -677,7 +747,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
      live region, so nothing is heard twice.
    - **The stage** is the same for every moment, and solid, so nothing beneath shows. While it is up, the status and
      navigation bars draw light icons.
-   - **Words:** the brand's name, counts ("10 perks", "50 a day") and menu paths ("Settings › Account & sync") never
+   - **Words:** the brand's name, counts ("10 perks", "45 a month") and menu paths ("Settings › Account & sync") never
      break inside; stage headlines never hyphenate.
 2. **The collection.**
    - **Title:** "Congratulations, you're Pro" ("You're Pro" from 130 % text, so no word breaks); "Welcome back to Pro"
@@ -688,7 +758,7 @@ only after a committed write: never for a pending payment, a renewal, or a trial
        services are included;
      - while the server hasn't confirmed the plan, where the online services stand;
      - every card as one line: its prop as a small square, its name, and its gain ("No limit", "20 goals",
-       "12 months", "50 a day") or its end date. When the name and its gain don't fit on one line (a date on a narrow
+       "12 months", "45 a month") or its end date. When the name and its gain don't fit on one line (a date on a narrow
        phone, large text), the gain moves under the name.
    - **Back** leaves the welcome: the award is still given and the badge appears.
 3. **Award**: the Lucento Pro medal on the award ceremony's stage. It is membership, not progress, so it stands on its
@@ -722,11 +792,11 @@ instead of turning, and the badge appears without movement.
 | D-7 | Custom-category cap for Free | "standard categories" | **No cap** | budgets are built from categories; the cost is zero |
 | D-8 | Scheduled-payment cap for Free | "basic recurring" | **No cap** | "never miss a bill" focus; cost zero |
 | D-9 | CSV export in Free | evaluate | **Yes** | portability is never sold; it is also the trust signal behind "your data" |
-| D-10 | Lifetime price | — | **₱3,490** (USD 79.99); founder offer ₱2,990 for 60 days | §4.3 |
+| D-10 | Lifetime price | — | **₱3,490** (USD 79.99), **lowered to ₱2,490 (USD 59.99) on 2026-11-21**; founder offer ₱2,990 for 60 days, **dropped 2026-11-21** (never created in Play) | §4.3 |
 | D-11 | Subscriber buys Lifetime | — | allowed; the person cancels the subscription in Play; no automatic credit (Play has none). Offer a support-granted Cloud extension equal to the unused months, manually, on request | avoids building proration logic Play does not support |
 | D-12 | Lucento Cloud add-on | — | **₱59 / ₱490**, offered to Lifetime owners only at launch | §4.4; a Free-tier Cloud SKU would undercut Pro |
 | D-13 | Lifetime included services | evaluate | **12 months of B/C/D from the purchase**, then Free AI allowance; Cloud add-on optional | the person experiences sync and the adviser; the promise stays bounded |
-| D-14 | AI monthly soft ceiling for Pro | 50 / day | **400 / month**, remote-configured, shown only when hit | §4.5 cost model |
+| D-14 | AI allowance for Pro | 50 / day | **400 / month** ceiling (2026-11) → **45 / calendar month, no daily limit; Free 5 / month** (owner, 2026-11-23: Gemini is for Ask Lucento; at most ≈ $0.23 / Pro account on 3.5 Flash-Lite) | §4.5 cost model |
 | D-15 | Role names | Manager / Companion | **Owner / Partner** (as approved and built) | PRODUCT_SPEC §2; a rename is a separate decision |
 | D-16 | Shared lapse policy | "do not interrupt companion" | **Lenient** (no new invites; existing Partner stays) | §6.4 |
 | D-17 | Where verification runs | — | Vercel + Play Developer API; Supabase stores | v1 D-10, unchanged |
@@ -743,7 +813,7 @@ Lifetime = permanent ownership of local features; AI enforced server-side; never
 |---|---|---|
 | The matrix (what each plan can do) | `PlanCatalog` (Kotlin, tested so the table and the gates agree) ← this document §3 | `lucento-website/src/data/pricing.ts` (new), Play listing text, in-app comparison table, `CUSTOMER_COPY.md` A |
 | Numeric limits | `PlanCatalog` for client counts; `plan_limits` for server-enforced AI / partners | website copy quotes them; a website unit test pins the numbers |
-| Prices | Google Play Console | app via `ProductDetails`; website "from ₱149 / month · ₱3,490 once" marked *indicative, final price in Google Play* |
+| Prices | Google Play Console | app via `ProductDetails`; website "from ₱149 / month · ₱2,490 once" marked *indicative, final price in Google Play* |
 | The Lifetime promise and FAQ | `CUSTOMER_COPY.md` B and E | website `/pricing` and `/faq`; in-app Pro page "What Lifetime means" link |
 | Legal | website `/terms` (new), `/privacy` | upgrade screen footer |
 
@@ -886,7 +956,8 @@ show the plan), every lock note, the paused-sync sheet. **Locks are one inline p
 from §5.1): `ProNote` = the existing note with a "See Lucento Pro" link, where the person is — wallet editor (by the
 button, no longer a red name field), goal editor, goal Restore (fixes a Phase 2 defect: a refused restore confirmed and
 closed), Insights, the report sheet, Settings › Account, the theme picker; a sheet over an editor sheet would stack two
-modals and lose the draft. `ProBadge` marks locked themes and the Receivable / Asset wallet types. The one-time
+modals and lose the draft. *(Superseded 2026-11-18: every lock is now one `ProWallDialog` at the tap, §6.1. A dialog
+hosted by the editor itself keeps the draft; `ProNote` was removed.)* `ProBadge` marks locked themes and the Receivable / Asset wallet types. The one-time
 **plan-ended notice** (`PlanNotices`, `PlanNoticeSheet`, last plan in `entitlement_preferences`) waits for the first
 refresh (`EntitlementManager.ready`) so a cold start never reads as a downgrade. Insights opens on 3 months on the free
 plan; the note appears only when a locked period is picked. `ScreenshotTourTest` runs on a simulated Pro plan and adds
@@ -909,7 +980,7 @@ What landed:
     whole reading a *failure*, so a forged purchase neither adds a plan nor hides a real one.
   - `onPurchasesUpdated` re-reads the whole list, because the merge treats a missing purchase as ended.
   - Offers are chosen in `PlayPriceSelection`: the trial when Play lists it, the base plan otherwise, never an offer with
-    a paid intro phase, and the cheapest Lifetime option (the founder price).
+    a paid intro phase, and the cheapest Lifetime option (there's only one, since the founder price was dropped on 2026-11-21).
   - `obfuscatedAccountId` is sha256 of the Lucento user id.
   - Release builds use Play only with `LUCENTO_PLAY_LICENSE_KEY`. Without it they use `UnavailablePurchaseSource`, which
     never removes a plan. Debug builds keep the fake store.
@@ -952,7 +1023,7 @@ What landed:
 
 Original scope:
 `billing-ktx` 9.x, `PlayPurchaseSource` (SUBS + INAPP, pending, acknowledge, restore, `obfuscatedAccountId`);
-Vercel `verify.ts`, `rtdn.ts`, `voided.ts`; Play Console products, base plans, offers (trial, founder price), RTDN
+Vercel `verify.ts`, `rtdn.ts`, `voided.ts`; Play Console products, base plans, offers (trial; the founder price was dropped later), RTDN
 topic, license testers; release signing (CS-20) and `targetSdk` check first.
 
 ### Phase 5 — QA, website, launch

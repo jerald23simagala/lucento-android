@@ -224,7 +224,9 @@ class PlanViewModel(
     fun saveSchedule(input: RecurringRepository.Input, onResult: (RecurringRepository.SaveResult) -> Unit) =
         write({
             val withCategory = when {
-                input.toWalletId == null || input.categoryId != null -> input
+                // A scheduled transfer has no category: it is never spending or income (tester round, 2026-11-17).
+                input.toWalletId == null || input.categoryId != null ||
+                    input.type == com.lucento.app.domain.TransactionType.TRANSFER_OUT -> input
                 input.type == com.lucento.app.domain.TransactionType.INCOME ->
                     input.copy(categoryId = categories.ensure(DebtMath.INTEREST_INCOME_CATEGORY, CategoryKind.INCOME, DebtMath.INTEREST_INCOME_ICON))
                 else -> input.copy(categoryId = categories.ensure(DebtMath.INTEREST_CATEGORY, CategoryKind.EXPENSE, DebtMath.INTEREST_ICON))
@@ -240,6 +242,35 @@ class PlanViewModel(
     fun setPaused(id: Long, paused: Boolean) = write({ recurring.setPaused(id, paused) }) {}
 
     fun deleteSchedule(id: Long) = write({ recurring.delete(id) }) {}
+
+    // Scheduled › All schedules, Select mode (tester round, 2026-11-18): one change to several plans, in one step.
+
+    fun moveDay(
+        ids: Collection<Long>,
+        monthDay: Int?,
+        weekday: java.time.DayOfWeek?,
+        firstDayOfWeek: java.time.DayOfWeek,
+        onResult: (RecurringRepository.BulkResult) -> Unit,
+    ) = write({ guarded { recurring.moveDay(ids, monthDay, weekday, firstDayOfWeek) } }, onResult)
+
+    fun setAmount(ids: Collection<Long>, amount: Money, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.setAmount(ids, amount) } }, onResult)
+
+    fun setPaused(ids: Collection<Long>, paused: Boolean, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.setPaused(ids, paused) } }, onResult)
+
+    fun deleteSchedules(ids: Collection<Long>, onResult: (RecurringRepository.BulkResult) -> Unit) =
+        write({ guarded { recurring.delete(ids) } }, onResult)
+
+    /** A failed bulk change (rolled back in its one transaction) comes back as Failed, so the screen can say so. */
+    private suspend fun guarded(block: suspend () -> RecurringRepository.BulkResult): RecurringRepository.BulkResult = try {
+        block()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        android.util.Log.w("Lucento", "Bulk schedule change failed and was rolled back", e)
+        RecurringRepository.BulkResult.Failed
+    }
 
     companion object {
         val Factory = containerFactory {

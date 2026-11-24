@@ -27,6 +27,19 @@ Google accounts get no metadata, because their consent is given by continuing.
 - Bump `VERSION` and `UPDATED` whenever the meaning changes.
 - The tests in `AccountFormTest` check only the structure. Accuracy is a review job.
 - The website's `/privacy` page matches the in-app Privacy Policy (checked 2026-11-08: crash reports and usage counts, AI features, exchange rates, Lucento Shared, Google Play billing). Keep them in step whenever either changes.
+- Version 2026-11-17: Ask Lucento's AI answers are on by default for a signed-in account and confirmed once before
+  anything is sent (owner decision; docs/ASK.md "Consent (v3)"); Read messages with Gemini stays off until turned on
+  (Lucento Pro). The Terms say "Gemini for the AI features you use". The website's `legal.ts`, homepage privacy table
+  and FAQ change in the same release (lucento-website PR #36).
+- Version 2026-11-22: cloud sync keeps the person's settings too (theme, features, name, default wallet and similar
+  choices; docs/SYNC.md "Settings"), and the policy says what stays on each phone (the consents and the app lock). Not a
+  new network path: the same opted-in sync. The website's `legal.ts` is regenerated and deployed with the release that
+  carries settings sync (NEXT_TASKS).
+- Version 2026-11-23 (0.5.16): the two texts dated 2026-11-22 together. "Scanning documents" (Lucento Scan, #125)
+  says photos and PDFs are read on the phone, and that the first "Scan pages" has Google Play services download Google's
+  document scanner. The cloud sync section adds settings (above). Re-dated because 0.5.15 carried the scanning text alone
+  under 2026-11-22, so each date names one text. Not a new Lucento network path. The website's `legal.ts` is
+  regenerated with this release.
 
 ## Keeping the website in step
 

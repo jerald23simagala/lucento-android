@@ -73,7 +73,7 @@ internal val LogoNavy = Color(0xFF17233F)
 @Composable
 fun WalletIdentityTile(wallet: Wallet, modifier: Modifier = Modifier, size: Dp = Sizes.iconTile) {
     val institution = wallet.institution()
-    if (institution != null) InstitutionAvatar(institution, modifier, size) else WalletTypeTile(wallet.type, modifier, size)
+    if (institution != null) InstitutionAvatar(institution, modifier, size) else WalletIconTile(wallet, modifier, size)
 }
 
 /**

@@ -1,0 +1,438 @@
+{
+  "id": "us-card-amex-01",
+  "country": "US",
+  "type": "CARD_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "Blue Cash Everyday(R) Card",
+      "SAMANTHA ORTIZ",
+      "Closing Date 10/14/26  Account Ending 2-71004",
+      "New Balance  $2,631.57",
+      "Minimum Payment Due  $51.19",
+      "Payment Due Date  11/08/26",
+      "Late Payment Warning: If we do not receive your Minimum Payment Due by the Payment Due Date of",
+      "11/08/26, you may have to pay a late fee of up to $41.00 and your APRs may be increased to the",
+      "Penalty APR of 29.99%.",
+      "Minimum Payment Warning: If you have a Non-Plan It Balance and make only the minimum",
+      "payment each period, you will pay more in interest and it will take you longer to pay off your Non-Plan It Balance.",
+      "If you make no additional charges and each month you pay...  You will pay off the balance  And you will pay an",
+      "shown on this statement in about...  estimated total of...",
+      "Only the Minimum Payment Due  9 years  $4,118",
+      "Account Summary",
+      "Previous Balance  $1,642.18",
+      "Payments/Credits  -$857.81",
+      "New Charges  +$1,810.21",
+      "Fees  +$12.12",
+      "Interest Charged  +$24.87",
+      "New Balance  $2,631.57",
+      "Minimum Payment Due  $51.19",
+      "Credit Limit  $8,000.00",
+      "Available Credit  $5,368.43",
+      "Cash Advance Limit  $1,600.00",
+      "Available Cash  $1,600.00",
+      "Days in Billing Period: 30",
+      "Customer Care & Billing Inquiries  1-800-528-4800",
+      "Website: americanexpress.com",
+      "Payment Coupon  Pay by Computer  Pay by Phone  Account Ending 2-71004",
+      "Do not staple or use paper clips  americanexpress.com/pbc  1-800-472-9297",
+      "SAMANTHA ORTIZ",
+      "8216 GREENWOOD AVE N",
+      "SEATTLE WA 98103-4519",
+      "Payment Due Date 11/08/26  New Balance $2,631.57  Minimum Payment Due $51.19",
+      "AMERICAN EXPRESS",
+      "PO BOX 6031",
+      "CAROL STREAM IL 60197-6031",
+      "p. 1/2"
+    ],
+    [
+      "SAMANTHA ORTIZ  Account Ending 2-71004  p. 2/2",
+      "Detail  *Indicates posting date",
+      "Payments  Amount",
+      "09/18/26*  AUTOPAY PAYMENT RECEIVED - THANK YOU  -$500.00",
+      "10/05/26*  ONLINE PAYMENT - THANK YOU  -$300.00",
+      "Credits  Amount",
+      "09/28/26  AMAZON MARKETPLACE NA PA AMZN.COM/BILL WA  -$37.82",
+      "10/09/26  TARGET 00012345 SEATTLE WA  -$19.99",
+      "Total Payments and Credits  -$857.81",
+      "New Charges",
+      "Summary",
+      "SAMANTHA ORTIZ Card Ending 2-71004  $1,810.21",
+      "Detail",
+      "SAMANTHA ORTIZ",
+      "Card Ending 2-71004",
+      "Amount",
+      "09/15/26  WHOLEFDS SLU 10155 SEATTLE WA  $84.27",
+      "GROCERY STORE",
+      "09/16/26  UBER *TRIP HELP.UBER.COM CA  $18.40",
+      "09/17/26  SHELL OIL 57444212 SEATTLE WA  $52.10",
+      "SERVICE STATION",
+      "09/18/26  NETFLIX.COM LOS GATOS CA  $15.49",
+      "09/19/26  TRADER JOE S #131 SEATTLE WA  $61.34",
+      "GROCERY STORE",
+      "09/20/26  AMAZON MARKETPLACE NA PA AMZN.COM/BILL WA  $37.82",
+      "MERCHANDISE",
+      "09/21/26  STARBUCKS STORE 12345 SEATTLE WA  $6.95",
+      "09/22/26  COSTCO WHSE #0001 SEATTLE WA  $143.66",
+      "WAREHOUSE CLUB",
+      "09/23/26  SQ *BLUE BOTTLE COFFEE SEATTLE WA  $5.75",
+      "09/24/26  CHEVRON 0091234 BELLEVUE WA  $47.88",
+      "SERVICE STATION",
+      "09/25/26  TST* THE HABIT - BELLEVUE BELLEVUE WA  $22.15",
+      "RESTAURANT",
+      "09/26/26  DELTA AIR LINES ATLANTA GA  $412.60",
+      "DELTA AIR LINES Passenger Ticket",
+      "From: SEA To: VIE Carrier: DL",
+      "09/27/26  CAFE CENTRAL WIEN AT  $21.36",
+      "18.40 Euro",
+      "09/28/26  HOTEL SACHER WIEN AT  $389.76",
+      "LODGING",
+      "335.80 Euro",
+      "09/29/26  BILLA DANKT 1234 WIEN AT  $28.44",
+      "24.50 Euro",
+      "09/30/26  WIENER LINIEN WIEN AT  $9.29",
+      "8.00 Euro",
+      "10/02/26  SAFEWAY #1551 SEATTLE WA  $78.12",
+      "GROCERY STORE",
+      "10/03/26  APPLE.COM/BILL 866-712-7753 CA  $2.99",
+      "10/04/26  TARGET 00012345 SEATTLE WA  $64.73",
+      "10/06/26  WALGREENS #4502 SEATTLE WA  $18.27",
+      "DRUG STORE",
+      "10/07/26  CHIPOTLE 1842 SEATTLE WA  $14.30",
+      "RESTAURANT",
+      "10/08/26  PUGET SOUND ENERGY BELLEVUE WA  $102.55",
+      "UTILITY",
+      "10/10/26  LYFT *RIDE TUE 7PM LYFT.COM CA  $24.60",
+      "10/11/26  SPOTIFY USA NEW YORK NY  $11.99",
+      "10/12/26  REI #11 SEATTLE SEATTLE WA  $129.95",
+      "SPORTING GOODS",
+      "10/13/26  STARBUCKS STORE 12345 SEATTLE WA  $5.45",
+      "Total New Charges  $1,810.21",
+      "Fees",
+      "Amount",
+      "09/27/26  FOREIGN TRANSACTION FEE  $0.58",
+      "09/28/26  FOREIGN TRANSACTION FEE  $10.52",
+      "09/29/26  FOREIGN TRANSACTION FEE  $0.77",
+      "09/30/26  FOREIGN TRANSACTION FEE  $0.25",
+      "Total Fees for this Period  $12.12",
+      "Interest Charged",
+      "Amount",
+      "Interest Charge on Purchases  $24.87",
+      "Interest Charge on Cash Advances  $0.00",
+      "Total Interest Charged for this Period  $24.87",
+      "2026 Fees and Interest Totals Year-to-Date",
+      "Amount",
+      "Total Fees in 2026  $15.23",
+      "Total Interest in 2026  $76.27",
+      "Interest Charge Calculation  Days in Billing Period: 30",
+      "Annual Percentage Rate  Balance Subject to Interest Rate  Interest Charge",
+      "Purchases  26.24% (v)  $1,152.88  $24.87",
+      "Cash Advances  29.99% (v)  $0.00  $0.00",
+      "Total  $24.87"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "American Express",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1642.18",
+        "closingBalance": "2631.57",
+        "statementBalance": "2631.57",
+        "minimumPayment": "51.19",
+        "paymentDueDate": "2026-11-08",
+        "creditLimit": "8000.00",
+        "availableCredit": "5368.43",
+        "transactions": [
+          {
+            "date": "2026-09-18",
+            "description": "AUTOPAY PAYMENT",
+            "amount": "500.00",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-05",
+            "description": "ONLINE PAYMENT",
+            "amount": "300.00",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-28",
+            "description": "AMAZON MARKETPLACE",
+            "amount": "37.82",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-10-09",
+            "description": "TARGET 00012345",
+            "amount": "19.99",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "WHOLEFDS SLU 10155",
+            "amount": "84.27",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Whole Foods"
+          },
+          {
+            "date": "2026-09-16",
+            "description": "UBER *TRIP",
+            "amount": "18.40",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber"
+          },
+          {
+            "date": "2026-09-17",
+            "description": "SHELL OIL 57444212",
+            "amount": "52.10",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Shell"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "NETFLIX.COM",
+            "amount": "15.49",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Netflix"
+          },
+          {
+            "date": "2026-09-19",
+            "description": "TRADER JOE S #131",
+            "amount": "61.34",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Trader Joe's"
+          },
+          {
+            "date": "2026-09-20",
+            "description": "AMAZON MARKETPLACE",
+            "amount": "37.82",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-09-21",
+            "description": "STARBUCKS STORE 12345",
+            "amount": "6.95",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "COSTCO WHSE #0001",
+            "amount": "143.66",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Costco"
+          },
+          {
+            "date": "2026-09-23",
+            "description": "SQ *BLUE BOTTLE COFFEE",
+            "amount": "5.75",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Blue Bottle Coffee"
+          },
+          {
+            "date": "2026-09-24",
+            "description": "CHEVRON 0091234",
+            "amount": "47.88",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chevron"
+          },
+          {
+            "date": "2026-09-25",
+            "description": "TST* THE HABIT",
+            "amount": "22.15",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Habit"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "DELTA AIR LINES",
+            "amount": "412.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Delta Air Lines"
+          },
+          {
+            "date": "2026-09-27",
+            "description": "CAFE CENTRAL",
+            "amount": "21.36",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Cafe Central"
+          },
+          {
+            "date": "2026-09-28",
+            "description": "HOTEL SACHER",
+            "amount": "389.76",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Hotel Sacher"
+          },
+          {
+            "date": "2026-09-29",
+            "description": "BILLA DANKT 1234",
+            "amount": "28.44",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Billa"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "WIENER LINIEN",
+            "amount": "9.29",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Wiener Linien"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "SAFEWAY #1551",
+            "amount": "78.12",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-10-03",
+            "description": "APPLE.COM/BILL",
+            "amount": "2.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Apple"
+          },
+          {
+            "date": "2026-10-04",
+            "description": "TARGET 00012345",
+            "amount": "64.73",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "WALGREENS #4502",
+            "amount": "18.27",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Walgreens"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "CHIPOTLE 1842",
+            "amount": "14.30",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Chipotle"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "PUGET SOUND ENERGY",
+            "amount": "102.55",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Puget Sound Energy"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "LYFT *RIDE",
+            "amount": "24.60",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Lyft"
+          },
+          {
+            "date": "2026-10-11",
+            "description": "SPOTIFY USA",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "REI #11",
+            "amount": "129.95",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "REI"
+          },
+          {
+            "date": "2026-10-13",
+            "description": "STARBUCKS STORE 12345",
+            "amount": "5.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-09-27",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "0.58",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-28",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "10.52",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-29",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "0.77",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-30",
+            "description": "FOREIGN TRANSACTION FEE",
+            "amount": "0.25",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-14",
+            "description": "Interest Charge on Purchases",
+            "amount": "24.87",
+            "direction": "OUT",
+            "kind": "INTEREST_CHARGE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "35 lines: 2 payments, 2 credits (refunds), 26 charges (4 in euros with the euro amount on continuation lines), 4 foreign transaction fees (2.7%) and interest. Year-to-date totals, the minimum-payment warning table and the interest calculation table are not transactions."
+}

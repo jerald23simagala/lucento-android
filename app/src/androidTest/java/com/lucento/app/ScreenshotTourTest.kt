@@ -14,6 +14,8 @@ import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.performTouchInput
@@ -183,6 +185,14 @@ class ScreenshotTourTest {
     private val demoDark: Boolean
         get() = InstrumentationRegistry.getArguments().getString("demoDark") == "true"
 
+    /**
+     * Opt-in (`-e demoHistory true`): eight more months of budgets and spending before the demo month, from January
+     * ([DemoMonth.seedHistory]), so Milestones' budget year shows each level for the website and the Play listing, and the
+     * tour also takes a finished month's recap. Off by default (CI keeps the demo month alone).
+     */
+    private val demoHistory: Boolean
+        get() = InstrumentationRegistry.getArguments().getString("demoHistory") == "true"
+
     private fun applyDemoDark() {
         if (!demoDark) return
         runBlocking { container.preferences.setThemeMode(com.lucento.app.data.preferences.ThemeMode.DARK) }
@@ -261,7 +271,18 @@ class ScreenshotTourTest {
         demoCurrency?.let { code ->
             compose.onAllNodes(hasSetTextAction())[0].performTextInput(code)
             waitForText("$code ·")
-            compose.onNodeWithText("$code ·", substring = true).performClick()
+            // The result row can arrive while the list is still settling, and a tap then doesn't select it: tap until the
+            // main-currency card says so (it happened on an API 35 emulator, 2026-11-13).
+            var chosen = false
+            repeat(5) {
+                if (chosen) return@repeat
+                compose.onAllNodesWithText("$code ·", substring = true).onFirst().performClick()
+                compose.waitForIdle()
+                chosen = runCatching {
+                    compose.waitUntil(2_000) { compose.onAllNodesWithText("$code · your main currency", substring = true).fetchSemanticsNodes().isNotEmpty() }
+                }.isSuccess
+            }
+            check(chosen) { "Onboarding didn't take $code as the main currency" }
             closeKeyboard()
         }
         shot("03b-onboarding-currency")
@@ -304,17 +325,31 @@ class ScreenshotTourTest {
         // shared with WebsiteShowcaseTest, so the website's screens and the tour show the same figures.
         // A new award is presented in a modal ceremony, and the seeded month earns several at once: mark them all as seen
         // first so no ceremony covers a capture or blocks a tap (the tour captures the cabinet and a ceremony on purpose).
-        runBlocking { container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet()) }
+        // With the marketing history, only what the data really earns is recorded (DemoMonth.settleHistoryMoments).
+        runBlocking {
+            if (demoHistory) DemoMonth.settleHistoryMoments(container, today)
+            else container.preferences.acknowledgeAchievements(com.lucento.app.domain.Achievement.entries.toSet())
+        }
+        // The monthly check-in card shows only in a month's last days and first week: settled here, so every run's
+        // dashboard is the same whatever the date (the card and the plan page are captured separately, on a set clock).
+        runBlocking {
+            container.preferences.dismissMonthCheckIn(
+                plan = java.time.YearMonth.from(today).plusMonths(1),
+                recap = java.time.YearMonth.from(today).minusMonths(1),
+            )
+        }
         runBlocking { DemoMonth.seed(container, currency, demoScale, today) }
+        if (demoHistory) runBlocking { DemoMonth.seedHistory(container, currency, demoScale, today) }
         applyDemoDark()
 
         // ---------------------------------------------------------------- dashboard: within budget (happy sun)
         val total = MoneyFormatter.format(money(2_590))
         waitForText("Monthly budget")
         waitForText(total) // the pace card's budget figure is the sum of the category amounts
-        // Bills due counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in red
-        // once the bills take what's left).
-        waitForText("Bills due")
+        // Upcoming expenses counts every scheduled bill, whatever its category; Safe to spend always closes the card (0 in
+        // red once the bills take what's left), the lower of Budget remaining and Spendable wallets.
+        waitForText("Budget remaining")
+        waitForText("Spendable wallets")
         waitForText("Safe to spend")
         waitForToastsGone()
         shot("06-home-within-budget")
@@ -332,17 +367,45 @@ class ScreenshotTourTest {
         compose.waitForIdle()
         runCatching { compose.onNodeWithText("Nothing is recorded until you mark", substring = true).performScrollTo() }
         shot("07-home-lower-cards")
-        // Awards: the cabinet (earned medals in gold, the rest as outlines with how to earn them and a count where it takes
-        // several steps), then an earned medal replays its ceremony — Lucento presenting the medal.
-        compose.onNodeWithContentDescription("Awards").performScrollTo().performClick()
-        waitForText("earned · from your own records")
-        shot("07a-awards-cabinet")
+        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards card, then the budget year as squares; this
+        // month's square opens its recap on its own page; then the awards on their own page (earned medals in gold, the
+        // rest as outlines with how to earn them and a count where it takes several steps); an earned medal replays its
+        // ceremony — Lucento presenting the medal.
+        compose.onNodeWithContentDescription("Milestones").performScrollTo().performClick()
+        waitForText("Your budget year")
+        shot("07a-milestones")
+        val thisMonth = java.time.YearMonth.now()
+        compose.onNode(
+            hasContentDescription("${com.lucento.app.feature.home.monthLabel(thisMonth)} ${thisMonth.year}", substring = true) and
+                androidx.compose.ui.test.hasClickAction(),
+        ).performScrollTo().performClick()
+        waitForText("Where it went")
+        shot("07a2-month-recap")
+        backUntilGone("Where it went")
+        waitForText("Your budget year")
+        if (demoHistory) {
+            // A finished month from the history: its square opens the recap with the month's budget result.
+            val lastMonth = thisMonth.minusMonths(1)
+            compose.onNode(
+                hasContentDescription("${com.lucento.app.feature.home.monthLabel(lastMonth)} ${lastMonth.year}", substring = true) and
+                    androidx.compose.ui.test.hasClickAction(),
+            ).performScrollTo().performClick()
+            waitForText("Where it went")
+            shot("07a2b-month-recap-finished")
+            backUntilGone("Where it went")
+            waitForText("Your budget year")
+        }
+        compose.onNodeWithText("Awards").performScrollTo().performClick()
+        waitForText("From your own records", substring = true)
+        shot("07a3-awards-cabinet")
         click("Money Keeper")
         waitForText("Thanks, Lucento")
         Thread.sleep(2_600) // the medal lands, the confetti settles and the shine passes
         shot("07b-award-ceremony")
         click("Thanks, Lucento")
-        backUntilGone("earned · from your own records")
+        // Awards, then Milestones under it.
+        backUntilGone("From your own records")
+        backUntilGone("Your budget year")
 
         // ---------------------------------------------------------------- the composer: several transactions in one message
         compose.onNodeWithContentDescription("Add transaction").performClick()
@@ -453,7 +516,8 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
-        waitForText("Remaining of $total")
+        // This month the hero's figure is the limits' "unspent" part (owner, 2026-11-18): "Unspent of your $… budget".
+        waitForText("Unspent of your $total")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()
@@ -617,7 +681,7 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
         // On the free plan the profile menu shows the Lucento Pro card in place of the plan row (owner, 2026-11-09).
-        click("See Lucento Pro")
+        click("See Lucento Plan")
         waitForText("What each plan includes")
         shot("24b-pro-page-free")
         runCatching { compose.onNodeWithText("Pro Lifetime").performScrollTo() }
@@ -628,13 +692,16 @@ class ScreenshotTourTest {
         back()
         // Back lands on Home (the Pro page opened from its profile menu); the dock returns after the page's exit animation.
         waitForText("Monthly budget")
-        // Insights opens on the free plan's 3 months; a locked period explains itself only when picked.
+        // Insights opens on the free plan's 3 months; a locked period, when picked, is a preview of the person's own
+        // months with the figures hidden (owner, 2026-11-19).
         compose.onNodeWithContentDescription("Insights").performScrollTo().performClick()
         waitForText("6 months · Pro")
         shot("24e-insights-free")
         click("6 months · Pro")
-        waitForText("Trends over 6 and 12 months are part of Lucento Pro")
+        // A locked period is a preview of the person's own months, figures hidden (owner, 2026-11-19).
+        waitForText("6 and 12 months are part of Lucento Pro")
         shot("24f-insights-locked-period")
+        click("Back to 3 months")
 
         // ---------------------------------------------------------------- Lucento Pro: buying (Phase 4), with the test store
         // Test builds fake Google Play's purchase flow: nothing is charged and every price says "test". The plan that
@@ -649,7 +716,7 @@ class ScreenshotTourTest {
         simulator.setTestStore(true)
         compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
         compose.waitForIdle()
-        click("See Lucento Pro")
+        click("See Lucento Plan")
         waitForText("Start 7-day free trial")
         runCatching { compose.onNodeWithText("Start 7-day free trial").performScrollTo() }
         shot("24g-pro-page-buy")
@@ -665,8 +732,7 @@ class ScreenshotTourTest {
         buildList {
             add("Add every account you use" to "25a-pro-card-wallets")
             add("Count everything you have" to "25b-pro-card-net-worth")
-            // Gemini and Lucento Shared need a Lucento account: only in a build with cloud sync (CI's test build has none).
-            if (com.lucento.app.data.sync.SupabaseModule.isConfigured) add("Smarter reading, with Gemini" to "25b2-pro-card-smart-reading")
+            // No Smarter reading card since 2026-11-23 (owner: Gemini is for Ask Lucento).
             add("Save for more at once" to "25c-pro-card-goals")
             add("Look further back" to "25d-pro-card-insights")
             add("Keep your statements" to "25e-pro-card-statements")

@@ -126,7 +126,8 @@ fun SearchField(
  *
  * [selectedTone] fills the selected tile with a stronger colour pair (e.g. brand blue for history filters, the
  * income / expense tone in the editor) where the choice deserves emphasis; [compact] trims the row to 40dp for
- * dense, pinned headers (the tiles span the full width, so they stay easy to hit).
+ * dense, pinned headers (the tiles span the full width, so they stay easy to hit). Otherwise each option is 48dp tall,
+ * and the selected one is outlined and bolder as well as lighter, so the choice never rests on a fill alone.
  */
 @Composable
 fun <T> SegmentedToggle(
@@ -136,6 +137,8 @@ fun <T> SegmentedToggle(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     selectedTone: ((T) -> TonePair)? = null,
+    /** What TalkBack reads for an option, when its label is shortened ("Only Dec" → "Only December"). */
+    descriptions: ((T) -> String)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val haptics = rememberHaptics()
@@ -173,23 +176,32 @@ fun <T> SegmentedToggle(
             Box(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = if (compact) 34.dp else 44.dp)
+                    .heightIn(min = if (compact) 34.dp else 48.dp)
                     .clip(MaterialTheme.shapes.small)
                     .background(container)
+                    // The plain selected tile is white on pale blue: its outline (3:1 or more on the track) marks it too.
+                    .then(if (isSelected && tone == null) Modifier.border(1.dp, colors.outline, MaterialTheme.shapes.small) else Modifier)
                     .selectable(selected = isSelected, role = Role.RadioButton) {
                         if (!isSelected) {
                             haptics.tick()
                             onSelect(value)
                         }
-                    },
+                    }
+                    .then(if (descriptions != null) Modifier.semantics { contentDescription = descriptions(value) } else Modifier)
+                    .padding(horizontal = Spacing.xs),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
-                    style = if (isSelected && tone != null) MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
-                    else MaterialTheme.typography.labelLarge,
+                    style = when {
+                        isSelected && tone != null -> MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold)
+                        isSelected -> MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                        else -> MaterialTheme.typography.labelLarge
+                    },
                     color = content,
-                    maxLines = 1,
+                    // Two lines at large text sizes rather than a label cut at the edge (critic r3, P2).
+                    maxLines = 2,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
             }
         }

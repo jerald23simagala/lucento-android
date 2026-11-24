@@ -10,9 +10,11 @@
 
 ## Owner to-dos (open, for the owner to run)
 
-> **Launch marketing (2026-11-14):** the plan is `docs/marketing/launch/PLAYBOOK.md` (₱0, faceless shorts, a weekly ready pack you schedule, the KlaroPH bridge). Your parts are OT-27 to OT-31, click by click in `docs/marketing/launch/OWNER_STEPS.md`.
+> **From 2026-11-20 the owner's to-dos live in Mission Control › Tasks** (`docs/mission-control/v1/OWNER_TASKS.md`), each with a complete click-by-click write-up; the owner marks them there and Claude reads them with `lucento-studio/mission-control/tasks.mjs status`. The write-ups are files in `lucento-studio/mission-control/owner-tasks/`. Setting it up is OT-42 below; until then this table is the list, and after it the table is history (new owner tasks go to Mission Control only).
 
-> **Launch film (2026-11-14):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the 30 s and 15 s cuts); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`), the vertical version and a real two-account Shared capture; the 10 product issues it surfaced are in `KNOWN_ISSUES.md`.
+> **Launch film (2026-11-14, refreshed with 0.5.14 screens on 2026-11-19):** watch `Downloads/lucento-launch-film/lucento-launch-film.mp4` (and the vertical version, the 30 s and 15 s cuts; the 0.5.8 versions are in `previous-0.5.8/` beside them); decide on narration (script in `docs/marketing/launch-film/VOICEOVER.md`) and a real two-account Shared capture; the product issues it surfaced are fixed in #116 (merged 2026-11-19; check them on the phone in the next build), listed in `KNOWN_ISSUES.md`.
+
+> **Launch marketing (2026-11-14; parked until the Play launch, owner 2026-11-21):** the plan is `docs/marketing/launch/PLAYBOOK.md` (₱0, faceless shorts, a weekly ready pack, the KlaroPH bridge), with the truth rules every post passes (`TRUTH_RULES.md`, checked against 0.5.19 on 2026-11-24) and the click-by-click parts in `OWNER_STEPS.md`. Its owner steps now live in Mission Control › Tasks.
 
 | # | To-do | Status | Why it matters |
 |---|---|---|---|
@@ -23,31 +25,333 @@
 | OT-6 | Apply `supabase/migrations/20261105090000_receivable_wallets.sql` to **`lucento-test`** (it is on production only) | **Done** (owner, 2026-11-05); verified live: `wallets_type_known` accepts `RECEIVABLE` | It must precede OT-7 (migrations apply in order), and receivables can't sync on test without it |
 | OT-7 | Apply `20261105120000_lucento_shared.sql`, then `20261105120100_lucento_shared_privileges.sql`, to **`lucento-test`**: SQL editor, or an interactive Claude session where `apply_migration` can be approved. Then run the security and performance advisors, and check `select count(*) from pg_policies where policyname like '%\_partner'` = 9 | **Done** (owner, 2026-11-05). Verified live by Claude (read-only, `docs/shared/SECURITY_MODEL.md` §8): all 16 function bodies identical to the repo, grants and RLS as designed, `%\_partner` policies = 9; advisors show only expected findings (KNOWN_ISSUES LS-K9). The SQL editor doesn't record migrations, so `list_migrations` doesn't show them | Lucento Shared can't be tried until then; the app says "isn't available on the server yet". Verified offline: `tools/sql-verify` 69/69 |
 | OT-8 | Two-device test on `lucento-test`: `docs/shared/TWO_DEVICE_TEST.md` | **Done** (owner, 2026-11-06: "good for now", one phone toggling two accounts). One finding, fixed the same day: after the space was closed and recreated, the invited standalone account saw the new invitation only in Settings (KNOWN_ISSUES LS-K13) | The only end-to-end check of joining, collaboration, removal and leaving |
-| OT-9 | Production: apply OT-6's and OT-7's migrations before any release that includes Lucento Shared | **Approved** (owner, 2026-11-06); the owner applies them (SQL editor). Production isn't visible to Claude: confirm here once applied | A v12 build syncs like v11 without them, but Lucento Shared needs them |
+| OT-9 | Production: apply OT-6's and OT-7's migrations before any release that includes Lucento Shared | **Done** with OT-17 (owner, 2026-11-07): production has Lucento Shared, verified read-only | A v12 build syncs like v11 without them, but Lucento Shared needs them |
 | OT-10 | Apply `supabase/migrations/20261106090000_multicurrency.sql` to **`lucento-test`** | **Done** (owner, 2026-11-06). Verified live by Claude (read-only): FX columns, `transactions_fx_known` / `wallets_fx_basis_known` with the explicit not-null tests, `ledger_settings` with RLS, select/insert policies and `authenticated` select/insert only; advisors show nothing new | A ledger with a wallet in another currency can sync its FX values |
-| OT-11 | Try multicurrency on a phone with `artifacts/apk/lucento-debug-multicurrency-2026-11-06-r3.apk` (worktree): wallets in other currencies (rate filled in online by default), spending online and offline, transfers between currencies, the "≈ ₱…" lines, the ₱ subtotals, the wallet page and Insights | **Round 2** (owner, 2026-11-06): the bank card's name was still cut ("Bank of Co…" — the institution card's top row, not the compact face fixed in round 1); fixed in r3 | The only end-to-end check of rates, transfers between currencies and the main-currency totals |
-| OT-12 | Production: apply `20261106090000_multicurrency.sql`, after OT-9 and before any release that includes multicurrency (v13) | **Approved** (owner, 2026-11-06: "good with me"); the owner applies it after OT-9. Confirm here once applied | A v13 build with a foreign wallet can't sync its FX values without it (uploads stay pending; nothing lost) |
-| OT-13 | Supabase, **both projects**: Authentication › Emails › Templates › **Confirm signup** — subject "Welcome to Lucento — verify your email", body = `supabase/templates/confirm-signup.html`. Check Site URL = `https://www.lucentoapp.com/auth/confirmed` | Open (owner, dashboard only) | The app's "Check your inbox" says to tap **Verify email**; the default template says "Confirm your mail" and isn't a welcome |
-| OT-14 | Try the new account onboarding on a phone (`feature/account-onboarding` APK): Get started → Keep your money safe → Sync with an account → Use email instead → Create your account (terms) → Check your inbox → open the email → "Email verified" → personalize. Also Google, and "Keep it on this phone only" | Open | The only check with a real inbox and a real link |
-| OT-5 | Try AI answers on a phone: install `artifacts/apk/lucento-release-TEST-SIGNED-ot5.apk` (a **test-only** release build: production Supabase and proxy, signed with this machine's Android debug key, SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75`; never distribute it). Sign in with an **email** account (Google sign-in likely fails: that key isn't registered for `com.lucento.app`), Insights › Ask Lucento › ask a question of your own (e.g. "How did October compare with September?") › Turn on AI answers › check the bold figures and "Answered by Gemini". Uninstall afterwards | Waits on OT-4 | The AI path can't run here; no signing secrets exist (`gh secret list` empty), so CI's release APK is unsigned |
+| OT-11 | Try multicurrency on a phone with `artifacts/apk/lucento-debug-multicurrency-2026-11-06-r3.apk` (worktree): wallets in other currencies (rate filled in online by default), spending online and offline, transfers between currencies, the "≈ ₱…" lines, the ₱ subtotals, the wallet page and Insights | **Round 2** (owner, 2026-11-06): the bank card's name was still cut ("Bank of Co…" — the institution card's top row, not the compact face fixed in round 1); fixed in r3 · **2026-11-20:** in Mission Control › Tasks, OT-49 asks to close it (later builds covered it) | The only end-to-end check of rates, transfers between currencies and the main-currency totals |
+| OT-12 | Production: apply `20261106090000_multicurrency.sql`, after OT-9 and before any release that includes multicurrency (v13) | **Done** with OT-17 (owner, 2026-11-07): production has multicurrency, verified read-only | A v13 build with a foreign wallet can't sync its FX values without it (uploads stay pending; nothing lost) |
+| OT-13 | Supabase, **both projects**: Authentication › Emails › Templates › **Confirm signup** — subject "Welcome to Lucento — verify your email", body = `supabase/templates/confirm-signup.html`. Check Site URL = `https://www.lucentoapp.com/auth/confirmed` | **Done** (owner, 2026-11-09): pasted in both projects | The app's "Check your inbox" says to tap **Verify email**; the default template says "Confirm your mail" and isn't a welcome |
+| OT-14 | Try the new account onboarding on a phone (`feature/account-onboarding` APK): Get started → Keep your money safe → Sync with an account → Use email instead → Create your account (terms) → Check your inbox → open the email → "Email verified" → personalize. Also Google, and "Keep it on this phone only" | Open · **2026-11-20:** in Mission Control › Tasks, OT-49 asks to close it (later builds covered it) | The only check with a real inbox and a real link |
+| OT-5 | Try AI answers on a phone: install `artifacts/apk/lucento-release-TEST-SIGNED-ot5.apk` (a **test-only** release build: production Supabase and proxy, signed with this machine's Android debug key, SHA-1 `49:AF:14:81:8D:53:F5:DF:68:42:03:3E:3C:1E:2E:DA:AA:AB:8C:75`; never distribute it). Sign in with an **email** account (Google sign-in likely fails: that key isn't registered for `com.lucento.app`), Insights › Ask Lucento › ask a question of your own (e.g. "How did October compare with September?") › Turn on AI answers › check the bold figures and "Answered by Gemini". Uninstall afterwards | **Done** (owner, 2026-11-09): Gemini AI answers worked on the phone | The AI path can't run here; no signing secrets exist (`gh secret list` empty), so CI's release APK is unsigned |
 | OT-15 | Apply `supabase/migrations/20261109090000_account_deletion.sql` (one function, `delete_my_account`) to **`lucento-test`**, then **production** before the first Play release | **Done** (owner, 2026-11-07). lucento-test verified by Claude (read-only): body md5 matches the file, `authenticated` only, `search_path=""`. Production: the owner's word (not visible to Claude) | Google Play requires in-app account deletion; until it is applied, Delete account answers "couldn't delete… email us" and changes nothing. Verified offline: `tools/sql-verify` account_deletion_suite 10/10 |
-| OT-16 | Play Console: work through `docs/play/PLAY_STORE_SUBMISSION.md` — register the Play app-signing and upload SHA-1s for Google sign-in, App content forms, Data safety, store listing, a reviewer account with a GRANT row, internal then closed testing (12 testers × 14 days for new personal accounts) | Open (2026-11-07) | Without the SHA-1s, Continue with Google fails in every Play-installed copy |
+| OT-16 | Play Console: work through `docs/play/PLAY_STORE_SUBMISSION.md` — register the Play app-signing and upload SHA-1s for Google sign-in, App content forms, Data safety, store listing, a reviewer account with a GRANT row, internal then closed testing (12 testers × 14 days for new personal accounts) | Open (2026-11-07) · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) · **Done 2026-11-21:** the new signing key's client, the Data safety purpose and the reviewer's 90-day Pro (Claude checked the grant) | Without the SHA-1s, Continue with Google fails in every Play-installed copy |
 | OT-17 | **Production is behind** (checked read-only by Claude 2026-11-07 after the owner switched the Supabase access to production): it has receivables, credit-card billing and `delete_my_account`, but **not** Lucento Shared, multicurrency, entitlements or Play purchases (OT-9 and OT-12 were approved but never applied). Paste `docs/monetization/PRODUCTION_APPLY.sql` (generated by `tools/supabase/build_apply.py`; one transaction; ends with a read-only check that should say ok nine times). Then add GRANT rows for the founders' accounts by uuid (SERVER_CONTRACT.md §7) | **Done** (owner, 2026-11-07). Verified by Claude, read-only: all nine checks ok, all 29 function bodies match the migration files, security advisors show only the expected notices. Website #11–#13 merged and live the same day. GRANT rows: still the owner's choice | Blocks the website merges (#11–#13: AI calls would fail) and any release build from `main` (sync would stall on the missing columns; plans can't be read). Rehearsed offline on a production-like database: applies cleanly, all 164 security checks pass after |
-| OT-18 | **GitHub secret `GOOGLE_SERVICES_JSON`** (crash reports in CI releases): `gh secret set GOOGLE_SERVICES_JSON < app/google-services.json`. Claude's attempt was blocked by the permission classifier (secret-store write), 2026-11-08. Then confirm Crashlytics in the Firebase console after an opted-in test crash, and that the first run with it uploads the R8 mapping | Open (owner) | Without it the release AAB has no Crashlytics. `LUCENTO_GOOGLE_WEB_CLIENT_ID` was also fixed on 2026-11-08: its value began with the variable's own name (`LUCENTO_GOOGLE_WEB_CLIENT_ID=4311…`), which broke Google sign-in in every CI release |
-| OT-19 | **Account emails** (docs/EMAILS.md › Setup): apply `20261110090000_account_emails.sql` to lucento-test, then production; create a Resend key with sending access to `send.lucentoapp.com`; Vercel Production env `LUCENTO_RESEND_API_KEY` and `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`; redeploy the site; then sign up on a phone and check the welcome arrives once. OT-13 (Confirm signup template, refreshed 2026-11-08 without the "no ads" line) and the SMTP sender fix belong to the same pass | Open (owner) | Until then `/api/account/welcome` answers 503 (the app retries at the next launch) and purchases get no confirmation email; nothing else changes |
+| OT-18 | **GitHub secret `GOOGLE_SERVICES_JSON`** (crash reports in CI releases): `gh secret set GOOGLE_SERVICES_JSON < app/google-services.json`. Claude's attempt was blocked by the permission classifier (secret-store write), 2026-11-08. Then confirm Crashlytics in the Firebase console after an opted-in test crash, and that the first run with it uploads the R8 mapping | **Done** (owner, 2026-11-09) | Without it the release AAB has no Crashlytics. `LUCENTO_GOOGLE_WEB_CLIENT_ID` was also fixed on 2026-11-08: its value began with the variable's own name (`LUCENTO_GOOGLE_WEB_CLIENT_ID=4311…`), which broke Google sign-in in every CI release |
+| OT-19 | **Account emails** (docs/EMAILS.md › Setup): apply `20261110090000_account_emails.sql` to lucento-test, then production; create a Resend key with sending access to `send.lucentoapp.com`; Vercel Production env `LUCENTO_RESEND_API_KEY` and `LUCENTO_SUPABASE_SERVICE_ROLE_KEY`; redeploy the site; then sign up on a phone and check the welcome arrives once. OT-13 (Confirm signup template, refreshed 2026-11-08 without the "no ads" line) and the SMTP sender fix belong to the same pass | **Done** (owner, 2026-11-09): the welcome email arrived once | Until then `/api/account/welcome` answers 503 (the app retries at the next launch) and purchases get no confirmation email; nothing else changes |
 | OT-20 | Supabase, **both projects**: Authentication › Emails › Templates › **Reset password** — subject "Your Lucento password reset code", body = `supabase/templates/reset-password.html` (it shows `{{ .Token }}`, no link). Check Authentication › Providers › Email › Email OTP Length is 6–10 | **Done** (owner, 2026-11-09: round 2) | The app's new "Forgot password?" sheet asks for the code from this email; the default template sends a link and no code, so the sheet can't be completed without it |
 | OT-21 | Supabase **production** (and lucento-test): Authentication › URL Configuration › **Site URL** = `https://www.lucentoapp.com/auth/confirmed` (OT-13 asked for it). Round 2: the verify link opened the homepage, so production's Site URL is still the homepage | **Done** (owner, 2026-11-09: round 2) | The page already exists: "Your email is confirmed — go back to Lucento: it notices and carries on by itself", and it explains an expired link |
 | OT-23 | **Replace the GitHub secret `LUCENTO_PLAY_LICENSE_KEY`** with Play's Base64 RSA licence key (Play Console › Monetize with Play › Monetization setup › Licensing; `PLAY_CONSOLE_SETUP.md` step 5). It holds a SHA-1 fingerprint today (KNOWN_ISSUES PB-1). Then build 0.5.3 (vc 8), upload it to internal testing and retest a trial and a yearly purchase: Pro should show within seconds and production should get a `purchase_links` row | **Done** (secret 2026-11-11 22:27Z; 0.5.3 built and checked; Restore granted Pro on the owner's phone 2026-11-12) | — |
 | OT-24 | **Switch on purchase checks and refund checks together** (owner's choice, 2026-11-12): fix Vercel env `LUCENTO_PLAY_SERVICE_ACCOUNT_JSON` (KNOWN_ISSUES PB-2); add `LUCENTO_RTDN_PUSH_TOKEN` with the Pub/Sub topic, the push subscription and Play's real-time developer notifications; add `CRON_SECRET` (KNOWN_ISSUES PB-3); redeploy production; then Send test notification and Restore purchases (PLAY_CONSOLE_SETUP steps 6, 8 and 9) | **Done, working** (verified 2026-11-13, production read-only): the owner's monthly test purchase was recorded on their account and then marked `REVOKED` (22:46–22:53Z, also in `revoked_purchases`), and the purchase check answered for the refunded Lifetime (22:41Z). The service-account JSON was fixed by the owner on 2026-11-12 | — |
-| OT-25 | **Retest 0.5.8 (vc 13) from internal testing**: (1) buying Lifetime after a refund (KNOWN_ISSUES PB-8). Open the plan page, tap Buy Lifetime, pay with a test card, and expect Play's sheet, not "You already own this item", then Pro Lifetime. (2) Voice in the composer in the Play build (PR #60). For later refund tests tick **Remove entitlement** in Play Console (PLAY_CONSOLE_SETUP "Refunding an order") | **Open**, 0.5.8 carries #65 and #60 | The first real check that Google Play releases a refunded purchase when Lucento consumes it |
-| OT-26 | **Check 0.5.9 (vc 14) from internal testing: the signed-out purchase warnings** (KNOWN_ISSUES PB-11): signed out, open the Lucento Plan page and expect the amber note above the plans ("You're not signed in. If you buy now…"). With a purchase made signed out still on the phone's Google Play, open Settings › Cloud sync (signed out) and expect the note above "Continue with Google". Then sign in with an account that holds a grant (Pro shows), sign out, and expect the free plan with no "your Lucento Pro has ended" notice, while a Pro purchase made with this phone's Google account stays (PB-12) | **Open**, ships in 0.5.9 | Needs a release build (debug builds use the test store, which never makes a purchase without an account unless bought signed out) |
-| OT-27 | **Launch channels** (`docs/marketing/launch/OWNER_STEPS.md` Part A, about 1 to 1½ hours): Instagram (professional, linked to the Lucento Page), TikTok (Business account) and a YouTube channel, all `@lucentoapp` on lucentoapp@gmail.com with 2-step verification; check that Meta Business Suite shows the Lucento and KlaroPH Pages; send Claude the links. Profile picture and covers are in `Downloads/lucento-channel-kit/` | **Done** 2026-11-14 (links in CHANNEL_KIT §1). TikTok stays a personal account (2026-11-15: the Business switch asks for business verification); no pre-registration, launch on approval | The weekly shorts need somewhere to go. Warm-up posting starts once these exist |
-| OT-28 | **Closed-test dates** (OWNER_STEPS A1): send Claude the day the 14-day closed test started; keep 12+ testers opted in and add 2–3 spares | **Done** 2026-11-14: Testers Community, 15/15 testers, 16-day plan from 14 Nov → apply 30 Nov, P-day expected 1–8 Dec (PLAYBOOK §6) | Sets P-day (launch day). A dropout below 12 can restart the 14 days |
-| OT-29 | **Apply for production** when the 14 days are done (OWNER_STEPS Part B): ask Claude to draft the answers from tester feedback first | Waits on OT-28 | The last gate before launch; Google usually answers within about a week |
-| OT-30 | **KlaroPH audience size**: from the KlaroPH founder dashboard, how many Klaro users can get marketing email (not unsubscribed) | **Open** (2026-11-14) | Lucento and Klaro share one Resend free tier (100 a day), so the Klaro email goes out at most 50 a day from P-day + 1 |
-| OT-31 | **Every week** (OWNER_STEPS Part C, about 40 minutes): approve the Launch Board on your phone, schedule the ready pack in TikTok Studio, Meta Business Suite and YouTube Studio, enter Sunday's numbers | Starts with the first ready pack | The whole launch runs on this loop |
-| OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier, Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Open** | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
+| OT-25 | **Retest 0.5.8 (vc 13) from internal testing**: (1) buying Lifetime after a refund (KNOWN_ISSUES PB-8). Open the plan page, tap Buy Lifetime, pay with a test card, and expect Play's sheet, not "You already own this item", then Pro Lifetime. (2) Voice in the composer in the Play build (PR #60). For later refund tests tick **Remove entitlement** in Play Console (PLAY_CONSOLE_SETUP "Refunding an order") | **Open**, 0.5.8 carries #65 and #60 · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) | The first real check that Google Play releases a refunded purchase when Lucento consumes it |
+| OT-26 | **Check 0.5.9 (vc 14) from internal testing: the signed-out purchase warnings** (KNOWN_ISSUES PB-11): signed out, open the Lucento Plan page and expect the amber note above the plans ("You're not signed in. If you buy now…"). With a purchase made signed out still on the phone's Google Play, open Settings › Cloud sync (signed out) and expect the note above "Continue with Google". Then sign in with an account that holds a grant (Pro shows), sign out, and expect the free plan with no "your Lucento Pro has ended" notice, while a Pro purchase made with this phone's Google account stays (PB-12) | **Open**, ships in 0.5.9 · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) | Needs a release build (debug builds use the test store, which never makes a purchase without an account unless bought signed out) |
+| OT-22 | **Security remediation (2026-11-10)**: work through `docs/security/OWNER_ACTIONS_REQUIRED.md` §1–§14 — Gemini paid tier (now OT-31, last before release), Confirm email, plan decision, then apply the four `20261111*` migrations (lucento-test → production), deploy the website branch `security/release-hardening`, internal-track purchase and refund checks | **Done** (2026-11-10): production migrated and verified, website #21 live, android #36/#38 merged. Its last two steps are in Mission Control › Tasks: the Gemini paid tier (OT-31) and switching test purchases off at launch (OT-44) | The release stays NOT APPROVED until §1, §2, §5/§6, §13 and §14 are done (`docs/security/REMEDIATION_REPORT.md`) |
+| OT-27 | **Mission Control on lucento-test**: `lucento-mission-control/DEPLOYMENT.md` parts A (first switch pg_cron on and paste `docs/mission-control/LUCENTO_TEST_CATCH_UP.sql`: lucento-test lacked the 2026-11-10/13 migrations, so the first try stopped on `test_purchase`; then paste `docs/mission-control/APPLY_MISSION_CONTROL.sql`, verify with `VERIFY_MISSION_CONTROL.sql`, expose `mc_api`, admin login + `mc.admins` row, the two secrets `mc.rotate_ingest_secret('app')` and `('backup')`), C (Vercel project, Preview env = lucento-test) and D (first sign-in with TOTP, the grant/revoke phone check) | **Done 2026-11-15** (owner): parts A–D on lucento-test; sign-in with the authenticator, a grant and its revoke work. Console on `lucento-mission-control.vercel.app` (TEST) | The console replaces production SQL for grants, refunds and support; D is the first check of a GRANT row from Mission Control on a phone |
+| OT-28 | **Mission Control on production**: the same part A on `lucento` after OT-27 looks right, then the domain `mission.lucentoapp.com` (CNAME at GoDaddy) | **Open**, after OT-27 · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) · **Done 2026-11-21:** the console runs on production at mission.lucentoapp.com, and the task list moved there | Part A changes one production constraint (`entitlements_grant_expires`, FD-V5) and adds the `mc` schemas and four pg_cron jobs |
+| OT-29 | **Weekly encrypted backup**: DEPLOYMENT.md part B (age key on your PC, five secrets in the main-only GitHub environment `backup`, run the workflow once). Production on Supabase Free has no usable backups | **Open** · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) · **Done 2026-11-21:** the first run was green (19:27 Manila) | Limits a loss to a week (FD-V13) |
+| OT-31 | **Gemini key on the paid tier — last step before the production release** (owner, 2026-11-15): `docs/security/OWNER_ACTIONS_REQUIRED.md` §1, about 12 minutes. Google now uses Prepay: buy $5 credit and switch on auto-reload with a monthly limit, or the key stops at $0. Then Claude removes the free-tier sentence (`LegalDocuments.GEMINI_DATA_USE`) from the app and /privacy for the release build | **Waiting**, on purpose: do it in the final days before P-day (expected 1–8 Dec) · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) | Release blocker (RELEASE_READINESS A3, audit F-05): on the free tier Google may use Ask Lucento's financial summaries and Smarter reading's messages to improve its products |
+| OT-30 | **Mission Control integrations** (when wanted): Resend send key + webhook (part E), Play service account with financial view only (part F, FD-V10), Crashlytics BigQuery link with sessions (part G) | **Open**, optional · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) | Emails/quota, revenue amounts, crash data. Each page says "not connected" until then |
+| OT-32 | **Try the microphone in Ask Lucento and the composer in 0.5.10 (vc 15) from internal testing**: Insights › Ask Lucento › microphone, say "How much did I spend this month?" and expect the answer without tapping Send; then in Add transactions say "Lunch 250, coffee 120" as before. Signed in with Pro, turn on Settings › Privacy & security › Smarter reading: the row and the dialog should warn that adding transactions gets slower, and the composer should say "Gemini is reading…" while it waits. Signed in on Free (a test account without Pro), the same switch can't be turned on and shows "Smarter reading is part of Lucento Pro…" with See Lucento Pro (from the build after 0.5.13: tapping the switch opens a dialog, "Smarter reading is part of Lucento Pro", with See Lucento Plan and Not now) | **Open**, ships in 0.5.10 · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) | The emulator couldn't turn speech into text, so no spoken words have gone through the shared microphone code yet (KNOWN_ISSUES FC-1) |
+| OT-33 | **Decide: lock Smarter reading for Free in Settings?** A Free user could turn it on and then waited for the server's refusal on every message (KNOWN_ISSUES FC-2) | **Done** (owner, 2026-11-15: lock it); built on `feature/fast-capture-ask-voice` | Free first users are the ones who'd feel the slowdown |
+| OT-34 | **Mission Control › Marketing on lucento-test**: `lucento-mission-control/DEPLOYMENT.md` part I, click by click: paste `docs/mission-control/APPLY_MARKETING.sql`, then `VERIFY_MARKETING.sql` (every column true); make the marketing key (`select mc.rotate_ingest_secret('marketing');`) and give it to Claude's tool on the PC (`node marketing/mc/mc.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); create the private Blob store `lucento-marketing-test` (Singapore, Production + Preview, read-write token unticked) and redeploy; check Settings › Integrations; then the phone check with the first pack (I6) | **Done** but the final check (2026-11-17): SQL, key, tool and Blob store set up; weeks 47 and 48 pushed to TEST · **2026-11-20:** moved to Mission Control › Tasks, and the phone check became a laptop check (owner: Mission Control is used on the laptop) | Until then Marketing says "isn't set up in this database yet" and the weekly packs stay on the Launch Board artifact. The week 48 go/no-go in Mission Control is Saturday 21 November, 18:00 Manila |
+| OT-35 | **Upload 0.5.11 (vc 16) and re-check Play Console's edge-to-edge warnings**: upload `Downloads\lucento-0.5.11-vc16.aab` to Internal testing; when Play has processed it, open Dashboard › "For your next release" and see whether "Your app uses deprecated APIs or parameters for edge-to-edge" and "Edge-to-edge may not display for all users" are gone for release 16 (0.5.11). On the phone, glance at Home in light and dark: the bars should look exactly as before | **Done** (owner, 2026-11-19, on 0.5.14 vc 19): the two edge-to-edge warnings are gone | Play only re-scans a new upload. If the deprecated-API warning names release 16 again, tell Claude the classes it lists (KNOWN_ISSUES E2E-1 has the method). The second warning is general advice; if it alone remains, nothing in the app needs changing |
+| OT-36 | **Try AI answers on by default, on Free and on Pro, in 0.5.12 (vc 17)** (`Downloads\lucento-0.5.12-vc17.aab`, internal testing): signed in with a Free test account, open Insights › Ask Lucento: it says "AI answers on · Gemini". Tap "Make me a plan to save more each month": a card "Your first AI question" says what is sent, and nothing is sent yet. Tap **Ask Gemini**: an answer comes, and the line under the status says "9 left this month". Ask again: no card. Turn the Gemini switch off, then on: the full consent appears first. On a Pro account the count says "… left today". The website's /privacy was published with this build (lucento-website PR #36, Privacy Policy 2026-11-17) | **Done** (owner, 2026-11-19, on 0.5.14 vc 19): AI answers on by default, the first-question card and the count work | The first real Gemini answer through the new card; debug builds have no AI proxy, so only a release build can show it. The website must not describe the new default before the app that has it is out |
+| OT-37 | **Auto-posting for Marketing**: `lucento-mission-control/DEPLOYMENT.md` part J, click by click: paste `docs/mission-control/APPLY_AUTOPOST.sql`, then `VERIFY_AUTOPOST.sql`; run `select mc.autopost_setup('https://lucento-mission-control.vercel.app/api/autopost/tick');` once; create the Meta app (Facebook Pages and Instagram), the Google Cloud OAuth client (YouTube) and the TikTok developer app (Login Kit + Content Posting API, your account as a sandbox user), add their keys to Vercel and redeploy; in Settings › Auto-posting connect each, check each, then turn auto-posting on | **Open** (2026-11-17) · **2026-11-20:** moved to Mission Control › Tasks (write-up for 0.5.14) · **2026-11-21:** parts 1–8 done on TEST (all five accounts said Works); parts 9–10 wait until Marketing restarts after the Play launch, then a short setup on production | Until then approved posts are scheduled by hand as before. TikTok videos go to your drafts (TikTok lets an unaudited app post only privately); the group question stays by hand (no API since April 2024) |
+| OT-38 | **Apply the tester round's database change: lucento-test first, then production.** 1. Open https://github.com/jerald23simagala/lucento-android/blob/feature/wallets-v14/docs/handover/apply-v14-wallet-kinds.sql (the same file is in `Downloads\lucento-v14-database.sql`; open it with Notepad instead if you like). 2. Click **Raw** (top right of the file), then press **Ctrl+A** and **Ctrl+C**. 3. Go to https://supabase.com/dashboard and click the **lucento-test** project. 4. In the left bar click **SQL Editor**, then **+ New query**. 5. Click inside the editor, press **Ctrl+V**, then click **Run** (bottom right). 6. A table with one row appears at the bottom: all five columns should say **true**. If any says false, or an error shows, stop and send Claude a screenshot. 7. Do steps 3–6 again in the production project, **lucento**. 8. Tell Claude "OT-38 done": Claude then merges PR #101 | **Done** (owner, 2026-11-18). Claude checked production read-only the same day: all four columns, both type lists, the new checks and the history record are there (lucento-test isn't visible from Claude's connection; the owner applied it first). #101 merged as `fd32c7b` | A build with investments, wallet kinds and icons, spending choices or scheduled transfers needs these columns; without them the server refuses those uploads and holds back the batch they're in (nothing is lost; it uploads once applied). Additive and safe to run twice; tested on a local Postgres |
+| OT-39 | **Try the tester round on a phone** with 0.5.13 (vc 18): upload `Downloads\lucento-0.5.13-vc18.aab` to Internal testing as with 0.5.12, update the app on your phone from the Play Store, then: Home › Monthly budget › tap **(i)** beside Safe to spend: two figures, the smaller marked Shown. Tap **Choose spending wallets**: switch Savings on and off again; under Credit cards tap **Set amount**, turn on Count credit as spending money, enter an amount, Save. Wallets › add a wallet › Type: **Investment**, pick a kind and an icon. Scheduled › add › **Transfer** from your bank into it, then mark it done ("Transfer recorded"). Settings › Money › **Show cents** off: Home shows whole pesos. Make a transfer: From and To open the account picker. Then look at Home with the phone's largest text size | **Done** (owner, 2026-11-19, on 0.5.14 vc 19): all checks passed | The first look with real data on a real phone; the emulator screens use demo data |
+| OT-41 | **Try the tester round's last parts and the Pro experience on a phone** with 0.5.14 (vc 19, carries #106–#110 and #112): upload `Downloads\lucento-0.5.14-vc19.aab` to Internal testing as with 0.5.13 and update the app from the Play Store. On the Free plan (a test account without Pro): set up a new ledger with 3 accounts and 2 cards (the add buttons go, a quiet line says "You can edit these any time in Wallets.", nothing mentions Pro); then Wallets › Add (a dialog), Add again (a short message at the bottom with Unlock); Insights › 6 months (your own months, figures hidden); Profile › tap Grove (Lucento turns green, "Trying"; closing the sheet turns it back). Scheduled › All schedules › Select: change a day, pause, delete. Turn on TalkBack once on the dialog and the message. Optional, last (it makes the account Pro): from Grove's note tap See Lucento Plan and test-buy Pro; Lucento turns green and stays green | **Done** (owner, 2026-11-19, on 0.5.14 vc 19): all checks passed | The emulator ran all of these (local captures); a phone checks gesture navigation, the keyboard and TalkBack |
+| OT-40 | **Two choices about the redesigned Monthly budget card** (PR for `feature/budget-card-constraints`). 1. Bills: keep taking upcoming bills off both Budget remaining and Spendable wallets (Safe to spend takes the lower, so each bill counts once), or follow the brief's wallet formula, which leaves bills out of the wallets. 2. Order: keep overview, the two limits, then Safe to spend (your mockup), or put Safe to spend right after the overview | **Done** (owner, 2026-11-18): keep bills in both limits; keep the order, showing both limits' results with fewer words and lines that balance between the two columns (built on the same PR) | The brief asked for both the literal formula and "no double counting"; they disagree when the wallets are the lower limit (KNOWN_ISSUES BC-1). The design review found the answer below the fold on small phones |
+| OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
+
+## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
+
+- **AS-1 Launch film on 0.5.19 (next; owner: after this review).** It still shows 0.5.14 screens ("Net Wallet Balance",
+  no Milestones). Re-capture with `capture_marketing.sh` runs `tour-php` and `showcase-php` (the same demo year), then
+  lucento-studio `video/tools/capture/live_capture.py` in the showcase state, `prepare_screens.py`, `remap_boxes.py
+  <old> <new>`, fix the moved crop boxes and render all five versions with the emulator shut down
+  (docs/marketing/launch-film/ASSET_INVENTORY.md). Update ASSET_INVENTORY's source line and the "Net worth" wording.
+- **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
+  graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
+- **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).
+- **AS-4 Claude pages:** the "Lucento" design-system page dates from 2026-10-23, before the five themes; bring its tokens
+  and themes up to `core/designsystem/theme/`. ~~"Lucento Price Check" showed AI answers as Free 10 a month · Pro 50 a
+  day~~ fixed 2026-11-24 (its features.csv re-uploaded; the repo source was fixed in this branch).
+- **AS-5 Website #45** merges on the owner's word after the Vercel preview; then the share image is live.
+- Parked by the owner until the Play launch (2026-11-21): the shorts, the Launch Board and Mission Control's posts. They
+  reuse these captures when marketing restarts.
+
+## Milestones — follow-ups (2026-11-23, `feature/milestones-budget-year`)
+
+- ~~ML-N1 Owner look at the screenshots~~ **Done 2026-11-23:** the owner asked for the year on top (a month's recap
+  moved to its own page), small medals on the Awards card, the title and year switcher on one line and a bulleted
+  totals footer, then a release once CI passes.
+- **ML-N2 Phone check in the next build**: Home › Quick links › Milestones; the Awards card opens the cabinet and an
+  earned medal replays its ceremony; a square opens that month's recap page (on Free too); Home's check-in card opens
+  the recap page; ‹ › steps to last year once there are records from it.
+
+## Composer — on-device reading, next (2026-11-23, after `feature/composer-merchant-categories`)
+
+- What's left between the phone and Gemini on the test notes is grammar, not categories:
+  - Tagalog date words ("kahapon" = yesterday, "ngayon", "noong Lunes");
+  - "paid 7000 to my credit card from payroll" / "binayaran ko … sa credit card" read as a card payment (a transfer);
+  - a closing "paid with BPI card" / "bayad gamit …" applying to every row of the message, not only the last.
+- Each is a deterministic rule with JVM tests, in `QuickEntryParser` / `BatchEntryParser`.
+
+## AI allowance per month — follow-ups (2026-11-23, `feature/ai-allowance-monthly`)
+
+- **Done 2026-11-23 (owner: "Switch now"):** Vercel production `GEMINI_MODEL=gemini-3.5-flash-lite`, redeployed
+  (`dpl_4Z9YaRLsUJ9j9q3CcKePrz49Ujd2`, serving www.lucentoapp.com); `/api/ask` and `/api/interpret` answer
+  `401 sign_in_required` without a token, as before.
+- **Owner (OT-61 in Mission Control, owner chose "Now"):** paste `supabase/migrations/20261123120000_ai_allowance_monthly.sql`
+  into production and `lucento-test`. Claude's Supabase connection reads but can't write (`execute_sql` was declined).
+  The website wording is live: lucento-website #43 merged as `e5b7441` and deployed 2026-11-23. Then release the app
+  build that carries this branch (0.5.18; KNOWN_ISSUES AI-5).
+- **Next (owner: "Yes, build it next"):** on-device categories for typed and spoken messages from the merchant dictionaries and the
+  person's own habits (today only scans use `MerchantDirectory` / `MerchantMemory`). Measured on the Gemini test's notes:
+  the on-device reader got 31/45 on Taglish and 35/45 in English with every amount right; 7 of the 14 Taglish misses
+  were categories left to choose. Gemini 3.5 Flash-Lite got 42/45.
+- **Decided:** the Pro welcome deck no longer deals the Smarter reading card (owner, 2026-11-23; KNOWN_ISSUES AI-6).
+
+## Security and anti-tampering plan (2026-11-23)
+
+The plan (work in order, sizes, console steps) is in the private `lucento-studio` repository
+(`docs/security/2026-11-23/IMPLEMENTATION_PLAN.md`), because this repository is public. Owner steps are in Mission
+Control › Tasks.
+
+## Monthly check-in, Progress, Follow Lucento — follow-ups (2026-11-23, `feature/month-close`)
+
+- **MCI-N1 Phone test at a real turn of the month** (owner, on 0.5.17: Mission Control **OT-59**, 28 Nov – 7 Dec) (from the 28th to the 7th), with a budget at least two weeks old:
+  the card appears; Plan December → the plan page → Done hides it and says "December is planned"; See November opens
+  Progress on November; Not this month hides it, and on a second phone after a sync; a Partner's phone gets only the
+  recap; the Budget tab steps into next month and back.
+- **MCI-N2 Opt-in reminder** for the check-in, together with bill reminders: the app's first `POST_NOTIFICATIONS`
+  (CI's release permission allow-list), a Settings switch, the Privacy Policy (local only), docs/QUALITY.md.
+- **MCI-N3 A switch to turn the card off**, when backup schema 7 comes (a new field needs the next `BackupMigrations`
+  step; older builds refuse newer files). Until then "Not this month" is the way.
+- **MCI-N4 Labels for one-off amounts** ("Mia's birthday"): a new table, never new columns on `budgets` (the same rule as
+  custom budget periods below).
+- **MCI-N5 Done 2026-11-23:** the Facebook Page is facebook.com/lucentoapp (OT-60, checked in a browser).
+  `LucentoLinks.FOLLOW` shows it as @lucentoapp, and lucento-website `src/data/site.ts` links it too.
+- **MCI-N6 Custom budget periods** (below): the check-in then follows the period's start rather than the 1st.
+
+## Settings that follow the account — follow-ups (2026-11-22, PR #130 merged as `96e6287` on 2026-11-23)
+
+Tester feedback: sync restored the records but not the settings and customisations, "so restoring means setting up
+again". Built: settings sync (`public.user_settings`, docs/SYNC.md "Settings") and backup v6 (docs/BACKUP.md), which adds
+the colour theme and the other customisations the file lacked.
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| SS-1 | Apply `supabase/migrations/20261122090000_user_settings.sql` to **lucento-test** and **production** before the release that carries settings sync. **lucento-test: done 2026-11-23** (owner, OT-54; Claude checked it over REST: the table answers anon with 42501 "permission denied", a missing table answers 404 PGRST205). **Production: owner task OT-55** (created 2026-11-23). The owner asked Claude to apply it (2026-11-22, and again 2026-11-23), but the Supabase connector declined `apply_migration` both times: it wants a confirmation that doesn't reach the owner here. OT-55 is the same paste as OT-54 plus a history row under the repository's version (`20261122090000`, `created_by 'owner-sql-editor'`, as the v14 paste did). The paste and its eight-column check ran on PGlite on top of every earlier migration: all true, and pasting twice changes nothing. Once OT-55 is done, Claude runs the check below read-only through MCP and records it | P0 for that release | Until then the settings step is skipped every cycle on production: records sync as before and settings wait on the phone; nothing is lost. Re-running the file is safe |
+| SS-2 | Regenerate the website's privacy text (`python tools/legal/export_legal.py ../lucento-website/src/data/legal.ts`) | **Done 2026-11-23** (owner: "Proceed"): lucento-website #38, merged `d44a281`, live (checked on www.lucentoapp.com: /privacy, / and /delete-account) | The policy of 2026-11-22 (sync also keeps settings; consents and the app lock stay per phone, docs/LEGAL.md). #38 also updates the home page's privacy row, the cloud sync FAQ and the deletion list, which say settings are only ever visible to their own account. Published early on purpose: the policy should be live before a build with settings sync reaches testers |
+| SS-3 | Phone test on lucento-test after SS-1: customise phone A (theme, mode, modules, name, Show cents, Wallets view, default wallet) and sync; restore the account on phone B (all of them come back); change a setting on B and see it on A | P1 | JVM- and SQL-tested only (see CURRENT_STATUS). **Owner 2026-11-23: tests it on the next build**: 0.5.16, Mission Control **OT-57**, with SS-3 and SS-6 step by step. A Play build is a release build, so it syncs with production, which has the table since 2026-11-23 (OT-55, checked) |
+| SS-4 | Release notes: "Your theme, features and other settings now come back when you restore, and stay the same on all your phones" | P2 | With the release. Also say backup files made by this version can't be restored on older versions |
+| SS-5 | Owner, Play Console › Policy › App content › Data safety: add **App functionality** to Personal info › Name (the display name now syncs with the settings), as `docs/play/PLAY_STORE_SUBMISSION.md` §3.2 now reads | P0 for that release; **owner task OT-56** (created 2026-11-23, priority soon) | The policy text says it (version 2026-11-22); the form must too |
+| SS-6 | Device QA, beyond SS-3: two phones that already synced, set up differently, both updated (neither restyles the other; a change made since reaches both); sign out and sign in as a different account (nothing of the first account arrives); sign out and back in to the same account with a change waiting (it goes up); Replace restore with sync on (the other phone matches the file); a Partner's phone (personal settings only) | P1 | The QA and architecture reviews' regression list (2026-11-22) |
+| SS-7 | Owner decisions from the Pro-gate audit (2026-11-23): **LP-K16**, a backup file's own records skip the Free limits (restore is deliberately ungated, and a lapsed Pro user must keep their records); **LP-K18**, a Pro theme left on a phone by another account | **Decided 2026-11-23**: both stay as they are (restore unlimited; a chosen theme stays on the phone) | Neither comes from settings sync: the audit found no bypass in it, and its hardening is done (KNOWN_ISSUES SS-K9) |
+
+SS-1 check (read-only):
+
+```sql
+select to_regclass('public.user_settings') is not null as table_exists,
+  (select relrowsecurity from pg_class where oid = to_regclass('public.user_settings')) as rls_on,
+  (select count(*) = 3 from pg_policies where schemaname = 'public' and tablename = 'user_settings') as three_policies,
+  has_table_privilege('authenticated', 'public.user_settings', 'select, insert, update') as signed_in_can_sync,
+  not has_table_privilege('authenticated', 'public.user_settings', 'delete') as no_deletes,
+  not has_table_privilege('anon', 'public.user_settings', 'select') as anon_none,
+  exists (select 1 from pg_trigger where tgname = 'trg_user_settings_write') as write_rule_on;
+  -- On production also (OT-55's eighth column):
+  -- exists (select 1 from supabase_migrations.schema_migrations where version = '20261122090000') as recorded;
+```
+
+## Lucento Scan — follow-ups (2026-11-22, `feature/scan-document-intelligence`)
+
+| # | Task | Why |
+|---|---|---|
+| SC-N1 | **Consented photo corpus**: the owner and testers photograph ≥ 40 real receipts, bills and statements (kept off the repository, ground truth written once); run the benchmark on it | The text corpus can't show glare, creases or OCR misreads; phase 1's gate |
+| SC-N2 | **Phone test** (owner, Mission Control OT-53 on 0.5.15 vc 20): Scan pages on paper (one receipt, three receipts, a 2-page statement), Take a photo, Choose images, Import a PDF (an e-statement, a locked one); "Add anyway"; the reconciliation panel at 100 % and 200 % font; a phone without Google Play services or with < 2 GB RAM | SC-4, SC-9. **Done by the owner 2026-11-23** (OT-53 marked done, no problems noted); a phone without Play services or with < 2 GB RAM is still untried |
+| SC-N3 | **Website privacy page** (lucento-website): add the "Scanning documents" lines (ML Kit diagnostics, the scanner's Play services download, PDFs and their passwords) to match `LegalDocuments.kt`; Play Data safety: declare ML Kit's diagnostics if not already | CLAUDE.md: every send path listed wherever the policy is summarised. **Website: lucento-website #39** (2026-11-23, with 0.5.16: `legal.ts` version 2026-11-23, a Scanning row in the homepage privacy sheet, the offline FAQs). **Still open before production:** Play Data safety for ML Kit's diagnostics |
+| SC-N4 | Owner decision: CJK photo OCR (bundle ML Kit's Japanese/Korean/Chinese models, or download via Play services) | SC-2 |
+| SC-N5 | Phase 4 decision (AI reading of hard photos through the Gemini proxy, paid tier, own consent; Pro or allowance) | Audit capability 4; not built |
+| SC-N6 | Grow the merchant dictionaries from the photo corpus and tester reports (data only, bump the file's `version`) | SC-7 |
+
+## Regional prices — follow-ups (2026-11-21, `feature/regional-pricing`)
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| RP-1 | Owner: untick **Manage store presence** on `lucento-play-billing` (Mission Control › Tasks **OT-52**); then confirm `pricing.mjs plan` gets 403 and purchase checks still read | P1 | The key also lives in Vercel for purchase checks, so it shouldn't keep price and listing powers |
+| RP-2 | lucento-website: say that the prices shown are the Philippine ones and that Google Play shows the price for each country (`src/data/plans.ts`, `Pricing.astro`) | P2 | A US visitor now pays $3.99, not the peso equivalent |
+| RP-3 | Re-run `node tools/play-pricing/pricing.mjs plan` every six months (next by May 2027), and whenever a currency moves more than about 10 % (TRY, ARS, EGP, NGN). Apply after the owner approves, then commit the new `REGIONAL_PRICES.md` and history | P3 | Needs RP-1's permission again for the run |
+| RP-4 | Watch the Lifetime-to-yearly mix after launch. Lifetime was lowered to ₱2,490 / $59.99 on 2026-11-21, which is about 2 × yearly, so a shift to Lifetime is expected. The founder price was dropped the same day. Any further change is the owner's call | P3 | Pro sits at the top of the no-bank-connection range; the store listing should lead with AI answers, sentence and voice entry, and debt interest (`COMPETITOR_PRICING_2026-11.md`) |
+
+## Pro experience — follow-ups (2026-11-19, `feature/pro-repeat-taps-previews`)
+
+- On a phone, Free plan: a wall met twice (the dialog, then the message with Unlock) on Wallets, in the wallet editor,
+  on Lucento Shared with the email field focused (the keyboard should close first) and in Ask past the allowance;
+  Insights 6 and 12 months (the preview, then buying from it lands on that period); trying Grove, picking Sunrise
+  mid-trial (no flash), closing the sheet; TalkBack on the message, the preview and the try-on note.
+- Compose UI tests: `ProWallDialog` first tap and repeat (one `onDismiss`, Unlock calls `open`), the message landing in
+  the open sheet, the theme trial ending with the sheet, the preview's semantics (one description, no digits).
+- Decided by the owner (2026-11-19): drafts stay as they are (the form closes on the way to the plan page); a tried
+  theme bought from its note is applied once Pro arrives; "See Lucento Plan" is the one label; "Unlock" stays (built in
+  `feature/owner-calls-2026-11-19`). Still to do: a 130 % capture set and a 360 dp set at 100 %.
+
+## Free limits and the Pro dialog — follow-ups (2026-11-19, `feature/free-limits-pro-dialog`)
+
+- On a phone, Free plan: the guided setup at 3 accounts and 2 cards or loans (no add options, the quiet line, nothing
+  about Pro), then Wallets › Add (the type sheet), Debts › Add, Goals › Add, Insights 6 months, Save as PDF and a Pro
+  theme (one dialog each), See Lucento Plan from inside the wallet editor, and TalkBack on the dialog.
+- Emulator tests for what JVM can't reach: Sync now and Lucento Shared create / send when locked, Smarter reading on, and
+  "Not now" keeping what was typed in the editor. FL-1's hardening with a recreation test.
+- At 200 % on a 360 dp phone the wallet editor's live card truncates its name and currency (FL-5, older than this change).
+- Older layout seen by the critic (FL-6): status-bar padding on the New wallet sheet's header, Skip once a setup step
+  has entries, tappable setup rows, the goal sheet's Name label.
+- Decided by the owner (2026-11-19): setup's line is "You can edit these any time in Wallets." (it promises nothing).
+  Still open (design opinion): start-aligned dialog bodies longer than two lines and centred buttons (shared
+  `ConfirmDialog`).
+
+## Scheduled bulk edit — follow-ups (2026-11-19, `feature/scheduled-bulk-edit`)
+
+- A Compose UI test for Select mode: Select all and its partial state, the action bar's states, Back and Done leaving
+  it, a filter pruning the selection, the "Adjust existing" preselect, and restoring after Android ends the app.
+- Device: TalkBack through Select mode (rows are checkboxes, day cells a radio group, "N selected" and the duplicate
+  warning are announced), a Partner's phone (no Select pill, no long press), "Don't keep activities" with a sheet and
+  the delete dialog open, and a second phone receiving a bulk change and a bulk delete (dirty flags and tombstones).
+- A phone frame check (`dumpsys gfxinfo`, Select all over about 40 plans › Change day › apply, and once with about 10
+  weekly plans ending in two years, the preview's costliest path): the emulator can only compare screens with each
+  other (its GPU path makes every screen read janky).
+- On a phone: the confirmation's check and its 1.3 s hold after a bulk change, Change amount with the keyboard up, and
+  one recorded entry into Scheduled (the one-frame empty state the critic caught is fixed in code, not re-recorded).
+- Design critic P3s left (APPROVE 4.1, round 4): rows jump when the list re-sorts after a change (the rows sit in one
+  lazy item, so `animateItem()` needs them split into items); in the Save check, Cancel reads stronger than Add
+  another (shared `ConfirmDialog` styling); the pale "Adjust existing" button on the amber warning.
+- Decided by the owner (2026-11-19): an earlier day makes this month's date overdue, as built. If testers ask: Change
+  amount by +/−/% instead of one amount.
+
+## Monthly budget card — follow-ups (2026-11-18, `feature/budget-card-constraints`)
+
+- To watch: colour a category by the percentage it shows, or show the percentage rounded down, with a JVM test
+  (159.90 of 200.00); see BC-5. Count today once between "days elapsed" and the days left.
+- A Compose UI test for the panel: stacking at 280dp and 130 %, the click labels, "—", Hide amounts.
+- Device: a Partner's phone (the wallets column opens the explanation), a TalkBack pass, a window 600dp or wider (the
+  verdict side by side). Since 2026-11-23 (tester: the sentence dropped under the amount and left the right side empty;
+  owner chose "Sentence beside the amount") phones put it beside the amount too, whenever it fits there in 4 lines at
+  normal text; checked on API 35 at 360, 393 and 411 dp and at 130 % (stacked), screenshots in the main checkout's
+  `artifacts/safe-to-spend-2026-11-23/`. Owner review of the screenshots (2026-11-23): the amount about 10 % smaller (`AmountStyles.hero`, 32 sp), both sides
+  top-aligned, and an information icon instead of the check while there is something to spend (it invites the tap for
+  the details; a warning icon at zero), on every layout; re-checked on API 35 at 360 and 411 dp, light and dark. Still to
+  do: TalkBack on the phone layout (the semantics are unchanged).
+- `DailyFigure.SafePerDay` / `NothingLeft` now only feed `BudgetDailyFigureTest`: fold those checks into
+  `budgetSafeToSpend` and keep `DailyFigure` for a finished month's average.
+
+## Tester round — follow-ups (2026-11-17, PRs #98–#101)
+
+- **#101 merged** (`fd32c7b`, 2026-11-18) after OT-38 and a green CI. The next release build carries Room v14; both
+  Supabase projects already have the columns it needs.
+- **Older phones (KNOWN_ISSUES TR-2).** Before a public release, consider a server guard that refuses changing a stored
+  INVESTMENT or RECEIVABLE wallet to another type from a write without a base revision. Also consider a one-time
+  re-pull after an app update that knows new types, so a "Restored account" placeholder heals itself.
+- **Owner calls raised by the design review:** whether Safe to spend at 0 should say how big the shortfall is (the
+  owner decided on 2026-11-03 not to show it), and whether to keep five tile colours or use one tone, as Mono does.
+- **Card networks** (below, tester round 3) now need Room **v15**: v14 is the tester round's.
+
+## Custom budget periods — future Pro feature, after launch (owner, 2026-11-16)
+
+Budgets by payday cycle, week, two weeks, half-month or a named period, as a Pro feature (`docs/MONETIZATION.md` §3
+lists "custom periods" as Planned). **Not in the launch scope:** Lucento launches with calendar-month budgets as they
+are. A read-only audit on 2026-11-16 (`origin/main` `ef816c6`; private report
+https://claude.ai/artifact/1xgQTq65RzqaSgDQ2JM88C) found nothing that has to be prepared in code: transactions carry
+only a calendar date and no budget link, no SQL query filters by date, the budget math is pure and centralised in
+`BudgetPlanner`, each screen keeps its own month, and Pro gating has a ready pattern (Insights' 6/12-month lock).
+Estimated complexity **Medium**: Low–Medium for a monthly cycle with a custom start day ("my month starts on the
+25th"), Medium–High for weekly, biweekly, semi-monthly (15th and month end) or arbitrary periods.
+
+**Rules any implementation must follow:**
+1. **New tables only, never period columns on `budgets`.** Older app versions decode sync rows with
+   `ignoreUnknownKeys` and nothing can force an update, so an older phone would read such a row as an "every month"
+   amount, and `SyncRepository.mergeDuplicateBudgets` (grouped by category, currency, `month`, `effective_from`)
+   would delete it. From any phone on the owner's account that deletion syncs everywhere. Older phones never pull
+   tables they don't know. (The v10 lifecycle columns went onto `budgets` before launch; don't repeat that pattern.)
+2. **Existing `"yyyy-MM"` rows always mean calendar months.** Seed a custom cycle's amounts by copying the monthly
+   ones; reinterpreting old rows would move past budgets onto other dates.
+3. **Cycle definitions are effective-dated**, like `effective_from`. Nothing is snapshotted, so a rule applied without
+   a start date rewrites every past period. Define the switch-over stub (moving to a 25th start mid-month leaves
+   1–24 Nov) and the month-end anchor for day-N cycles (`RecurringMath`: Jan 31 → Feb 28 → Mar 31).
+4. **One contiguous cycle per ledger.** Overlapping named budgets (a holiday budget) are a separate, later concept,
+   never added to the cycle's figures.
+5. **No implicit proration** between period lengths: amounts are entered per period type.
+6. **The cycle setting needs its own synced table:** `ledger_settings` is insert-only (it locks the main currency).
+
+**Owner decisions when it is scheduled** (ask as options): which cycles ship first (recommended: the monthly start
+day); which screens follow the budget period (recommended: Budget; Home's budget card, pace and Safe to spend; the
+widget; Ask Lucento's budget facts and "Budget vs actual". Insights, Wallets, net flow, "Where it went" and
+Transactions stay on calendar months); the rule that replaces "a month's spending is one figure"
+(`MonthSpendingReconciliationTest`; proposed: the same date range gives the same figure, with a "This budget period"
+preset in Transactions); lapse behaviour (recommended, per MONETIZATION §6.3: an active cycle keeps running, only
+creating or changing a cycle is locked); what a Partner sees.
+
+**Outline:** pure domain first (`BudgetPeriod`, an effective-dated `BudgetCycle`; period versions of
+`BudgetPlanner.plan`/`burn` and `CashflowCalculator.safeToSpend`, keeping the `YearMonth` versions as wrappers so
+every caller and test still passes) → Room tables with a migration test → backup schema bump → Supabase migration
+(owner writes, Partner reads, grants, LWW and stamp triggers, CHECKs, the cloud write gate, quotas, account deletion,
+Mission Control) and `PulledRowRules` → `ProFeature.CUSTOM_BUDGET_PERIODS(LOCAL_PRO)` with a `ProGates` rule → screens
+and copy (about 170 month-worded phrases) → "same range, same figure" tests, boundary months and a mixed-version pair
+of phones.
+
+## Mission Control › Marketing approvals — follow-ups (2026-11-16)
+
+Built on `feature/mc-marketing` (database, this repository) and `lucento-mission-control` `feature/marketing` (console);
+Claude's tool is in `lucento-studio` (`marketing/mc`, `6edd819`). Contract: `docs/mission-control/v1/MARKETING_APPROVALS.md`.
+
+- **Owner:** OT-34 (part I on lucento-test), then the phone check with the first pack; week 48 go/no-go Sat 21 Nov
+  18:00 Manila. Production comes with OT-28 (the marketing SQL folds into the regenerated `APPLY_MISSION_CONTROL.sql`; a
+  second store `lucento-marketing-production`; `setup --env PRODUCTION … --default`).
+- **Owner decisions (2026-11-16, after three critic rounds):** merge to TEST now; a 'coming soon' post after launch
+  can still be approved ("Approve anyway"), scheduling waits for a launch version; keep the phone order (media, then
+  texts and decisions); no scheduled checker: the owner pastes "Check Mission Control marketing requests" into Claude
+  (the page shows when Claude last checked, with a Copy button; KNOWN_ISSUES MC-11).
+- **First real TEST push:** confirm the Blob API takes the tool's streamed uploads (KNOWN_ISSUES MC-9), then that a
+  video seeks and Download saves on the phone (DEPLOYMENT I6).
+- **Design:** critic round 1 REJECT 2.9 (studio `critic/reports/2026-11-16-mission-control-marketing-r1.md`); fixed:
+  typed input kept on a refusal, "Saved for Claude" instead of "Sent", "Scheduled in" (every app ticked), filters
+  (Needs you · With Claude · Done · All) with settled posts folded to one row, the week pinned in the address, urgency
+  on the card, launch switch below the posts, Overview capped at three marketing lines, two columns from 1024 px.
+  Round 2 REJECT 3.2 (gate 6: a duplicate React key, fixed; and a WebKit hydration warning that turned out to come from
+  the QA tool's screenshots, MC-8, fixed in the studio). Round 3 **REVISE 3.3, all gates pass**
+  (`…-r3.md`); its launch-day findings were fixed after it: no scheduling a 'coming soon' post after launch (database
+  `launch_version_needed`), the one-tap launch request keeps its answer and counts with Claude, "I posted it" is
+  recorded as posted by hand (`posted_late`), undoing the launch can cancel those requests. Three rounds without
+  APPROVE: escalated to the owner (design loop rule).
+- **Left after round 3:** the summary's detail behind "More" (optional polish); Safari and TalkBack checks on a real
+  device. Decision buttons above the media on phones: the owner kept the current order (2026-11-16).
+- **Truth rules in words:** the T-codes in Claude's truth lines have no plain-language list anywhere (MC-10); the card
+  shows the pass/fail chip and keeps the codes under "What Claude checked".
+
+## Mission Control V1 — follow-ups (2026-11-15)
+
+- ~~Run the local stack end to end~~ **Done 2026-11-15** (CURRENT_STATUS): 6 Playwright tests, a 72-screen tour per
+  privacy state; then the UI pass below ran on it.
+- **Console UI pass** (owner: "I need better UI/UX", 2026-11-15): merged as console PR #7 (`df195fe`), live on TEST.
+  Owner choices the same day: Needs attention strip first on Overview, ticket pages message first, keep IBM Plex
+  (merged as lucento-mission-control #8, `998420f`, live on TEST: three critic rounds, REVISE 3.4 last, the owner took
+  it with the P1/P2 fixes; studio `critic/reports/2026-11-15-mission-control-p2-r3b.md` lists the polish left). Left from critic round 3 (studio
+  `critic/reports/2026-11-15-mission-control-r3.md`): stat values misalign when a label wraps at 130 % text, the Custom
+  date panel ignores Esc and outside clicks, several action panels can be open at once, the translucent sticky header,
+  "16 accounts" vs "Registered 14" without a breakdown.
+- **API fields the console needs** (a new migration, then the owner pastes it): refunds with the account they belong to
+  (today only purchases in the recent 25 are named), the order date for Recent purchases (today the link date), the
+  latest purchase and refund state in a ticket's customer panel, and the revoke date on entitlement rows.
+- **Subscription renewals in Revenue**: Lucento stores only each purchase's first order id. Before the first monthly
+  renewals (about a month after launch), have the website record each renewal's `latestSuccessfulOrderId` when it
+  re-verifies a subscription (verify.ts / rtdn.ts), so the daily sweep can fetch its amount.
+- **Android release with Contact support** (roadmap 4.6, FD-V4/V7/V15): **built**, draft PR #77
+  (`feature/contact-support`, worktree `../lucento-contact-support`): in-app form, offline queue, daily `report_client`,
+  Privacy Policy 2026-11-15, the complimentary-Lifetime display (M5). Unit tests and lint green locally; no phone test
+  yet. Order: OT-27 (migrations on lucento-test), then the PR's owner test, then merge and release. The same day the
+  release goes live, regenerate the website's /privacy (`python tools/legal/export_legal.py
+  ../lucento-website/src/data/legal.ts`) and deploy it. Only after both are live: Settings › Extended data on, then
+  Records view on (DEPLOYMENT.md H; KNOWN_ISSUES MC-7).
+- ~~Owner confirmations for the privacy policy wording~~ **Done 2026-11-15**: the owner kept both (support requests
+  deleted with the account and 12 months after their last message; backups kept 28 days; KNOWN_ISSUES MC-3).
 ## Home-screen widgets — follow-ups (2026-11-12, `feature/home-widgets`)
 
 - Merged as `50727be` (PR #57, 2026-11-13); not released yet. Next, a device pass on Android 12+ (the S8 runs Android 9:
@@ -126,11 +430,11 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
   (vc 12, PR #64). Its fixes: the next card is in place under a leaving card at once and a swiped card leaves from
   where it was let go; each card's own scroll position; balanced last lines. Large text
   re-captured (130 % light/dark, 150 %, 200 %) after the emulator's System UI froze on text-size changes (capture
-  with a settle step: studio scratch `capture_lt.sh` logic). Open for the owner (three polish rounds done): doodle
-  spacing refinements (bare patches beside the pair), one art window for the deck with copy trims, centring wide pairs
-  versus keeping the torch glow inside, the AI feature's name and card 7's chip wording; a phone recording of leaving,
-  swiping and going back;
-- (b) on a phone: the mascot's hop as each card turns, the doodles' contrast on OLED, prop sharpness at 560+ dpi;
+  with a settle step: studio scratch `capture_lt.sh` logic). The owner's calls (OT-48, 2026-11-22: "1 A, 2 B, 3 A,
+  4 B"; on the phone the hop, swipe, doodles and props were fine): doodles stay as they are; wide pairs are centred and
+  the glow's faint outer edge may be cut; "AI answers" and "AI adviser" both stay; card 7's chip says "Pro allowance
+  until" (both built on `feature/pro-cards-owner-calls`). The one art window for the deck was passed on earlier;
+- (b) on a phone: done by the owner in OT-48 (the hop, the doodles in a dim room, the props' sharpness);
 - (c) later, if wanted: show the art at 200 % when there is room (today it gives way at 175 %).
 
 1. Design, through the studio loop: three reveal styles as tappable prototypes, scored by the design critic. The owner
@@ -149,10 +453,10 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
   Transfer + Withdrawal stacked beside Adjust; cards and loans get Record payment (From wallet / External payment);
   "What for" required; the bank's card logo on gallery faces.
 - **Decided 2026-11-11 (owner)**: Withdrawal stays on cash, bank, e-wallet and savings — not "Other asset" wallets
-  (valued by hand, no movements) or receivables.
+  (valued by hand, no movements) or receivables. Since the tester round (2026-11-17) investments allow it too.
 
 - **Item 3 visual polish done** (owner chose "visual polish only for now", 2026-11-11): `drawCardFinish` (light, sheen, glass edge) on every wallet face, a soft day-theme shadow, a smaller type pill in the gallery.
-- **Later, card networks**: a second PR. Needs a wallet `card_network` column (Room v14 + migration test,
+- **Later, card networks**: a second PR. Needs a wallet `card_network` column (Room v15 + migration test,
   Supabase migration applied to production *before* the app that writes it, PulledRowRules, backup). Logos from
   `lucento-bank-assets/Global-Banking-Assets/card-networks` (Visa, Mastercard, JCB, Amex, Discover, UnionPay; owner
   accepted trademark use 2026-11-01). **No BancNet logo in the library**: the owner supplies an official file or it

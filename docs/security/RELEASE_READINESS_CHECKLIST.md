@@ -44,18 +44,18 @@ Legend: **[B]** blocks release · **[R]** recommended before release · **[P]** 
 - [x] Suite cases for probes X1 and X2 pass. *Evidence: 258/258, 2026-11-10.*
 - [x] Applied to production (with A1, OWNER_ACTIONS §13). *Evidence: as A1.*
 
-### A3. [B] F-05 — Gemini key on the paid tier (owner, about 5 minutes)
+### A3. [B] F-05 — Gemini key on the paid tier (owner, about 12 minutes) — do it last
 
-1. Open https://aistudio.google.com/apikey and sign in with the account that made Lucento's key.
-2. Find the key that Vercel uses. Note the **Project** name next to it.
-3. Click the project name, or open https://console.cloud.google.com/billing and pick that project at the top.
-4. Under **Billing**, check that the project shows a **linked billing account** (not "This project has no billing
-   account").
-5. If there is none, click **Link a billing account**, choose or create one, and confirm.
-6. Optional: **Billing → Budgets & alerts → Create budget** with a monthly amount and an email alert.
-7. Take a screenshot of the linked billing account and save it as `docs/security/evidence/gemini-billing.png`.
+**Timing (owner, 2026-11-15):** one of the last steps before the production release, so the free tier lasts as long as
+possible; before the final release build. Click-by-click steps (Google's Prepay billing):
+[OWNER_ACTIONS_REQUIRED.md §1](OWNER_ACTIONS_REQUIRED.md#1-gemini-key-on-googles-paid-tier-f-05).
 
-- [ ] Done. Screenshot saved.
+- [ ] Billing set up on the key's project, $5 Prepay credit bought (§1 steps 1–6).
+- [ ] Auto-reload on with a monthly limit, so the key never stops at $0 (§1 steps 7–8).
+- [ ] Projects page no longer says "Set up billing"; Ask Lucento answers on a phone. Screenshot saved as
+      `docs/security/evidence/gemini-billing.png` (§1 steps 10–12).
+- [ ] Free-tier sentence removed from the app and the website's /privacy, `LegalDocuments.VERSION` bumped, date
+      recorded in `docs/ASK.md` (Claude, §1 step 13), in the release build.
 
 ### A4. [B] F-06 — Supabase Auth settings on production (owner, about 10 minutes)
 

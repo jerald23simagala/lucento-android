@@ -47,6 +47,8 @@ fun LucentoPrimaryButton(
     icon: ImageVector? = null,
     /** After the label: an arrow for "go on" actions in getting started. Decorative. */
     trailingIcon: ImageVector? = null,
+    /** False for a button that sits in a row of actions and is as wide as its label. */
+    fillWidth: Boolean = true,
 ) {
     val haptics = rememberHaptics()
     Button(
@@ -55,7 +57,7 @@ fun LucentoPrimaryButton(
             onClick()
         },
         enabled = enabled,
-        modifier = modifier.fillMaxWidth().heightIn(min = Sizes.button),
+        modifier = (if (fillWidth) modifier.fillMaxWidth() else modifier).heightIn(min = Sizes.button),
         shape = MaterialTheme.shapes.medium,
         contentPadding = ButtonPadding,
         colors = ButtonDefaults.buttonColors(),

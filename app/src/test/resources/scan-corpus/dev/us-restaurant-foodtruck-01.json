@@ -1,0 +1,46 @@
+{
+  "id": "us-restaurant-foodtruck-01",
+  "country": "US",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-12",
+  "pages": [
+    [
+      "El Gordo Tacos",
+      "Order #A17",
+      "10/11/2026 12:48 PM",
+      "Ticket: Carlos",
+      "2 Carne Asada Taco  $9.00",
+      "1 Al Pastor Burrito  $11.50",
+      "1 Horchata (L)  $4.25",
+      "Subtotal  $24.75",
+      "Tax  $2.54",
+      "Tip  $4.00",
+      "Total  $31.29",
+      "VISA XXXX 0391",
+      "Auth code 044871",
+      "Thank you! Follow us @elgordotacos",
+      "Powered by Square"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "El Gordo Tacos",
+        "total": "31.29",
+        "currency": "USD",
+        "currencyEvidence": "NONE",
+        "date": "2026-10-11",
+        "dateAmbiguous": true,
+        "direction": "OUT",
+        "category": "takeout",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "0391"
+      }
+    ]
+  },
+  "notes": "No address, phone or tax name: only '$' is printed, so nothing settles the currency or the date order. 10/11/2026 is Oct 11 (truth, US truck) or Nov 10. Tip already added; total includes it."
+}

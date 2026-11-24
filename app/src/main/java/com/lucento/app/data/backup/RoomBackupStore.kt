@@ -42,6 +42,11 @@ class RoomBackupStore(
     private val runner: TransactionRunner,
     private val preferences: UserPreferencesRepository,
     private val goalPhotos: GoalPhotos,
+    /**
+     * Lucento Pro: whether this phone's plan may use a theme, so a file can't unlock a Pro theme (ProGates.themeAllowed).
+     * No default, so the store can't be built without the plan (Pro-gate review 2026-11-23, F1).
+     */
+    private val themeAllowed: suspend (com.lucento.app.data.preferences.ThemeId) -> Boolean,
 ) : BackupStore {
 
     override suspend fun read(): BackupSnapshot = runner.run {
@@ -80,7 +85,7 @@ class RoomBackupStore(
         }
         droppedPhotos.forEach { goalPhotos.delete(it) }
         val defaultWallet = snapshot.settings.defaultWalletId?.let { database.walletDao().findByClientUuid(it)?.id }
-        preferences.applyBackupSettings(snapshot.settings, defaultWallet)
+        preferences.applyBackupSettings(snapshot.settings, defaultWallet, themeAllowed)
     }
 
     override suspend fun mergeAll(snapshot: BackupSnapshot) {
@@ -100,8 +105,9 @@ class RoomBackupStore(
             previousPhotos - database.goalDao().getAll().mapNotNull { it.photoPath }.toSet()
         }
         droppedPhotos.forEach { goalPhotos.delete(it) }
+        // Merge keeps this phone's preferences (BackupMerge passes them through); only a default wallet it removed goes.
         val defaultWallet = snapshot.settings.defaultWalletId?.let { database.walletDao().findByClientUuid(it)?.id }
-        preferences.applyBackupSettings(snapshot.settings, defaultWallet)
+        preferences.clearDefaultWalletAfterMerge(defaultWallet)
     }
 
     private suspend fun ensureIds() {
@@ -130,6 +136,7 @@ class RoomBackupStore(
         val goals = database.goalDao().getAll()
         val goalUuid = goals.associate { it.id to requireNotNull(it.clientUuid) }
         val prefs = preferences.preferences.first()
+        val own = preferences.backupCustomisations()
         val settings = BackupSettings(
             onboardingComplete = prefs.onboardingComplete,
             themeMode = prefs.themeMode.name,
@@ -143,6 +150,12 @@ class RoomBackupStore(
             defaultWalletId = prefs.defaultWalletId?.let { id -> wallets.firstOrNull { it.id == id }?.clientUuid },
             guideStep = prefs.guideStep?.key,
             smartReading = prefs.smartReading,
+            // Version 6: only the phone's own values, so a default never arrives elsewhere as a choice.
+            themeId = own.themeId,
+            showCents = own.showCents,
+            walletsView = own.walletsView,
+            moduleOffersHidden = own.moduleOffersHidden,
+            fxRatesOnline = own.fxRatesOnline,
         )
         return BackupSnapshot(
             wallets = wallets.map { it.toBackup() },
@@ -196,6 +209,10 @@ class RoomBackupStore(
                     institutionId = row.institutionId,
                     fxBasisRate = row.fxBasisRate,
                     fxRevalue = row.fxRevalue,
+                    kind = row.kind,
+                    iconKey = row.iconKey,
+                    spendable = row.spendable,
+                    spendableCreditMinor = row.spendableCreditMinor,
                     currencyCode = row.currency,
                     openingBalanceMinor = row.openingBalanceMinor,
                     sortOrder = row.sortOrder,
@@ -526,6 +543,10 @@ private fun WalletEntity.toBackup() = BackupWallet(
     institutionId = institutionId,
     fxBasisRate = fxBasisRate,
     fxRevalue = fxRevalue,
+    kind = kind,
+    iconKey = iconKey,
+    spendable = spendable,
+    spendableCreditMinor = spendableCreditMinor,
     name = name,
     type = enumValueOf(type),
     currency = currencyCode,
@@ -670,6 +691,10 @@ private fun newWallet(row: BackupWallet) = WalletEntity(
     institutionId = row.institutionId,
     fxBasisRate = row.fxBasisRate,
     fxRevalue = row.fxRevalue,
+    kind = row.kind,
+    iconKey = row.iconKey,
+    spendable = row.spendable,
+    spendableCreditMinor = row.spendableCreditMinor,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,
@@ -688,6 +713,10 @@ private fun WalletEntity.edited(row: BackupWallet) = copy(
     institutionId = row.institutionId,
     fxBasisRate = row.fxBasisRate,
     fxRevalue = row.fxRevalue,
+    kind = row.kind,
+    iconKey = row.iconKey,
+    spendable = row.spendable,
+    spendableCreditMinor = row.spendableCreditMinor,
     name = row.name,
     type = row.type.name,
     currencyCode = row.currency,

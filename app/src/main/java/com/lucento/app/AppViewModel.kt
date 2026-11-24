@@ -60,6 +60,8 @@ class AppViewModel(
     private val planMemory: com.lucento.app.data.entitlement.PlanMemory? = null,
     /** Goals, for Lucento Pro's tour (null in tests). */
     goals: com.lucento.app.data.repository.GoalRepository? = null,
+    /** The time the theme gate reads ([lockedThemes], [setThemeId]); tests move it. */
+    private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     /** Lucento Pro: the one-time "your plan has ended" notice (docs/MONETIZATION.md §6.3 rule 7); null when there is none. */
     private val _planNotice = MutableStateFlow<com.lucento.app.domain.entitlement.PlanNotice?>(null)
@@ -173,7 +175,7 @@ class AppViewModel(
     /** Lucento Pro: the themes this plan may not pick (docs/MONETIZATION.md §3.8). A locked theme already chosen stays. */
     val lockedThemes: StateFlow<Set<ThemeId>> =
         if (entitlements == null) MutableStateFlow(emptySet())
-        else entitlements.map { plan -> com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(plan, System.currentTimeMillis()).mapNotNull { id -> ThemeId.entries.firstOrNull { it.name == id } }.toSet() }
+        else entitlements.map { plan -> com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(plan, clock()).mapNotNull { id -> ThemeId.entries.firstOrNull { it.name == id } }.toSet() }
             .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
     /** Multicurrency: every wallet's and movement's value in the main currency, for the "≈ ₱…" lines under them. */
     val fxDisplay: StateFlow<com.lucento.app.domain.fx.FxDisplay> =
@@ -333,7 +335,7 @@ class AppViewModel(
         viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
     }
 
-    /** Profile menu: the optional name shown on the avatar (stored only on this device). */
+    /** Profile menu: the optional name shown on the avatar (follows the account with cloud sync, docs/SYNC.md "Settings"). */
     fun setDisplayName(name: String) {
         viewModelScope.launch { preferences.setDisplayName(name) }
     }
@@ -344,6 +346,10 @@ class AppViewModel(
 
     fun setThemeId(theme: ThemeId) {
         if (theme in lockedThemes.value) return // the picker shows why; nothing is persisted
+        // [lockedThemes] is worked out when the plan changes: a plan that ends while Lucento stays open is caught here,
+        // at the tap (Pro-gate review 2026-11-23, PE-3).
+        val plan = entitlements?.value
+        if (plan != null && !com.lucento.app.domain.entitlement.ProGates.themeAllowed(theme.name, plan, clock())) return
         viewModelScope.launch { preferences.setThemeId(theme) }
     }
 

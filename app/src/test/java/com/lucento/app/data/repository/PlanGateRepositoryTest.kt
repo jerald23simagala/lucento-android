@@ -63,6 +63,32 @@ class PlanGateRepositoryTest {
         repeat(12) { assertTrue(repo.create("W$it", WalletType.values()[it % WalletType.values().size], php) is WalletRepository.SaveResult.Saved) }
     }
 
+    @Test fun a_type_change_into_another_kind_counts_as_a_new_one_of_it() = runTest {
+        val repo = wallets(free)
+        val cash = (repo.create("Cash", WalletType.CASH, php) as WalletRepository.SaveResult.Saved).id
+        repo.create("GCash", WalletType.E_WALLET, php)
+        repo.create("BPI", WalletType.BANK, php)
+        val visa = (repo.create("Visa", WalletType.CREDIT_CARD, php) as WalletRepository.SaveResult.Saved).id
+        repo.create("Car loan", WalletType.LOAN, php)
+        // Within a kind: a card into a loan, cash into a bank account at three.
+        assertTrue(repo.update(visa, "Visa", WalletType.LOAN, php) is WalletRepository.SaveResult.Saved)
+        assertTrue(repo.update(cash, "Cash", WalletType.BANK, php) is WalletRepository.SaveResult.Saved)
+        // Into another kind: a receivable is Pro, and a third card or loan is over the free two.
+        assertEquals(WalletRepository.SaveResult.ProRequired(ProFeature.RECEIVABLES), repo.update(cash, "Cash", WalletType.RECEIVABLE, php))
+        assertEquals(
+            WalletRepository.SaveResult.LimitReached(ProFeature.DEBT_ACCOUNTS, used = 2, limit = Limit.Count(2)),
+            repo.update(cash, "Cash", WalletType.CREDIT_CARD, php),
+        )
+        // A receivable kept from Pro: kept and editable, but not a fourth money wallet.
+        val owed = (wallets(pro).create("Owed by Ana", WalletType.RECEIVABLE, php) as WalletRepository.SaveResult.Saved).id
+        assertTrue(repo.update(owed, "Owed by Ana R.", WalletType.RECEIVABLE, php) is WalletRepository.SaveResult.Saved)
+        assertEquals(
+            WalletRepository.SaveResult.LimitReached(ProFeature.MONEY_WALLETS, used = 3, limit = Limit.Count(3)),
+            repo.update(owed, "Owed by Ana R.", WalletType.CASH, php),
+        )
+        assertTrue(wallets(pro).update(cash, "Cash", WalletType.RECEIVABLE, php) is WalletRepository.SaveResult.Saved)
+    }
+
     @Test fun existing_wallets_over_the_limit_keep_working_after_a_downgrade() = runTest {
         val proRepo = wallets(pro)
         val ids = (1..6).map { (proRepo.create("W$it", WalletType.BANK, php) as WalletRepository.SaveResult.Saved).id }

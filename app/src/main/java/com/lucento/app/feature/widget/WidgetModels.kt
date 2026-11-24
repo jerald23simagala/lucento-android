@@ -63,8 +63,8 @@ sealed interface SafeToSpendWidgetModel {
     ) : SafeToSpendWidgetModel
 
     companion object {
-        const val OVER_BUDGET_REASON = "You’re over budget this month"
-        const val BILLS_REASON = "Bills due take what’s left"
+        const val OVER_BUDGET_REASON = com.lucento.app.feature.home.BudgetFormula.CAPTION_OVER_BUDGET
+        const val BILLS_REASON = com.lucento.app.feature.home.BudgetFormula.CAPTION_BILLS
         const val BUDGETS_OFF_NOTE = "Budgets is switched off, so this shows Net flow, as Home does."
 
         fun from(
@@ -73,13 +73,16 @@ sealed interface SafeToSpendWidgetModel {
             appLock: Boolean,
             hideAmounts: Boolean,
             locale: Locale = Locale.getDefault(),
+            /** Settings › Money › Show cents; off rounds the widget's figures like every other amount people read. */
+            showCents: Boolean = true,
         ): SafeToSpendWidgetModel {
             if (!onboarded) return NotSetUp
             if (appLock) return Locked(MoneyFormatter.masked(home.focusCurrency, locale))
             val month = monthLabel(home.month, locale)
+            val whole = !showCents
             fun shown(money: Money) =
-                if (hideAmounts) MoneyFormatter.masked(money.currencyCode, locale) else MoneyFormatter.format(money, locale)
-            fun spoken(money: Money) = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money, locale)
+                if (hideAmounts) MoneyFormatter.masked(money.currencyCode, locale) else MoneyFormatter.format(money, locale, wholeUnits = whole)
+            fun spoken(money: Money) = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.format(money, locale, wholeUnits = whole)
 
             val plan = home.budget
             val burn = home.burn
@@ -91,7 +94,7 @@ sealed interface SafeToSpendWidgetModel {
                 val figure = if (hideAmounts) {
                     MoneyFormatter.masked(net.currencyCode, locale)
                 } else {
-                    MoneyFormatter.formatSigned(net, showPlus = true, locale = locale)
+                    MoneyFormatter.formatSigned(net, showPlus = true, locale = locale, wholeUnits = whole)
                 }
                 val tone = when {
                     hideAmounts -> WidgetTone.NEUTRAL
@@ -99,7 +102,7 @@ sealed interface SafeToSpendWidgetModel {
                     net.isNegative -> WidgetTone.NEGATIVE
                     else -> WidgetTone.NEUTRAL
                 }
-                val spokenNet = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(net, showPlus = true, locale = locale)
+                val spokenNet = if (hideAmounts) HIDDEN_AMOUNT_DESCRIPTION else MoneyFormatter.formatSigned(net, showPlus = true, locale = locale, wholeUnits = whole)
                 return NetFlow(
                     monthLabel = month,
                     figure = figure,
@@ -123,11 +126,8 @@ sealed interface SafeToSpendWidgetModel {
                 label = "Safe to spend"
                 figureMoney = safeShown!!
                 nothing = formula.nothingSafe
-                reason = when {
-                    !nothing -> null
-                    formula.overspent -> OVER_BUDGET_REASON
-                    else -> BILLS_REASON
-                }
+                // Home's own caption, including when the spending money set it (tester round, 2026-11-17).
+                reason = formula.safeCaption
             } else {
                 // Home closes on Remaining (or Overspent) when there is no safe-to-spend figure.
                 label = if (formula.overspent) "Overspent" else "Remaining"
@@ -139,7 +139,8 @@ sealed interface SafeToSpendWidgetModel {
             val dayAmount = if (safe != null && hasSafe && !nothing) safe.perDay else null
             val days = safe?.daysLeft ?: 0
             val perDay = dayAmount?.let { "${shown(it)} a day · ${daysLeft(days)}" }
-            val billsDue = formula.billsDue?.takeIf { hasSafe && !nothing && !it.isZero }
+            // The budget's bills explain the budget's figure only; when the spending money set it, the reason says so.
+            val billsDue = formula.billsDue?.takeIf { hasSafe && !nothing && !it.isZero && !formula.limitedByMoney }
             val bills = billsDue?.let { "After ${shown(it)} bills due" }
             val used = burn.consumedPercent ?: 0
             val verdict = paceVerdict(plan, burn.pace, home.isCurrentMonth)

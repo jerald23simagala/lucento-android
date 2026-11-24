@@ -1,0 +1,44 @@
+{
+  "id": "ph-payment-metrobank-instapay-fee-01",
+  "country": "PH",
+  "type": "PAYMENT_CONFIRMATION",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "4:48",
+      "Metrobank",
+      "Transfer Successful",
+      "Transfer Amount  PHP 2,500.00",
+      "Service Fee  PHP 15.00",
+      "Total Amount Debited  PHP 2,515.00",
+      "To  JUAN DELA CRUZ",
+      "GCash  0917 *** 2231",
+      "Via  InstaPay",
+      "From  Savings Account  ***-***-*4417",
+      "Reference No.  MB26110912345678",
+      "Date  Nov 9, 2026 04:47 PM",
+      "Back to Home"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": null,
+        "total": "2515.00",
+        "currency": "PHP",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-09",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "transfer",
+        "paymentInstrument": "Metrobank",
+        "instrumentLast4": "4417"
+      }
+    ]
+  },
+  "notes": "InstaPay to a person's GCash: 2,500.00 transfer + 15.00 service fee = 2,515.00 debited; total is what left the account."
+}

@@ -1,0 +1,60 @@
+{
+  "id": "us-other-autoloan-01",
+  "country": "US",
+  "type": "OTHER_FINANCIAL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-15",
+  "pages": [
+    [
+      "ally",
+      "Ally Financial",
+      "Monthly Statement",
+      "Account Number  ****8812",
+      "Statement Date  10/20/2026",
+      "KEVIN NGUYEN",
+      "2210 E MADISON ST",
+      "SEATTLE WA 98112-5502",
+      "Vehicle  2023 TOYOTA RAV4 XLE  VIN ****4411",
+      "Payment Due Date  11/14/2026",
+      "Amount Due  $412.50",
+      "Payment Summary",
+      "Last Payment Received  10/14/2026  $412.50",
+      "Applied to Principal  $341.82",
+      "Applied to Interest  $70.68",
+      "Applied to Fees  $0.00",
+      "Account Summary",
+      "Principal Balance  $16,840.33",
+      "Payoff Amount (good through 10/30/2026)  $16,882.19",
+      "Interest Rate  5.04%",
+      "Remaining Payments  44",
+      "Year-to-date Interest Paid  $741.55",
+      "Amount Due Summary",
+      "Current Monthly Payment  $412.50",
+      "Past Due Amount  $0.00",
+      "Late Charges  $0.00",
+      "Total Amount Due  $412.50",
+      "Pay online at ally.com or with the Ally Auto app.",
+      "Ally Financial  P.O. Box 380902  Bloomington, MN 55438-0902"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Ally",
+        "total": "412.50",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-20",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "car",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Auto-loan statement treated like a bill: the person records the monthly payment due (412.50). The last payment received, principal balance, payoff amount and YTD interest are history or balances, not new transactions."
+}

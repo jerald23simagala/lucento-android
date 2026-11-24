@@ -56,8 +56,11 @@ billed differently; the table shows them as one column with a note where they di
 | **Where your money went and net worth over time** — expenses by category and month-end net worth, for the period you pick (3 months free) | ✔ | ✔ | ✔ |
 | **Ask Lucento** — answers from your own figures, on this phone, no internet: net worth, cash flow, budget against actual, debts, top categories | ✔ | ✔ | ✔ |
 | **Save or share a statement as a PDF** | — | ✔ | ✔ |
-| **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **10 questions a month** | **50 questions a day** | 50 a day for the **first 12 months**, then 10 a month — or 50 a day with Lucento Cloud |
-| **Smarter reading** — Gemini reads a messy message into transactions when the on-phone reader isn't sure | — | ✔ | First 12 months, then with Lucento Cloud |
+| **AI adviser** — ask Gemini about your numbers and get plans and recommendations (needs sign-in, consent and internet; Lucento sends figures, never your name) | **5 questions a month** | **45 questions a month** | 45 a month for the **first 12 months**, then 5 a month — or 45 a month with Lucento Cloud |
+| **Smarter reading** — Gemini reads a messy message into transactions when the on-phone reader isn't sure (off until you turn it on in Settings; slower; each message uses one of the month's AI questions) | — | ✔ | First 12 months, then with Lucento Cloud |
+| **Monthly check-in** — as a month ends, a card on Home offers to plan the next one (a yearly bill, a birthday) and, from the 1st, last month's recap; never a notification | ✔ | ✔ | ✔ |
+| **Milestones** — each month's recap (what you kept, where it went, how the budget ended) and the awards you earn from your own records | ✔ | ✔ | ✔ |
+| **Milestones: your budget year** — the calendar year as twelve squares, each coloured by how its budget went | Your own months as a preview | ✔ | ✔ |
 
 ### A.5 Keeping your data
 
@@ -80,7 +83,7 @@ billed differently; the table shows them as one column with a note where they di
 
 | | Free | Pro Monthly | Pro Annual | Pro Lifetime |
 |---|---|---|---|---|
-| Price (Philippines, indicative — final price in Google Play) | ₱0 | ₱149 / month | ₱1,190 / year (≈ ₱99 / month) | **₱3,490 once** |
+| Price (Philippines, indicative — final price in Google Play) | ₱0 | ₱149 / month | ₱1,190 / year (≈ ₱99 / month) | **₱2,490 once** |
 | Free trial | — | — | 7 days (once per Google account) | — |
 | Renews | — | Monthly, until cancelled in Google Play | Yearly, until cancelled in Google Play | **Never** |
 | Online services (sync, cloud restore, AI adviser, Shared) | — | While subscribed | While subscribed | **12 months included**, then optional Lucento Cloud: ₱59 / month or ₱490 / year |
@@ -117,7 +120,7 @@ phone. Lucento does not check your purchase every time you open it, and it never
 adviser's Pro allowance, Smarter reading and Lucento Shared run on servers that cost money every month. Lifetime
 includes them for **12 months** from your purchase. After that you can keep them with **Lucento Cloud**
 (₱59 a month or ₱490 a year), or carry on without them: your data stays on your phone, backup files and CSV keep
-working, and the AI adviser falls back to the free allowance of 10 questions a month. Nothing you own is affected.
+working, and the AI adviser falls back to the free allowance of 5 questions a month. Nothing you own is affected.
 
 **If Lucento's servers are ever unavailable.** Everything you own keeps working, because none of it depends on our
 servers. Only the online services would be affected, for everyone, for as long as the outage lasts.
@@ -155,10 +158,10 @@ an account.**
 - Schedule bills and salary, and confirm them when they happen.
 - Two active savings goals.
 - Insights over the last 3 months, and Ask Lucento's on-phone statements.
-- 10 AI adviser questions a month when you sign in.
+- 5 AI adviser questions a month when you sign in.
 - Backup files, CSV export, app lock, two themes.
 
-*Limits:* 3 money wallets, 2 cards or loans, 2 active goals, 3-month Insights, 10 AI questions a month, no cloud
+*Limits:* 3 money wallets, 2 cards or loans, 2 active goals, 3-month Insights, 5 AI questions a month, no cloud
 sync or Lucento Shared.
 
 *CTA:* **Get Lucento on Google Play**
@@ -181,10 +184,10 @@ adviser who knows your numbers.
 - Statements as PDF.
 - Cloud sync between your phones, and restore from your account on a new one.
 - Lucento Shared: one Partner sees and records in your ledger from their own phone.
-- AI adviser, 50 questions a day, and Smarter reading.
+- AI adviser, 45 questions a month.
 - All five themes.
 
-*Limits:* 20 active goals; 50 AI questions a day. The online services need internet and an active subscription.
+*Limits:* 20 active goals; 45 AI questions a month (shared with Smarter reading). The online services need internet and an active subscription.
 
 *Price:* **₱149 a month**, or **₱1,190 a year** (about ₱99 a month) with a **7-day free trial**.
 
@@ -209,13 +212,13 @@ a subscription and without our servers.
 - All five themes.
 - Every future Pro feature that runs on the phone.
 
-*Included for 12 months:* cloud sync, restore from your account, Lucento Shared, the AI adviser at 50 questions a day,
+*Included for 12 months:* cloud sync, restore from your account, Lucento Shared, the AI adviser at 45 questions a month,
 Smarter reading. Afterwards, optional with Lucento Cloud (₱59 a month or ₱490 a year), or carry on without them.
 
 *Limits:* 20 active goals. Online services are a service, not part of the one-time purchase, and are included for the
 first 12 months.
 
-*Price:* **₱3,490, once.** No renewal, ever.
+*Price:* **₱2,490, once.** No renewal, ever.
 
 *CTA:* **Buy Lifetime**
 
@@ -226,8 +229,8 @@ fully offline. Read exactly what Lifetime includes in **The Lifetime promise**.
 
 *Short description:* The online services for people who own Lucento.
 
-*Included:* cloud sync between your phones, restore from your account, Lucento Shared, the AI adviser at 50 questions a
-day, Smarter reading.
+*Included:* cloud sync between your phones, restore from your account, Lucento Shared, the AI adviser at 45 questions a
+month, Smarter reading.
 
 *Price:* **₱59 a month** or **₱490 a year.**
 
@@ -240,8 +243,84 @@ questions a month; everything you own is untouched.
 
 ## D. In-app messages
 
-Format: title · body · buttons. `{n}` values come from the evaluator or the server, never typed into copy. Each sheet
-is opened only by the tap that would have used the feature; "Not now" is remembered for the rest of the session.
+Format: title · body · buttons. `{n}` values come from the evaluator or the server, never typed into copy.
+
+**D-0 The Pro dialog (shipped 2026-11-18; owner: one dialog at the tap, directing to the Lucento Plan page).** Every Pro
+wall uses this one dialog (`ProWallDialog`; strings in `ProCopy.wallTitle` / `wallBody`), opened only by the tap that
+would have crossed the wall. The title says what the Free plan includes or what is Pro; the body never repeats it. Not
+now closes it; the next tap shows it again (MONETIZATION §6.1). It supersedes the draft sheets D-1 to D-4 and the free
+case of D-5 below, which stay for the reasoning.
+
+| Wall | Title | Body |
+|---|---|---|
+| Money wallets | The Free plan includes 3 money wallets | You have {n}. Lucento Pro and Pro Lifetime have no limit. Everything in the wallets you have keeps working. |
+| Cards or loans | The Free plan includes 2 cards or loans | You have {n}. Lucento Pro and Pro Lifetime have no limit. Payments and reminders on the ones you have carry on as usual. |
+| Every wallet kind full (Add wallet) | The Free plan includes 3 money wallets and 2 cards or loans | You have {n} money wallets and {m} cards or loans. Lucento Pro and Pro Lifetime have no limit. Everything in the ones you have keeps working. |
+| Savings goals | The Free plan includes 2 active goals | You have {n}. Lucento Pro and Pro Lifetime allow 20. When a goal is reached, archiving it frees a slot. Nothing happens to the goals you have. |
+| AI questions | The Free plan includes 5 AI questions a month | Lucento Pro gives you 45 a month. Until your questions return, Lucento answers what it can on this phone. |
+| Receivable | Money owed to you is part of Lucento Pro | Track what someone owes you and each instalment they pay back. You can always record what they pay as income. |
+| Valued asset | Things you own are part of Lucento Pro | Add a home, a car or jewellery at a value you set, so your net worth is complete. Your wallets and debts already count. |
+| Other currency | Wallets in other currencies are part of Lucento Pro | A wallet in your main currency is always free. |
+| Insights 6 / 12 months | 6 and 12 months are part of Lucento Pro | See longer trends in what came in, what went out and how your net worth moved. Your last 3 months are always free. |
+| PDF statement | PDF statements are part of Lucento Pro | Everything on this screen is always free. Pro adds saving or sharing it as a PDF. |
+| Theme | {Grove} is part of Lucento Pro | Pro adds Grove, Mono and Aurora. Sunrise and Midnight are always free. |
+| Cloud sync | Cloud sync is part of Lucento Pro | Your data stays on this phone whatever you choose, and a backup file is always free. |
+| Restore from account | Restoring from your account is part of Lucento Pro | Restoring a backup file is always free. |
+| Smarter reading | Smarter reading is part of Lucento Pro | Without it, Lucento reads your messages on this phone straight away, always free. |
+| Lucento Shared | Inviting a Partner is part of Lucento Pro | Being someone’s Partner is always free. |
+
+For **Pro Lifetime without Lucento Cloud** (its included year over), the online services name Lucento Cloud instead
+(`ProCopy.cloudWall`):
+
+| Wall | Title | Body |
+|---|---|---|
+| AI questions | Pro Lifetime includes 5 AI questions a month | Lucento Cloud gives you 45 a month. Until your questions return, Lucento answers what it can on this phone. |
+| Cloud sync | Cloud sync comes with Lucento Cloud | Everything on this phone stays yours with Pro Lifetime. Lucento Cloud adds cloud sync, Lucento Shared, Smarter reading and more AI questions. |
+| Restore from account | Restoring from your account comes with Lucento Cloud | (as above) |
+| Smarter reading | Smarter reading comes with Lucento Cloud | (as above) |
+| Lucento Shared | Inviting a Partner comes with Lucento Cloud | (as above) |
+
+> [ Not now ]  [ See Lucento Plan ]
+
+At 20 active goals (the most on any plan) there is no dialog, only the plain line "20 active goals is the most on any
+plan. Archive a goal you’ve reached to make room."
+
+**D-0b A wall met again in the same session (owner, 2026-11-19).** A snackbar for 10 seconds with a close button, at the
+foot of the app or at the top of the open sheet (never over the sheet's own buttons):
+> {the dialog's title}  [ Unlock ]
+
+e.g. "The Free plan includes 3 money wallets · Unlock". Unlock opens the plan page, as See Lucento Plan does.
+
+**D-0c Insights, 6 or 12 months on the Free plan (a preview).** Under the person's own chart, softened, figures hidden:
+> **6 and 12 months are part of Lucento Pro**
+> This is the shape of your last 6 months, with the figures hidden. Lucento Pro shows every figure for 6 and 12 months,
+> where your money went and how your net worth moved. Your last 3 months are always free.
+> [ See Lucento Plan ]  [ Back to 3 months ]
+
+(With nothing recorded, the first sentence is left out.) TalkBack reads the picture as "Your last 6 months of income and
+expenses, with the figures hidden."
+
+**D-0d A Pro theme tried on.** Under the themes while Lucento shows it:
+> **Grove is part of Lucento Pro**
+> Lucento is showing it now and nothing is saved: Done, or closing this sheet, goes back to Sunrise. Sunrise and Midnight
+> are always free.
+> [ See Lucento Plan ]  [ Done ]
+
+The tried theme's tile reads "Trying" (TalkBack: "Trying, not saved"); the saved theme keeps its check. Taken to the
+plan page from this note and bought, it becomes the theme once Pro arrives (owner, 2026-11-19). Every button to the plan
+page reads "See Lucento Plan" (owner, 2026-11-19), the profile card's and the plan-ended sheet's included.
+
+**D-0a Free limits while setting up (no dialog, no mention of Pro).** At the Free numbers the guided setup hides its
+add options and says:
+- Accounts, and cards and loans: "You can edit these any time in Wallets." (owner, 2026-11-19; the step's header then reads "These are the
+  accounts you’re starting with." or "These are the cards and loans you’re starting with.")
+- The wallet editor in setup, if a save meets a count anyway: "Setup adds up to 3 accounts and 2 cards or loans. You
+  can edit them any time in Wallets."; a
+  currency the plan doesn't include: "Setup uses your main currency, PHP." (what setup does; it promises nothing the plan
+  doesn't give). At the limit the step's title reads "Your accounts" or "Your cards and loans"
+- Goals: setup's goal step adds one goal, under the free two, and its "Kept in" offers no Add wallet at three money
+  wallets; a goal save in setup that meets the count anyway says "Setup adds up to 2 goals. You can edit them any time
+  in Goals."
 
 **D-1 Wallet limit reached (money wallet)**
 > **You have {3} money wallets — the most on the free plan**
@@ -289,23 +368,17 @@ is opened only by the tap that would have used the feature; "Not now" is remembe
 
 **D-5 AI quota exhausted**
 Free:
-> **You've used your 10 free adviser questions this month**
-> They return on {1 December}. Lucento Pro gives you 50 a day. Ask Lucento's on-phone statements are always available.
+> **You've used your 5 free adviser questions this month**
+> They return on {1 December}. Lucento Pro gives you 45 a month. Ask Lucento's on-phone statements are always available.
 > [ See plans ]  [ OK ]
 
-Pro, daily:
-> **That's 50 questions today**
-> Your allowance returns at midnight. Statements and on-phone answers are still here.
-> [ OK ]
-
-Pro, monthly ceiling (rare):
-> **You've reached this month's adviser allowance**
-> To keep the adviser affordable for everyone there is a monthly limit; it resets on {date}. Everything else in Pro is
-> unaffected.
+Pro (owner, 2026-11-23: every plan runs per calendar month; Pro's daily limit and monthly ceiling are gone):
+> **You've used this month's 45 adviser questions**
+> They return on {1 December}. Statements and on-phone answers are still here; everything else in Pro is unaffected.
 > [ OK ]
 
 **D-6 Lifetime purchase option (plan selector card)**
-> **Pro Lifetime · ₱3,490 once**
+> **Pro Lifetime · ₱2,490 once**
 > Own every Pro feature that runs on your phone, for life, offline, with no renewal. Includes 12 months of cloud sync,
 > Shared and the AI adviser; keep them afterwards with Lucento Cloud, or not.
 > [ Buy Lifetime ]   · What Lifetime means ›
@@ -469,7 +542,7 @@ from the moment you buy it. Google Play cannot credit the unused months automati
 contact us and we will extend your included online services by the same amount.
 
 **15. How many AI questions do I get, and why is there a limit?**
-Free: 10 a month. Pro, and Lifetime in its first year or with Lucento Cloud: 50 a day. Each question is answered by
+Free: 5 a month. Pro, and Lifetime in its first year or with Lucento Cloud: 45 a month, shared with Smarter reading. Each question is answered by
 Google's Gemini and costs us money, so there are limits; they are enforced on our servers and shown in the app. The
 on-phone Ask Lucento statements have no limit.
 

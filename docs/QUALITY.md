@@ -35,8 +35,13 @@ export) → schema committed and unchanged (`git diff --exit-code app/schemas`) 
 `LUCENTO_KEY_ALIAS`, `LUCENTO_KEY_PASSWORD` secrets exist; otherwise unsigned) → inspect release APK with `aapt2`
 (application id `com.lucento.app`, not debuggable, permissions limited to an allow-list — INTERNET,
 ACCESS_NETWORK_STATE for opt-in cloud sync, WAKE_LOCK, RECEIVE_BOOT_COMPLETED for WorkManager, USE_BIOMETRIC /
-USE_FINGERPRINT for the app lock, `com.android.vending.BILLING` for Google Play Billing (Lucento Pro); debug id `com.lucento.app.debug`)
-→ size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
+USE_FINGERPRINT for the app lock, `com.android.vending.BILLING` for Google Play Billing (Lucento Pro); no required
+hardware feature but the default faketouch, so a library can't quietly narrow the devices Play offers Lucento to (0.5.15:
+the document scanner's portrait-locked screen dropped 23 devices); debug id `com.lucento.app.debug`)
+→ release code free of the edge-to-edge APIs Android 15 deprecated (`dexdump`: no `Window.setStatusBarColor`,
+`setNavigationBarColor`, `setNavigationBarDividerColor`, `setStatusBarContrastEnforced`, and no cutout mode written in
+code; Play Console flags them, and 0.5.10 had them through androidx.activity's `enableEdgeToEdge`, which
+`core/designsystem/theme/SystemBars.kt` and the themes replace) → size table in the run summary → artifacts (debug APK, release AAB/APK + R8 mapping, schemas, reports).
 
 Job **migrations** (needs build): fails immediately if schema history is incomplete, otherwise boots an API 30 x86_64
 emulator (Pixel 6 profile) and runs `MigrationTest`, `ReconciliationTest` (Home, Transactions and Budget agree on a
@@ -76,6 +81,29 @@ US dollars, UAE dirhams and Japanese yen at fixed rates (`mc-*`). It is opt-in a
 -Pandroid.testInstrumentationRunnerArguments.websiteShowcase=true` (plus `hostCapture=true` on API 36.1).
 The website's screens are dark mode: run the tour with `-Pandroid.testInstrumentationRunnerArguments.demoDark=true`
 (Sunrise, dark, from before onboarding); `WebsiteShowcaseTest` takes its Home pair and foreign wallets in dark too.
+
+### Marketing screenshots (website, Google Play listing, launch film)
+
+Every public picture of the app comes from one capture of the release it describes (owner, 2026-11-24: align every
+asset with the latest build). `tools/screenshots/capture_marketing.sh <out dir>` reinstalls the debug build before each
+of four runs and pulls the shots into `<out dir>/<run>/`: `tour-php` and `showcase-php` for the website and the
+Philippine listing, `tour-usd` and `showcase-usd` for the global listing. Every run passes `demoHistory=true`
+(`DemoMonth.seedHistory`): eight more months of budgets and spending before the demo month, from January, so Milestones'
+budget year is full and Insights compares like with like; only the awards that data earns are recorded
+(`DemoMonth.settleHistoryMoments`), and the tour also takes a finished month's recap (`07a2b-month-recap-finished`). CI
+passes none of these arguments.
+
+The emulator is AVD `Lucento_Shots_API35` (medium phone, 1080 × 2400 at 420 dpi, `google_apis_playstore`; API 35
+screenshots in the guest, so no host capture). Boot it with `-read-only -no-snapshot-save` when its saved data belongs to
+someone else's session, then set: 3-button navigation (above), all three animation scales 0, `settings put secure
+show_ime_with_hard_keyboard 0` (otherwise the keyboard covers onboarding's currency result and the run silently stays in
+dollars), and the clock on the demo month's day, Sunday 2026-11-08 10:00 (`settings put global auto_time 0`, `cmd alarm
+set-time <ms>`), so dates and percentages match the website's words. Wait until `/proc/loadavg` is under 5 after boot.
+
+Then: the website's screens are cropped with lucento-studio `qa/crop-screen.mjs` (lucento-website docs/WEBSITE_DESIGN.md
+› Screens has the name of every screen); the Play listing's graphics are drawn by lucento-studio
+`lab/play-graphics/render.mjs` into `docs/play/graphics/{global,ph}`; the launch film follows
+docs/marketing/launch-film/ASSET_INVENTORY.md. Never edit a screenshot by hand.
 
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues

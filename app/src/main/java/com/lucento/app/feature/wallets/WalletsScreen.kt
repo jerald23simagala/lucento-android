@@ -121,7 +121,8 @@ fun WalletsScreen(
     val fmt = amountFormat()
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
-    val newDraft = { WalletDraft(currencyCode = state.primaryCurrency) }
+    // Add: the editor on Cash, the type sheet when money wallets are full, or the Pro dialog (owner, 2026-11-18).
+    val startAdding = rememberAddWallet(state.planWallets, state.primaryCurrency) { editing = it }
     val access = com.lucento.app.feature.sharedspace.LocalSharedAccess.current
     // A Partner sees every wallet but doesn't add them (the Shared Space's Owner does).
     val canAdd = (allowAdding || state.wallets.isEmpty()) && access.canManageStructure
@@ -146,7 +147,7 @@ fun WalletsScreen(
                     if (state.wallets.isNotEmpty() && canAdd) {
                         com.lucento.app.core.designsystem.component.AddPillButton(
                             "Add",
-                            onClick = { editing = newDraft() },
+                            onClick = startAdding,
                             contentDescription = "Add wallet",
                         )
                     }
@@ -165,7 +166,7 @@ fun WalletsScreen(
                     action = if (canAdd) ({
                         LucentoPrimaryButton(
                             text = "Add wallet",
-                            onClick = { editing = newDraft() },
+                            onClick = startAdding,
                         )
                     }) else null,
                 )
@@ -242,6 +243,8 @@ fun WalletsScreen(
             onSave = viewModel::save,
             onDelete = viewModel::delete,
             onDismiss = { editing = null },
+            activeWallets = state.planWallets,
+            mainCurrency = state.planMainCurrency,
             onPlanPayment = onPlanDebtPayment?.let { plan ->
                 { id, date ->
                     editing = null

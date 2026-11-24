@@ -153,6 +153,12 @@ fun GuideScreen(
 
     if (state.loading) return@AmountsShown
     val steps = state.steps
+    // Free limits in the guided setup (owner, 2026-11-18): at the plan's number the add options go and a quiet line says
+    // more can come later, from Wallets. Setup carries on; nothing here mentions Pro.
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val capabilities = remember(plan) { plan.capabilities(System.currentTimeMillis()) }
+    fun canAddAnother(types: List<WalletType>): Boolean =
+        com.lucento.app.domain.entitlement.ProGates.firstAddableWalletType(types, state.currency, state.currency, state.wallets, capabilities) != null
 
     Column(Modifier.fillMaxSize().imePadding()) {
         // Sunrise Path: back (not on the first page: the story resumes there anyway), the stage with its screen count
@@ -179,6 +185,7 @@ fun GuideScreen(
                         wallets = state.assets,
                         currency = state.currency,
                         suggested = state.spendTypes.map { it.walletType }.toSet(),
+                        canAddMore = canAddAnother(listOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET, WalletType.SAVINGS)),
                         onAdd = { type -> editingWallet = WalletDraft(type = type, currencyCode = state.currency, isDefault = state.assets.isEmpty()) },
                     )
                     GuideStep.DEBTS -> AccountsStep(
@@ -186,6 +193,7 @@ fun GuideScreen(
                         wallets = state.debts,
                         currency = state.currency,
                         suggested = state.spendTypes.map { it.walletType }.toSet(),
+                        canAddMore = canAddAnother(listOf(WalletType.CREDIT_CARD, WalletType.LOAN)),
                         onAdd = { type -> editingWallet = WalletDraft(type = type, currencyCode = state.currency) },
                     )
                     GuideStep.BUDGETS -> BudgetsStep(
@@ -202,6 +210,8 @@ fun GuideScreen(
                     GuideStep.TRANSACTIONS -> TransactionsStep(state, onRecordTransactions)
                     GuideStep.WELCOME -> WelcomeStep(state)
                 }
+                // Room to scroll the last line clear of the dock's fade (it covers the 16 dp above the dock).
+                Spacer(Modifier.height(Spacing.xl))
             }
         }
 
@@ -246,6 +256,9 @@ fun GuideScreen(
             onSave = walletsViewModel::save,
             onDelete = null,
             onDismiss = { editingWallet = null },
+            activeWallets = if (state.loading) null else state.wallets,
+            mainCurrency = state.currency,
+            inSetup = true,
         )
     }
     addingGoal?.let { name ->
@@ -272,12 +285,21 @@ private fun AccountsStep(
     currency: String,
     suggested: Set<WalletType>,
     onAdd: (WalletType) -> Unit,
+    /** Whether the plan holds one more of these (the Free numbers: 3 accounts, 2 cards or loans). */
+    canAddMore: Boolean = true,
 ) {
     val quick = if (debts) listOf(WalletType.CREDIT_CARD, WalletType.LOAN) else listOf(WalletType.CASH, WalletType.BANK, WalletType.E_WALLET)
     val ordered = quick.sortedBy { if (it in suggested) 0 else 1 }
     StepHeader(
-        if (debts) "Any cards or loans?" else "Add your accounts",
         when {
+            !canAddMore && wallets.isNotEmpty() -> if (debts) "Your cards and loans" else "Your accounts"
+            debts -> "Any cards or loans?"
+            else -> "Add your accounts"
+        },
+        when {
+            // At the Free numbers the list is what setup starts with; the add options are gone (owner, 2026-11-18).
+            !canAddMore && wallets.isNotEmpty() ->
+                if (debts) "These are the cards and loans you’re starting with." else "These are the accounts you’re starting with."
             debts -> "Add credit cards and loans so your net worth is honest. Skip this if you have none — you can add them later."
             wallets.isEmpty() -> "Start with the cash, bank accounts and e-wallets you use, with today’s balance. No bank login needed."
             else -> "Add every account you use; you can add more later from Wallets."
@@ -303,26 +325,44 @@ private fun AccountsStep(
             StartingBalanceCard(wallets, currency)
             Spacer(Modifier.height(12.dp))
         }
+        // From 130 % text the amount goes under the name and type, so neither is cut (large-text rule).
+        val stacked = androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f
         LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
             wallets.forEachIndexed { i, w ->
+                // A card or loan shows what it does to net worth (−300.00), never an unsigned owed amount.
+                val amount = if (w.type.isLiability) w.netWorthContribution else w.balance
                 Row(Modifier.fillMaxWidth().padding(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
                     WalletIdentityTile(w)
                     Spacer(Modifier.width(Spacing.md))
                     Column(Modifier.weight(1f)) {
-                        Text(w.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            w.name,
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = if (stacked) Int.MAX_VALUE else 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         Text(w.type.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (stacked) MoneyText(money = amount, style = AmountStyles.row, fractionScale = 1f)
                     }
-                    // A card or loan shows what it does to net worth (−300.00), never an unsigned owed amount.
-                    MoneyText(money = if (w.type.isLiability) w.netWorthContribution else w.balance, style = AmountStyles.row, fractionScale = 1f)
+                    if (!stacked) MoneyText(money = amount, style = AmountStyles.row, fractionScale = 1f)
                 }
                 if (i < wallets.lastIndex) Hairline()
             }
         }
         Spacer(Modifier.height(Spacing.lg))
-        GroupLabel("Add another")
-        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            quick.forEach { type -> AddChip(type.shortLabel, type.icon, LucentoTheme.extendedColors.tone(type).content) { onAdd(type) } }
-            if (!debts) AddChip("Other", Icons.Outlined.MoreHoriz, MaterialTheme.colorScheme.onSurfaceVariant) { onAdd(WalletType.SAVINGS) }
+        if (canAddMore) {
+            GroupLabel("Add another")
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                quick.forEach { type -> AddChip(type.shortLabel, type.icon, LucentoTheme.extendedColors.tone(type).content) { onAdd(type) } }
+                if (!debts) AddChip("Other", Icons.Outlined.MoreHoriz, MaterialTheme.colorScheme.onSurfaceVariant) { onAdd(WalletType.SAVINGS) }
+            }
+        } else {
+            // The plan holds no more of these for now: setup goes on, and the rest can come later (owner, 2026-11-18).
+            Text(
+                SETUP_MORE_LATER,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -454,7 +494,7 @@ private fun StartingBalanceCard(wallets: List<Wallet>, currency: String) {
         Column {
             Text("STARTING BALANCE", style = Hierarchy.cardOverline, color = ext.onHeroMuted, modifier = Modifier.semantics { contentDescription = "Starting balance" })
             Spacer(Modifier.height(Spacing.xs))
-            Text(MoneyFormatter.format(total), style = AmountStyles.hero, color = ext.onHero)
+            Text(MoneyFormatter.format(total, wholeUnits = false), style = AmountStyles.hero, color = ext.onHero)
             Text(
                 buildString {
                     append("Across ${counted} ${if (counted == 1) "account" else "accounts"}")
@@ -540,7 +580,7 @@ private fun BudgetHero(state: GuideUiState, text: (Long) -> String, separator: C
                 }
             }
             Spacer(Modifier.height(Spacing.xs))
-            Text(MoneyFormatter.format(total), style = AmountStyles.hero)
+            Text(MoneyFormatter.format(total, wholeUnits = false), style = AmountStyles.hero)
             Text(
                 "The sum of ${rows.size} of ${state.expenseCategories.size} categories",
                 style = MaterialTheme.typography.bodySmall,
@@ -642,7 +682,7 @@ private fun GoalStep(state: GuideUiState, onAdd: (String) -> Unit) {
                     IconTile(icon = Icons.Outlined.Flag, container = LucentoTheme.extendedColors.savings.container, content = LucentoTheme.extendedColors.savings.content)
                     Spacer(Modifier.width(Spacing.md))
                     Text(g.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                    Text(MoneyFormatter.format(g.target), style = AmountStyles.row)
+                    Text(MoneyFormatter.format(g.target, wholeUnits = false), style = AmountStyles.row)
                 }
                 if (i < state.goals.lastIndex) Hairline()
             }
@@ -762,7 +802,7 @@ private fun ExampleConversation(currency: String) {
                         IconTile(icon, container = scheme.primaryContainer, content = scheme.onPrimaryContainer, size = 32.dp, shape = MaterialTheme.shapes.small)
                         Spacer(Modifier.width(Spacing.md))
                         Text(name, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                        Text(MoneyFormatter.format(com.lucento.app.core.money.Money(-money.amountMinor, money.currencyCode)), style = AmountStyles.row)
+                        Text(MoneyFormatter.format(com.lucento.app.core.money.Money(-money.amountMinor, money.currencyCode), wholeUnits = false), style = AmountStyles.row)
                     }
                 }
             }
@@ -811,9 +851,9 @@ private fun WelcomeStep(state: GuideUiState) {
         LucentoCard(Modifier.fillMaxWidth(), contentPadding = 0.dp) {
             val rows = buildList {
                 val counted = GuidedSetup.startingBalanceAccounts(state.wallets, state.currency)
-                add(Triple(state.assets.isNotEmpty(), "Accounts", if (state.assets.isEmpty()) "Not yet" else "${plural(state.wallets.size, "account", "accounts")} · ${MoneyFormatter.format(GuidedSetup.startingBalance(state.wallets, state.currency))}".takeIf { counted > 0 } ?: plural(state.wallets.size, "account", "accounts")))
+                add(Triple(state.assets.isNotEmpty(), "Accounts", if (state.assets.isEmpty()) "Not yet" else "${plural(state.wallets.size, "account", "accounts")} · ${MoneyFormatter.format(GuidedSetup.startingBalance(state.wallets, state.currency), wholeUnits = false)}".takeIf { counted > 0 } ?: plural(state.wallets.size, "account", "accounts")))
                 if (state.features.isEnabled(com.lucento.app.domain.Feature.BUDGETS)) {
-                    add(Triple(state.budgetedCount > 0, "Monthly budget", if (state.budgetedCount > 0) "${MoneyFormatter.format(budgetTotal)} across ${plural(state.budgetedCount, "category", "categories")}" else "Not set yet"))
+                    add(Triple(state.budgetedCount > 0, "Monthly budget", if (state.budgetedCount > 0) "${MoneyFormatter.format(budgetTotal, wholeUnits = false)} across ${plural(state.budgetedCount, "category", "categories")}" else "Not set yet"))
                 }
                 add(Triple(state.transactionCount > 0, "First transactions", if (state.transactionCount > 0) "${state.transactionCount} recorded" else "Tap + on Home to record one"))
                 if (state.features.isEnabled(com.lucento.app.domain.Feature.SAVINGS_GOALS)) {
@@ -872,3 +912,6 @@ private fun DoneRow(done: Boolean, title: String, detail: String) {
         }
     }
 }
+
+/** Where the guided setup's add options were, once the plan holds no more of a kind (owner, 2026-11-18: no Pro mention). */
+internal const val SETUP_MORE_LATER = "You can edit these any time in Wallets."

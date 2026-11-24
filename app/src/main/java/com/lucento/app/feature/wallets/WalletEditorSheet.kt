@@ -126,6 +126,10 @@ fun Wallet.toDraft(isDefault: Boolean = false): WalletDraft = WalletDraft(
     statementDayText = debt?.statementDay?.toString().orEmpty(),
     dueDayText = debt?.dueDay?.toString().orEmpty(),
     fxRateText = fxBasisRate?.let(com.lucento.app.core.money.FxRate::encode).orEmpty(),
+    kind = kind,
+    iconKey = iconKey,
+    spendable = spendable,
+    spendableCreditText = spendableCredit?.takeIf { it.amountMinor > 0L }?.let { MoneyFormatter.formatPlain(it) }.orEmpty(),
 )
 
 /**
@@ -168,6 +172,9 @@ internal fun WalletDraft.previewWallet(decimalSeparator: Char): Wallet {
         openingBalance = amount,
         debt = terms,
         institutionId = institutionId,
+        kind = kind?.takeIf { it.type == type },
+        iconKey = iconKey,
+        spendable = spendable,
     )
 }
 
@@ -185,6 +192,14 @@ fun WalletEditorSheet(
      * reminder comes from its due day instead (CreditCardMath), so it never opens one.
      */
     onPlanPayment: ((Long, LocalDate) -> Unit)? = null,
+    /**
+     * The active wallets and the main currency, so a type or currency the plan doesn’t include is met when it is chosen,
+     * not after the form is filled in (owner, 2026-11-18). Null skips that check; Save still applies the plan.
+     */
+    activeWallets: List<Wallet>? = null,
+    mainCurrency: String? = null,
+    /** The guided setup: what the plan doesn’t include isn’t offered, and nothing here mentions Pro (owner, 2026-11-18). */
+    inSetup: Boolean = false,
 ) = AmountsShown {
     val sheetState = com.lucento.app.core.designsystem.component.rememberStickySheetState()
     val scope = rememberCoroutineScope()
@@ -195,9 +210,33 @@ fun WalletEditorSheet(
     var error by remember { mutableStateOf<DraftError?>(null) }
     var pickingCurrency by remember { mutableStateOf(false) }
     var pickingInstitution by remember { mutableStateOf(false) }
+    var pickingType by remember { mutableStateOf(false) }
+    var pickingIcon by remember { mutableStateOf(false) }
     val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
+    // A Pro wall met in this sheet (the dialog), or in the guided setup a plain note instead.
+    var wall by remember { mutableStateOf<com.lucento.app.feature.pro.ProWall?>(null) }
+    var setupNote by remember { mutableStateOf<String?>(null) }
+    val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+    val plan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val capabilities = remember(plan) { plan.capabilities(System.currentTimeMillis()) }
+    val editingWallet = activeWallets?.firstOrNull { it.id == initial.id }
+
+    // The early check needs the wallet list and, for an edit, the wallet in it; until then (still loading) the save decides.
+    val planKnown = activeWallets != null && (initial.id == null || editingWallet != null)
+
+    /**
+     * What the plan says to this wallet being [type] in [currency] (the repository’s own rule, asked early). An edit across
+     * the balance side (own ↔ owe, or into or out of something valued by hand) gets no early answer: a wallet with history
+     * can't make it on any plan, and the save says which (QA 2026-11-19).
+     */
+    fun planAccess(type: WalletType, currency: String): com.lucento.app.domain.entitlement.Access =
+        if (planKnown && !(editingWallet != null && com.lucento.app.domain.WalletChangePolicy.crossesBalanceSide(editingWallet.type, type))) {
+            com.lucento.app.domain.entitlement.ProGates.walletAccess(type, currency, editingWallet, mainCurrency, activeWallets.orEmpty(), capabilities)
+        } else {
+            com.lucento.app.domain.entitlement.Access.Allowed
+        }
 
     // Onboarding's filled fields: tinted, rounded, outlined only while focused.
     val fieldColors = LucentoFields.filledColors()
@@ -218,7 +257,7 @@ fun WalletEditorSheet(
             SheetHeader(
                 title = if (initial.id == null) "New wallet" else "Edit wallet",
                 subtitle = if (initial.id == null) "Build it below and watch it take shape." else initial.name,
-                leading = { WalletTypeTile(draft.type) },
+                leading = { DraftIconTile(draft) },
                 trailing = if (initial.id != null && onDelete != null) {
                     {
                         IconButton(onClick = { confirmingDelete = true }) {
@@ -233,6 +272,7 @@ fun WalletEditorSheet(
             val receivable = draft.type == WalletType.RECEIVABLE
             val amountLabel = when {
                 draft.type.isValuedManually -> "Estimated value"
+                draft.type == WalletType.INVESTMENT -> if (initial.id == null) "Current value" else "Starting value"
                 initial.id != null && draft.type.isLiability -> "Opening amount owed"
                 initial.id != null && receivable -> "Opening amount owed to you"
                 initial.id != null -> "Opening balance"
@@ -271,14 +311,8 @@ fun WalletEditorSheet(
 
             Spacer(Modifier.height(Spacing.md))
             IconFieldHeader(Icons.Outlined.Category, "Type")
-            TypeDropdown(
-                selected = draft.type,
-                onSelect = {
-                    haptics.tick()
-                    draft = draft.copy(type = it)
-                    if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
-                },
-            )
+            // Tester round (2026-11-17): a sectioned picker with what each type is for, in place of a flat menu.
+            WalletTypeField(selected = draft.type, currencyCode = draft.currencyCode, onClick = { pickingType = true })
             (error as? DraftError.TypeLocked)?.let { locked ->
                 Text(
                     "“${initial.name}” has ${locked.usage.describe()}. Switching between an account you own and one you owe " +
@@ -290,6 +324,13 @@ fun WalletEditorSheet(
                 )
             }
 
+            // The kind of an investment, owned thing or loan: a label, an icon and a group in Net worth.
+            if (draft.type.hasKinds) {
+                Spacer(Modifier.height(Spacing.md))
+                IconFieldHeader(Icons.Outlined.Category, "Kind (optional)")
+                WalletKindChips(type = draft.type, currencyCode = draft.currencyCode, selected = draft.kind) { draft = draft.copy(kind = it) }
+            }
+
             if (draft.type != WalletType.CASH) {
                 Spacer(Modifier.height(Spacing.md))
                 IconFieldHeader(Icons.Outlined.AccountBalance, "Bank or provider (optional)")
@@ -298,6 +339,11 @@ fun WalletEditorSheet(
                     onClick = { pickingInstitution = true },
                     onClear = { draft = draft.copy(institutionId = null) },
                 )
+            }
+            // Without a bank logo, the wallet shows an icon the person can choose.
+            if (draft.type == WalletType.CASH || institution == null) {
+                Spacer(Modifier.height(Spacing.sm))
+                WalletIconField(draft = draft, onClick = { pickingIcon = true })
             }
 
             Spacer(Modifier.height(Spacing.md))
@@ -323,10 +369,11 @@ fun WalletEditorSheet(
                             WalletType.BANK -> "e.g. Everyday account"
                             WalletType.E_WALLET -> "e.g. Mobile wallet"
                             WalletType.SAVINGS -> "e.g. Emergency fund"
+                            WalletType.INVESTMENT -> if (draft.currencyCode == "PHP") "e.g. MP2 2026, Stock portfolio" else "e.g. Stock portfolio, Retirement fund"
                             WalletType.CREDIT_CARD -> "e.g. Travel card"
                             WalletType.LOAN -> "e.g. Car loan"
                             WalletType.RECEIVABLE -> "e.g. Loan to Ana"
-                            WalletType.OTHER_ASSET -> "e.g. Home, car, investments"
+                            WalletType.OTHER_ASSET -> "e.g. Home, car, jewellery"
                         }
                     )
                 },
@@ -430,6 +477,8 @@ fun WalletEditorSheet(
                             is DraftError.AmountUnclear -> e.message
                             else -> when {
                                 draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
+                                draft.type == WalletType.INVESTMENT && initial.id == null ->
+                                    "What it’s worth today. Money you put in or take out is a transfer; use Update value when it grows or falls."
                                 initial.id != null -> "Where this wallet started, before the transactions you record."
                                 draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
                                 receivable -> "What they still owe you. It counts towards your net worth, but not as money you can spend."
@@ -463,25 +512,40 @@ fun WalletEditorSheet(
                 )
             }
 
-            if (draft.type.isSpendable) {
+            // Tester round (2026-11-17): whether this wallet counts towards Safe to spend's money on hand.
+            if (draft.type.canBeSpendingMoney) {
+                Spacer(Modifier.height(Spacing.sm))
+                SpendingMoneySection(
+                    draft = draft,
+                    error = error,
+                    decimalSeparator = decimalSeparator,
+                    fieldColors = fieldColors,
+                    onChange = {
+                        draft = it
+                        if (error == DraftError.SpendableCreditInvalid || error == DraftError.SpendableCreditTooHigh) error = null
+                    },
+                )
+            }
+
+            if (draft.type.canBeDefault) {
                 Spacer(Modifier.height(Spacing.sm))
                 SwitchRow(
                     title = "Default wallet",
-                    description = "New transactions go here unless you pick another wallet in the composer.",
+                    description = if (draft.type == WalletType.CREDIT_CARD) {
+                        // Tester round (2026-11-18): a card can be the default; income and transfers still go to cash or a bank.
+                        "New expenses go here unless you pick another wallet. Income and transfers go to your cash, bank or e-wallet."
+                    } else {
+                        "New transactions go here unless you pick another wallet in the composer."
+                    },
                     checked = draft.isDefault,
                     onCheckedChange = { draft = draft.copy(isDefault = it) },
                 )
             }
 
-            // Lucento Pro: a plan limit isn't a mistake in the form; it is said here, by the button, with the way out.
-            (error as? DraftError.PlanLimit)?.let { limit ->
-                val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
+            // The guided setup says plainly that more can come later, never "Pro" (owner, 2026-11-18).
+            setupNote?.let { note ->
                 Spacer(Modifier.height(Spacing.md))
-                com.lucento.app.feature.pro.ProNote(
-                    limit.message,
-                    from = limit.feature,
-                    open = { feature -> close { onDismiss(); openPro(feature) } },
-                )
+                com.lucento.app.core.designsystem.component.InfoNote(note)
             }
             Spacer(Modifier.height(Spacing.lg))
             LucentoPrimaryButton(
@@ -490,6 +554,16 @@ fun WalletEditorSheet(
                     onSave(draft, decimalSeparator) { result, savedId ->
                         val remind = draft.reminderDate
                         when {
+                            // A plan limit met at Save (the early check missed it, or wasn’t asked): the Pro dialog, or in
+                            // the guided setup the plain note.
+                            result is DraftError.PlanLimit -> {
+                                haptics.reject()
+                                if (inSetup) {
+                                    setupNote = setupLine(result.feature, mainCurrency)
+                                } else {
+                                    wall = com.lucento.app.feature.pro.ProWall(result.feature, result.used, result.limit)
+                                }
+                            }
                             result != null -> {
                                 haptics.reject()
                                 error = result
@@ -505,13 +579,83 @@ fun WalletEditorSheet(
         }
     }
 
+    if (pickingType) {
+        // Types the plan doesn’t include now: marked Pro (picking one opens the dialog), or in the guided setup not offered.
+        val locked = if (planKnown) {
+            WalletType.entries.filter { planAccess(it, draft.currencyCode) != com.lucento.app.domain.entitlement.Access.Allowed }.toSet()
+        } else if (plan.has(com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis())) {
+            emptySet()
+        } else {
+            // Without the list: the Pro-only kinds, never the wallet's own type (one kept from Pro stays editable).
+            setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET) - initial.type
+        }
+        WalletTypePickerSheet(
+            selected = draft.type,
+            currencyCode = draft.currencyCode,
+            proTypes = if (inSetup) emptySet() else locked,
+            hidden = if (inSetup) locked else emptySet(),
+            proLabel = { type ->
+                com.lucento.app.feature.pro.ProWall.of(planAccess(type, draft.currencyCode))
+                    ?.let { com.lucento.app.feature.pro.ProCopy.wallTitle(it) } ?: "Lucento Pro feature"
+            },
+            onSelect = { type ->
+                val met = com.lucento.app.feature.pro.ProWall.of(planAccess(type, draft.currencyCode))
+                if (met != null && !inSetup) {
+                    // The dialog at the tap that would cross the limit; the type stays as it was (owner, 2026-11-18).
+                    pickingType = false
+                    wall = met
+                } else {
+                    // A kind belongs to its type; an icon the person chose stays.
+                    draft = draft.copy(type = type, kind = draft.kind?.takeIf { it.type == type })
+                    if (error is DraftError.TypeLocked || error is DraftError.PlanLimit) error = null
+                    setupNote = null
+                    pickingType = false
+                }
+            },
+            onDismiss = { pickingType = false },
+        )
+    }
+    wall?.let { met ->
+        com.lucento.app.feature.pro.ProWallDialog(
+            met,
+            onDismiss = { wall = null },
+            // The sheet closes first, then the plan page opens.
+            open = { feature ->
+                close {
+                    onDismiss()
+                    openPro(feature)
+                }
+            },
+        )
+    }
+    if (pickingIcon) {
+        WalletIconPickerSheet(
+            type = draft.type,
+            current = com.lucento.app.domain.WalletIcon.fromKey(draft.iconKey),
+            suggested = draft.kind?.defaultIcon,
+            onSelect = {
+                draft = draft.copy(iconKey = it.key)
+                pickingIcon = false
+            },
+            onDismiss = { pickingIcon = false },
+        )
+    }
     if (pickingCurrency) {
         CurrencyPickerSheet(
             selected = draft.currencyCode,
-            onSelect = {
-                draft = draft.copy(currencyCode = it)
-                if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
+            onSelect = { code ->
+                val met = com.lucento.app.feature.pro.ProWall.of(planAccess(draft.type, code))
                 pickingCurrency = false
+                when {
+                    // Another currency the plan doesn’t include yet: the dialog, or in the guided setup a plain note.
+                    met != null && !inSetup -> wall = met
+                    met != null -> setupNote = setupLine(met.feature, mainCurrency)
+                    else -> {
+                        draft = draft.copy(currencyCode = code)
+                        if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
+                        setupNote = null
+                    }
+                }
             },
             onDismiss = { pickingCurrency = false },
         )
@@ -657,7 +801,7 @@ private fun DebtDetails(
             error is DraftError.InstallmentUnclear -> HintText((error as DraftError.InstallmentUnclear).message, isError = true)
             suggested != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                 HintText(
-                    "${MoneyFormatter.format(suggested)} a month ${if (receivable) "pays back" else "repays"} ${MoneyFormatter.format(owed!!)} in ${if (months == 1) "1 month" else "$months months"}" +
+                    "${MoneyFormatter.format(suggested, wholeUnits = false)} a month ${if (receivable) "pays back" else "repays"} ${MoneyFormatter.format(owed!!, wholeUnits = false)} in ${if (months == 1) "1 month" else "$months months"}" +
                         (rate?.let { " at ${DebtMath.formatRate(it)}" } ?: "") + ".",
                     modifier = Modifier.weight(1f),
                 )
@@ -748,8 +892,8 @@ private fun CardDetails(
             "Enter both days, from 1 to 31, or leave both empty."
         } else {
             "Day of the month (a shorter month uses its last day). On the due day, Lucento reminds you of the amount due: " +
-                "what you owed on the statement day, less payments since. It isn’t counted in Safe to spend — your card " +
-                "purchases already are."
+                "what you owed on the statement day, less payments since. Your purchases already count as spending, so " +
+                "the payment isn’t spending again; Safe to spend sets it aside from the account that pays the card."
         },
         isError = daysError,
     )
@@ -861,50 +1005,18 @@ private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boole
     )
 }
 
-/** The wallet type as one dropdown field (its icon and name), so the sheet stays short; the menu lists every type with its icon. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TypeDropdown(selected: WalletType, onSelect: (WalletType) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    val colors = MaterialTheme.colorScheme
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                .filledField(active = expanded)
-                .semantics { contentDescription = "Wallet type: ${selected.label}" }
-                .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            WalletTypeTile(selected, size = 32.dp)
-            Spacer(Modifier.width(Spacing.md))
-            Text(selected.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-        }
-        val proTypes = if (com.lucento.app.feature.pro.LocalEntitlements.current.has(
-                com.lucento.app.domain.entitlement.Capability.LOCAL_PRO, System.currentTimeMillis(),
-            )
-        ) {
-            emptySet()
-        } else {
-            setOf(WalletType.RECEIVABLE, WalletType.OTHER_ASSET)
-        }
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            WalletType.entries.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(type.label, fontWeight = if (type == selected) FontWeight.SemiBold else null) },
-                    leadingIcon = { WalletTypeTile(type, size = 28.dp) },
-                    // Lucento Pro: kinds the plan doesn't include carry a mark before they're chosen (display only).
-                    trailingIcon = if (type in proTypes) { { com.lucento.app.feature.pro.ProBadge() } } else null,
-                    onClick = {
-                        expanded = false
-                        onSelect(type)
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-                )
-            }
-        }
+/** The guided setup’s plain words when the plan holds no more of a kind (owner, 2026-11-18: no mention of Pro). */
+/**
+ * The guided setup's plain line for a limit, with no mention of Pro: the count, or for another currency what setup does
+ * ("Setup uses your main currency, PHP."), which promises nothing the plan doesn't give.
+ */
+private fun setupLine(feature: com.lucento.app.domain.entitlement.ProFeature, mainCurrency: String?): String =
+    if (feature == com.lucento.app.domain.entitlement.ProFeature.FOREIGN_CURRENCY_WALLETS) {
+        "Setup uses your main currency${mainCurrency?.let { ", $it" }.orEmpty()}."
+    } else {
+        SETUP_ADD_LATER
     }
-}
+
+private val SETUP_ADD_LATER =
+    "Setup adds up to ${com.lucento.app.domain.entitlement.PlanCatalog.FREE_MONEY_WALLETS} accounts and " +
+        "${com.lucento.app.domain.entitlement.PlanCatalog.FREE_DEBT_ACCOUNTS} cards or loans. You can edit them any time in Wallets."

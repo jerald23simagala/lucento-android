@@ -170,6 +170,7 @@ fun OnboardingScreen(
     val picks by viewModel.picks.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val signedInEmail by viewModel.signedInEmail.collectAsStateWithLifecycle()
+    val syncIncluded by viewModel.syncIncluded.collectAsStateWithLifecycle()
     val connecting by viewModel.connecting.collectAsStateWithLifecycle()
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val restoreStage by viewModel.restoreStage.collectAsStateWithLifecycle()
@@ -412,6 +413,7 @@ fun OnboardingScreen(
                 )
                 else -> ConfirmStep(
                     currency, theme, features, picks, error, signedInEmail,
+                    syncIncluded = syncIncluded,
                     spendTypes = spendTypes,
                     accountUnavailable = signedInEmail != null && accountCheck == AccountCheck.Unavailable,
                     holdsAccountData = holdsAccountData,
@@ -1433,6 +1435,8 @@ private fun ConfirmStep(
     picks: CategoryPicks,
     error: String?,
     signedInEmail: String?,
+    /** Whether the signed-in account's plan includes cloud sync; null while signed out or not known yet. */
+    syncIncluded: Boolean?,
     spendTypes: Set<SpendType>,
     /** Finishing couldn't check the connected account: Try again, or finish without syncing. */
     accountUnavailable: Boolean,
@@ -1559,8 +1563,10 @@ private fun ConfirmStep(
                     .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                // Signed in isn't synced: a plan without cloud sync keeps everything here (StorageSummary).
+                val storage = storageSummary(signedInEmail, syncIncluded)
                 IconTile(
-                    if (signedInEmail != null) Icons.Outlined.CloudSync else Icons.Outlined.PhoneAndroid,
+                    if (storage.cloud) Icons.Outlined.CloudSync else Icons.Outlined.PhoneAndroid,
                     container = scheme.surfaceContainerHigh,
                     content = scheme.onSurfaceVariant,
                     size = 32.dp,
@@ -1568,12 +1574,8 @@ private fun ConfirmStep(
                 )
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (signedInEmail != null) "Synced with your account" else "Kept on this phone", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        if (signedInEmail != null) signedInEmail.ifEmpty { "Connected" } else "Export a backup any time in Settings",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = scheme.onSurfaceVariant,
-                    )
+                    Text(storage.title, style = MaterialTheme.typography.titleSmall)
+                    Text(storage.detail, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
                 }
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = scheme.onSurfaceVariant)
             }

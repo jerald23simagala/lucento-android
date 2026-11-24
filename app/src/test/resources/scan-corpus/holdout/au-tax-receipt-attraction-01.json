@@ -1,0 +1,44 @@
+{
+  "id": "au-tax-receipt-attraction-01",
+  "country": "AU",
+  "type": "TAX_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-09",
+  "pages": [
+    [
+      "SYDNEY TOWER EYE",
+      "Westfield Sydney, Level 5, 100 Market St, Sydney NSW 2000",
+      "Merlin Entertainments (Sydney Tower) Pty Ltd  ABN 12 345 678 901",
+      "TAX INVOICE",
+      "Date: 08 Nov 2026  16:20",
+      "Order 5512-8873",
+      "2 x Adult General Admission @ A$34.00  A$68.00",
+      "1 x Child (4-15) General Admission  A$24.50",
+      "Booking fee  A$2.00",
+      "TOTAL (incl. GST)  A$94.50",
+      "GST included  A$8.59",
+      "PAID  VISA ************3317  A$94.50",
+      "Thank you for visiting!"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Sydney Tower Eye",
+        "total": "94.50",
+        "currency": "AUD",
+        "currencyEvidence": "EXPLICIT",
+        "date": "2026-11-08",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "entertainment",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "3317"
+      }
+    ]
+  },
+  "notes": "Australian tax invoice with A$ amounts; GST (1/11) is included."
+}

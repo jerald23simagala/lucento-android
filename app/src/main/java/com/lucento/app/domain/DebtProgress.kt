@@ -20,8 +20,8 @@ data class CardCycle(
 
 /**
  * A credit card's payment reminder: derived from its billing days and transactions every time, never stored as a
- * schedule, and never part of Safe to spend — the card's purchases were already counted as spending, so paying the card
- * is a transfer.
+ * schedule, and never spending — the card's purchases were already counted, so paying the card is a transfer. Safe to
+ * spend's money on hand sets it aside from the paying account ([MoneyOnHandCalculator], tester round 2026-11-17).
  */
 data class CardDue(
     val wallet: Wallet,
@@ -120,7 +120,9 @@ object CreditCardMath {
             .filter { it.walletId == wallet.id && it.type == ownLeg && it.transferGroup != null }
             .sortedWith(compareByDescending<Transaction> { it.date }.thenByDescending { it.createdAtEpochMillis })
             .firstNotNullOfOrNull { leg -> others[leg.transferGroup]?.walletId?.let(byId::get) }
-        return last ?: candidates.filter { it.type.isSpendable }.maxByOrNull { it.balance.amountMinor }
+        // Tester round (2026-11-17): the person's own spending choice, not only the type's default, so Safe to spend sets
+        // a card's payment aside from the money it will come from.
+        return last ?: candidates.filter { it.isSpendingMoney }.maxByOrNull { it.balance.amountMinor }
             ?: candidates.maxByOrNull { it.balance.amountMinor }
     }
 }

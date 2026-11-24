@@ -1,0 +1,51 @@
+{
+  "id": "us-cafe-starbucks-01",
+  "country": "US",
+  "type": "RESTAURANT_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-27",
+  "pages": [
+    [
+      "STARBUCKS",
+      "Store #12345",
+      "1912 Pike Pl",
+      "Seattle, WA 98101",
+      "(206) 448-8762",
+      "CHK 712344",
+      "10/27/2026 07:58 AM",
+      "1891 Drawer: 1 Reg: 2",
+      "1 Gr Caffe Latte  5.95",
+      "1 Oatmilk  0.80",
+      "1 Butter Croissant  3.95",
+      "Subtotal  $10.70",
+      "Tax 10.35%  $1.11",
+      "Total  $11.81",
+      "Apple Pay  $11.81",
+      "XXXXXXXXXXXX1044",
+      "Change Due  $0.00",
+      "Check Closed",
+      "10/27/2026 07:58 AM",
+      "Join Starbucks Rewards and earn Stars",
+      "on every purchase. Download the app."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Starbucks",
+        "total": "11.81",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-27",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "cafe",
+        "paymentInstrument": "Apple Pay",
+        "instrumentLast4": "1044"
+      }
+    ]
+  }
+}

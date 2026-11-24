@@ -1,14 +1,11 @@
 package com.lucento.app
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.WindowManager
 import android.widget.Toast
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeOut
@@ -42,7 +39,9 @@ import com.lucento.app.core.designsystem.component.EnvironmentBadge
 import com.lucento.app.core.designsystem.component.LaunchAnimation
 import com.lucento.app.core.designsystem.theme.LucentoTheme
 import com.lucento.app.core.designsystem.theme.ThemeSpec
+import com.lucento.app.core.designsystem.theme.drawEdgeToEdge
 import com.lucento.app.core.designsystem.theme.isDark
+import com.lucento.app.core.designsystem.theme.isSystemDark
 import com.lucento.app.data.preferences.ThemeId
 import com.lucento.app.data.preferences.ThemeMode
 import com.lucento.app.feature.widget.WidgetLaunches
@@ -115,7 +114,9 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         // Hold the system splash only until preferences are read (typically a few ms).
         splash.setKeepOnScreenCondition { appViewModel.uiState.value is AppUiState.Loading }
-        enableEdgeToEdge()
+        // Lucento's own, not androidx.activity's enableEdgeToEdge(): see SystemBars.kt (Play flags the deprecated APIs
+        // that one calls). Icons follow the phone until the saved theme is known, then the effect below.
+        window.drawEdgeToEdge(darkTheme = resources.configuration.isSystemDark)
         // A home-screen widget tap (feature/widget) says where to go, once: a rotation or a restored task isn't a new tap.
         if (savedInstanceState == null) widgetLaunchFrom(intent)?.let(WidgetLaunches::offer)
 
@@ -123,24 +124,18 @@ class MainActivity : FragmentActivity() {
             val state by appViewModel.uiState.collectAsStateWithLifecycle()
             val ready = state as? AppUiState.Ready
             val themeMode = ready?.preferences?.themeMode ?: ThemeMode.SYSTEM
-            val themeId = ready?.preferences?.themeId ?: ThemeId.SUNRISE
+            val savedThemeId = ready?.preferences?.themeId ?: ThemeId.SUNRISE
+            // A Pro theme tried on in the profile sheet shows instead while it lasts; it is never saved (owner, 2026-11-19).
+            val trial by (application as LucentoApplication).container.themeTrial.trying.collectAsStateWithLifecycle()
+            val themeId = trial ?: savedThemeId
+            // Where short messages show: the app's snackbar, or an open sheet's (owner, 2026-11-19).
+            val messageHosts = androidx.compose.runtime.remember { com.lucento.app.core.designsystem.component.MessageHosts() }
             // A dark-only theme (Midnight) is dark whatever the mode, and the system bars follow it.
             val dark = ThemeSpec.of(themeId).isDark(themeMode.isDark())
 
             // Keep status / navigation bar icons legible when the in-app theme overrides the system.
             DisposableEffect(dark) {
-                enableEdgeToEdge(
-                    statusBarStyle = if (dark) {
-                        SystemBarStyle.dark(Color.TRANSPARENT)
-                    } else {
-                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-                    },
-                    navigationBarStyle = if (dark) {
-                        SystemBarStyle.dark(Color.TRANSPARENT)
-                    } else {
-                        SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
-                    },
-                )
+                window.drawEdgeToEdge(darkTheme = dark)
                 onDispose {}
             }
 
@@ -166,10 +161,15 @@ class MainActivity : FragmentActivity() {
                             CompositionLocalProvider(
                                 LocalInstitutions provides institutions,
                                 com.lucento.app.core.designsystem.component.LocalAmountsHidden provides ready.preferences.hideAmounts,
+                                com.lucento.app.core.designsystem.component.LocalWholeUnits provides !ready.preferences.showCents,
                                 // Multicurrency: the main currency and the day's rates for every screen that records money.
                                 com.lucento.app.feature.fx.LocalMainCurrency provides ready.preferences.primaryCurrency,
                                 com.lucento.app.feature.fx.LocalFxRates provides (application as LucentoApplication).container.fxRates,
                                 com.lucento.app.feature.pro.LocalEntitlements provides entitlements,
+                                // A Pro wall met again this session is a short message (owner, 2026-11-19).
+                                com.lucento.app.core.designsystem.component.LocalMessageHosts provides messageHosts,
+                                com.lucento.app.feature.pro.LocalProWallMemory provides (application as LucentoApplication).container.proWalls,
+                                com.lucento.app.feature.profile.LocalThemeTrial provides (application as LucentoApplication).container.themeTrial,
                                 // Overlays that would sit above the lock screen or the launch logo (Lucento Pro's welcome) wait.
                                 com.lucento.app.navigation.LocalAppObscured provides (locked || launching),
                             ) {

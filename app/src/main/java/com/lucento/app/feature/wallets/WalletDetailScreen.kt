@@ -32,6 +32,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,6 +107,7 @@ fun WalletDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val walletsState by walletsViewModel.uiState.collectAsStateWithLifecycle()
     var editing by remember { mutableStateOf<WalletDraft?>(null) }
+    val editScope = rememberCoroutineScope()
     var adjusting by remember { mutableStateOf(false) }
     var outsideSheet by remember { mutableStateOf<com.lucento.app.domain.OutsideMovement?>(null) }
     var statement by remember { mutableStateOf<com.lucento.app.domain.ask.Report?>(null) }
@@ -129,7 +132,7 @@ fun WalletDetailScreen(
                 actions = {
                     // A Partner sees the wallet but doesn't change it (the Shared Space's Owner does).
                     if (wallet != null && access.canManageStructure) {
-                        IconButton(onClick = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) }) {
+                        IconButton(onClick = { editScope.launch { editing = walletsViewModel.draftFor(wallet) } }) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Edit account")
                         }
                     }
@@ -164,7 +167,7 @@ fun WalletDetailScreen(
                         container = ext.warningContainer,
                         content = ext.warning,
                         actionLabel = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) "Set rate" else null,
-                        onAction = { editing = wallet.toDraft(isDefault = wallet.id == walletsState.defaultWalletId) },
+                        onAction = { editScope.launch { editing = walletsViewModel.draftFor(wallet) } },
                     )
                 } else {
                     val worth = fx.carrying?.let { com.lucento.app.core.money.MoneyFormatter.format(if (liability) -it else it) }
@@ -198,7 +201,8 @@ fun WalletDetailScreen(
                     onAction = { adjusting = true },
                 )
                 wallet.type == WalletType.SAVINGS -> InfoNote(
-                    "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
+                    if (wallet.isSpendingMoney) "You count these savings as spending money, so Safe to spend includes them. Change it in Edit."
+                    else "Savings aren’t counted in Safe to spend, so money you set aside stays set aside.",
                     modifier = notes,
                 )
             }
@@ -254,9 +258,13 @@ fun WalletDetailScreen(
                     title = when {
                         loan -> "Adjust loan"
                         receivable -> "Adjust amount"
+                        wallet.type == WalletType.INVESTMENT -> "Update value"
                         else -> "Adjust balance"
                     },
                     body = when {
+                        // Tester round (2026-11-17): an investment's value moves on its own; the change is never income.
+                        wallet.type == WalletType.INVESTMENT ->
+                            "Worth more or less today? Enter its current value — the change is recorded as an adjustment, not income or spending."
                         loan -> "Lender’s statement says otherwise? Enter what you owe on a date — the gap is recorded as an adjustment, not borrowing or spending."
                         receivable -> "Agreed on a different amount? Enter what they still owe you — the gap is recorded as an adjustment, not income or spending."
                         liability -> "Card statement says otherwise? Enter what you owe — the gap is recorded as an adjustment, not a purchase or a payment."
@@ -297,7 +305,8 @@ fun WalletDetailScreen(
                         cycle != null ->
                             "Amount due ${fmt.format(cycle.amountDue)} by ${shortDate(cycle.dueDate)}: you owed " +
                                 "${fmt.format(cycle.statementBalance)} on the ${shortDate(cycle.statementDate)} statement, less payments since. " +
-                                "It’s a reminder, not a bill in Safe to spend — the card’s purchases were already counted as spending."
+                                "It’s a reminder, not a bill — the card’s purchases were already counted as spending. Safe to spend " +
+                                "sets the payment aside from the account that pays the card."
                         else ->
                             "Add card purchases with + — they’re spending. Paying the card from another account is a transfer, " +
                                 "so the same purchase is never counted twice."
@@ -389,6 +398,8 @@ fun WalletDetailScreen(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editing = null },
+            activeWallets = walletsState.planWallets,
+            mainCurrency = walletsState.planMainCurrency,
             onPlanPayment = onPlanDebtPayment?.let { plan ->
                 { id, date ->
                     editing = null

@@ -1,0 +1,170 @@
+{
+  "id": "us-card-discover-noise-01",
+  "country": "US",
+  "type": "CARD_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-31",
+  "pages": [
+    [
+      "DISC0VER",
+      "Discover it(R) Card",
+      "ACCOUNT SUMMARY  Account number ending in 3398",
+      "Open Date: Sep 03, 2026 - Close Date: Oct 02, 2026",
+      "New Balance  $396.59",
+      "Minimum Payment Due  $35.00",
+      "Payment Due Date  October 30, 2026",
+      "Previous Balance  $412.06",
+      "Payments and Credits  - $457.05",
+      "Purchases  + $441.58",
+      "Balance Transfers  + $0.00",
+      "Cash Advances  + $0.00",
+      "Fees Charged  + $0.00",
+      "Interest Charged  + $0.00",
+      "New Balance  S396.59",
+      "Credit Line  $6,500",
+      "Credit Line Available  $6,103.41",
+      "Cash Advance Credit Line  $1,950",
+      "Cash Advance Credit Line Available  $1,950",
+      "Cashback Bonus(R) Balance  $8.83",
+      "TRANSACTIONS",
+      "TRANS. DATE  POST DATE  PAYMENTS AND CREDITS  AMOUNT  MERCHANT CATEGORY",
+      "09/12  09/12  INTERNET PAYMENT - THANK Y0U  -$412.06  Payments and Credits",
+      "09/20  09/21  CASHBACK B0NUS REDEMPTION PYMT/STMT CRDT  -$25.00  Awards and Rebate Credits",
+      "09/24  09/25  TARGET 00023456 COLUMBUS OH  -$19.99  Merchandise",
+      "TRANS. DATE  POST DATE  PURCHASES  AMOUNT  MERCHANT CATEGORY",
+      "09/04  09/05  KROGER#0632 COLUMBUS OH  $87.45  Supermarkets",
+      "09/06  09/07  SPEEDWAY 08812 COLUMBUS OH  $39.20  Gasoline",
+      "09/09  09/10  TARGET 00023456 COLUMBUS OH  $52.18  Merchandise",
+      "09/13  09/14  RAISING CANES 0512 COLUMBUS OH  $13.27  Restaurants",
+      "09/15  09/16  HULU 877-8244858 CA  $18.99  Services",
+      "09/18  09/19  AMAZON.COM*2B4XY71Q AMZN.COM/BILL WA  $46.80  Merchandise",
+      "09/22  09/23  AEP OHIO 800-672-2231 OH  $96.13  Services",
+      "09/27  09/28  PANERA BREAD #6021 COLUMBUS OH  $15.64  Restaurants",
+      "09/30  10/01  GIANT EAGLE #4061 COLUMBUS OH  $71.92  Supermarkets",
+      "FEES AND INTEREST CHARGED",
+      "TOTAL FEES FOR THIS PERIOD  $0.00",
+      "TOTAL INTEREST FOR THIS PERIOD  $0.00",
+      "Ask about our Balance Transfer offer  1-800-DISCOVER",
+      "Page 3 of 5"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CREDIT_CARD",
+        "institution": "Discover",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "412.06",
+        "closingBalance": "396.59",
+        "statementBalance": "396.59",
+        "minimumPayment": "35.00",
+        "paymentDueDate": "2026-10-30",
+        "creditLimit": "6500.00",
+        "availableCredit": "6103.41",
+        "transactions": [
+          {
+            "date": "2026-09-12",
+            "description": "INTERNET PAYMENT",
+            "amount": "412.06",
+            "direction": "IN",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-20",
+            "description": "REDEMPTION PYMT/STMT CRDT",
+            "amount": "25.00",
+            "direction": "IN",
+            "kind": "OTHER",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-24",
+            "description": "TARGET 00023456",
+            "amount": "19.99",
+            "direction": "IN",
+            "kind": "REFUND",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-09-04",
+            "description": "KROGER",
+            "amount": "87.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Kroger"
+          },
+          {
+            "date": "2026-09-06",
+            "description": "SPEEDWAY 08812",
+            "amount": "39.20",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Speedway"
+          },
+          {
+            "date": "2026-09-09",
+            "description": "TARGET 00023456",
+            "amount": "52.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Target"
+          },
+          {
+            "date": "2026-09-13",
+            "description": "RAISING CANES",
+            "amount": "13.27",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Raising Cane's"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "HULU",
+            "amount": "18.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Hulu"
+          },
+          {
+            "date": "2026-09-18",
+            "description": "AMAZON.COM*2B4XY71Q",
+            "amount": "46.80",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-09-22",
+            "description": "AEP OHIO",
+            "amount": "96.13",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "AEP Ohio"
+          },
+          {
+            "date": "2026-09-27",
+            "description": "PANERA BREAD",
+            "amount": "15.64",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Panera Bread"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "GIANT EAGLE",
+            "amount": "71.92",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Giant Eagle"
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "OCR noise: 'DISC0VER', 'THANK Y0U', 'B0NUS', 'KROGER#0632' (dropped space), 'S396.59' for the second New Balance. Cashback redemption is a statement credit (kind OTHER). Dates are the TRANS. DATE column."
+}

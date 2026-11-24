@@ -13,6 +13,7 @@ import com.lucento.app.data.repository.CategoryRepository
 import com.lucento.app.domain.CategoryPresets
 import com.lucento.app.feature.budget.CategoryPicks
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import com.lucento.app.domain.Feature
@@ -93,6 +94,30 @@ class OnboardingViewModel(
     /** The connected account's email, or null while signed out. */
     val signedInEmail: StateFlow<String?> = (auth?.observeSignedInEmail() ?: kotlinx.coroutines.flow.flowOf(null))
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private val _syncIncluded = MutableStateFlow<Boolean?>(null)
+    /**
+     * Whether the signed-in account's plan includes cloud sync (Lucento Pro, or a Shared Space Owner's plan); null while
+     * signed out or until [planAllowsCloud] answers. The summary says "Synced" only when it does ([storageSummary]).
+     */
+    val syncIncluded: StateFlow<Boolean?> = _syncIncluded
+
+    init {
+        viewModelScope.launch {
+            signedInEmail.collectLatest { email ->
+                _syncIncluded.value = null
+                if (email == null) return@collectLatest
+                // A check that can't finish leaves the line neutral ("Signed in"); it never claims sync.
+                _syncIncluded.value = try {
+                    planAllowsCloud?.invoke() ?: true
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
+    }
 
     private val _connecting = MutableStateFlow(false)
     val connecting: StateFlow<Boolean> = _connecting
@@ -841,10 +866,10 @@ class OnboardingViewModel(
         savedState[KEY_CURRENCY] = code
     }
 
-    /** Applied immediately so the user sees the theme they pick. */
+    /** Applied immediately so the user sees the theme they pick (a setup choice, see previewThemeMode). */
     fun selectTheme(mode: ThemeMode) {
         savedState[KEY_THEME] = mode.name
-        viewModelScope.launch { preferences.setThemeMode(mode) }
+        viewModelScope.launch { preferences.previewThemeMode(mode) }
     }
 
     fun finish() {

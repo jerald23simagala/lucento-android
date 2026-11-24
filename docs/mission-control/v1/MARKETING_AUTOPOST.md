@@ -1,0 +1,276 @@
+# Mission Control: auto-posting for Marketing (design and contract, v1)
+
+Status: v1, 2026-11-17. Owner request: "I want an interface that when I approved it Claude will handle the posting. I
+can connect all my accounts as needed." Owner choice (multiple choice): **all four platforms, TikTok via drafts**.
+Builds on [MARKETING_APPROVALS.md](MARKETING_APPROVALS.md) (v2): approvals, versions and slots work as before; this
+document adds what happens after Approve. Three pieces ship together: the database module (migration
+`20261118090000_mission_control_autopost.sql`), the console (`lucento-mission-control`: Settings › Auto-posting, the
+posting run, the Marketing card) and the owner's setup (lucento-mission-control `DEPLOYMENT.md` part J).
+
+## 1. What changes for the owner
+
+1. Once, in Settings › Auto-posting: connect **Facebook and Instagram** (one Meta sign-in: the Lucento Page, the
+   KlaroPH Page and the Instagram account linked to the Lucento Page), **YouTube** and **TikTok**; check each; turn
+   auto-posting **on** (a fresh authenticator code). The three developer apps are the owner's own (DEPLOYMENT.md part J).
+2. Each week, as before, the owner approves posts in Marketing. An approved post now says **"Posts automatically
+   Mon 19:30"** with each platform; at the slot Mission Control posts it, even with the owner's PC off.
+3. After the slot the card shows each platform's result with a link (**Posted 19:31 · View**). TikTok says **"In your
+   TikTok drafts: open TikTok and tap Post"**, and "Did you post it on TikTok? [Yes] [Don't post it there]" follows.
+4. Something went wrong: the card and Overview say so (**"The Instagram video for Mon 19:30 didn't go out"**) with **Try
+   again** and **I'll post it by hand**. Mission Control never posts more than 3 hours late on its own; a day or more
+   late, **Post it now** says how late and asks first.
+5. Before its slot, any post can still be undone, skipped or changed (nothing is posted), or turned to **"Post this one
+   by hand"**. Turning auto-posting off stops everything not under way.
+
+## 2. What each platform allows (research 2026-11-17; recheck before changing this)
+
+| Label on a post | What Mission Control does | Why |
+|---|---|---|
+| FB + IG Reels | Facebook Reel on the Lucento Page, Instagram Reel, both public | The owner's own Meta app, switched to **Live** and used only by its admin: Standard Access, no App Review ("only for a business I own or manage"). In development mode Meta shows the app's posts only to the app's admins, developers and testers, so it must be Live |
+| Lucento Facebook Page / KlaroPH Facebook Page | A photo post on that Page, with the alt text | Same Meta app; each Page has its own token |
+| YouTube Shorts | Uploaded as a public Short | Uploads from unaudited API projects were long locked to private; reports from Oct 2026 say this was lifted. Mission Control checks the answer: a video YouTube kept private is reported ("YouTube kept it private: publish it in YouTube Studio") |
+| TikTok | Sent to the owner's TikTok drafts (inbox); the owner taps Post | An unaudited app can only post privately (to a private account); TikTok's audit takes weeks and is often refused. The upload-to-drafts flow needs no audit |
+| Lucento Community group | Nothing (by hand, as before) | Meta removed the Groups API on 22 April 2024 |
+| Any other label | Nothing (by hand) | |
+
+Vercel Hobby's cron runs once a day, so the clock is in the database: pg_cron every minute, pg_net to call the console.
+
+## 3. Data model (schema `mc`)
+
+- `mc.autopost_connections`: one row per provider (`meta`, `google`, `tiktok`): account id and name, **encrypted**
+  access and refresh tokens with their expiry (none for Meta: it posts with the Pages' own tokens, and its user token
+  isn't kept), scopes, `options` (what the account can post to: Pages with their own encrypted tokens, Instagram
+  accounts with the Page each is linked to, the channel, the TikTok account), last error.
+- `mc.autopost_destinations`: `lucento_page`, `klaroph_page`, `instagram`, `youtube`, `tiktok`, each picked from the
+  connection's options (a Page carries its token; Instagram carries its Page's token).
+- `mc.autopost_jobs`: one per (post, version, target), unique; due and late-until times; status `queued` → (`preparing`
+  → `ready` for Reels) → `posted` / `sent_to_drafts`, or `failed` / `uncertain` / `cancelled` / `by_hand`; attempts,
+  lease, next try, the provider's id and link, the error and its code.
+- `mc.autopost_events`: what happened to each job; `mc.autopost_state`: the clock (set up, last call, last claim).
+- `mc.marketing_cards.autopost_off`: the owner's "post this one by hand". Settings `autopost_enabled` (default false)
+  and `autopost_tick_url`. Ingest-secret purpose `autopost` (the clock's). `job_runs.job` gains `autopost`.
+
+Tokens: AES-256-GCM in the console (`v1:<iv>:<ciphertext>:<tag>`, base64url, the provider, the account and the
+token's purpose as additional data); the key never reaches the database, and no answer to a page ever carries a
+ciphertext.
+
+## 4. Rules
+
+- **Targets** (`mc.autopost_targets`): the labels above, matched without case or surrounding spaces.
+- **Due** at the slot (10:00 for an "any time" day); **late until** 3 hours after (the day's end for "any time").
+  Reels start 20 minutes ahead (Meta fetches and processes the video), then publish at the slot; the rest start at the
+  slot.
+- **Blocked** (`mc.autopost_blocked`, design review round 1): Mission Control never posts a post that is already in
+  the apps by the owner's hand (`in_apps`: `in_apps_version` set and no automatic post of that version went out, or an
+  older version is in the apps), a launch post before launch (`too_early`) or a 'coming soon' post after it
+  (`after_launch`). The card says which; deleting it in the apps and tapping "I've removed it from the apps" hands it
+  over.
+- **A destination that can post** (`mc.autopost_destination_ok`, design review round 2): chosen, its last Check
+  didn't refuse, and its account's last token renewal didn't fail. What the posts say is what happens: an account that
+  needs a reconnect posts nothing (no job is made; a waiting one stops) until a reconnect clears its Checks.
+- **Candidates** (`mc.autopost_candidates`): auto-posting on; post approved, not `autopost_off`, with a slot; current
+  version ready and passing the truth check; not blocked; the target's destination can post.
+- **Covers** (`mc.autopost_covers`): every label on the post is a target whose destination can post. **Posts any**
+  (`mc.autopost_posts_any`): at least one is; `due_soon` ("approved but not scheduled") leaves those out, as the owner
+  has nothing to schedule (a manual label, such as the group, is posted at the time and asked about after the slot). A
+  post whose every account needs a reconnect is the owner's to schedule again.
+- **Jobs** are created by the claim within their lead time (never at approval), stepped under a 3-minute lease, and
+  re-checked at every step: a post undone, skipped, revised or turned to by hand, a destination gone or to reconnect,
+  or auto-posting off stops it before its next step (`cancelled`; turning auto-posting off cancels the waiting steps at
+  once). Each stop records why, as a code its card puts in words (`mc.autopost_stop_reason`): `autopost_off`,
+  `disconnected`, `card_off` (the owner's own), `not_approved`, `new_version`, `no_destination`, `reconnect`,
+  `blocked_<why>`, `not_ready`. A cancelled job starts over when its post can go out again while its slot's window is
+  open (approved again, back to automatic, reconnected, on again): it never posted anything. Past that, the owner
+  decides: "Post it now" (`retry`) or "I'll post it by hand". Past late-until a waiting job `failed` with `missed`.
+- **A run that never reported** (`mc.autopost_settle_lapsed`, first in the claim, disconnecting and "post this one by
+  hand"): every result, retry, cancellation and miss clears the lease, so a lease left behind means the run died or its
+  result couldn't be saved. A step taken at or after the slot that publishes from its status (`ready`; `queued` Page,
+  YouTube and TikTok steps; `preparing` Reels) may have posted: it becomes `uncertain` (`lease_lapsed`) and is never
+  handed out again. A step taken earlier only prepared, and goes out again. (Security review M1.)
+- **Results**: `preparing` (checked again in a minute), `ready` (published at the slot), `posted`, `sent_to_drafts`,
+  `failed` (retried up to 3 attempts when the console says it may help, at 30 s × attempts or as asked), `uncertain`
+  (the platform may have posted it: never retried; the owner looks). A late "posted" from a lapsed lease is still
+  recorded: what happened on the platform wins.
+- **Out**: the first job posted (or sent to drafts, or taken by hand) sets `in_apps_version` to that version; `by_hand`
+  gets the labels the owner still finishes (manual ones, a target sent to drafts or taken by hand, a target whose
+  destination can't post and that didn't go out: not connected, disconnected or to reconnect), so the page asks "Did you
+  post it on …?" after the slot. A label shared by two platforms ("FB + IG Reels") whose one platform went out is kept
+  by its other platform's name ("Instagram Reels", `mc.autopost_by_hand_names`), so the question names only what is
+  still the owner's. A step that couldn't be confirmed (`uncertain`) isn't added: the owner looks first. A label Mission
+  Control later posts on every platform (its account came back) leaves `by_hand`. Nothing changes when the post was
+  revised or undone meanwhile.
+
+## 5. SQL API
+
+Owner (granted to authenticated; each calls `mc.gate` first, its own hourly counter):
+
+| Function | Gate | Notes |
+|---|---|---|
+| `autopost_settings()` | marketing.read | enabled, the clock, connections (no tokens), destinations |
+| `autopost_set_enabled(p_on)` | marketing.autopost_enable, step-up to turn on, 20/h | refuses `clock_not_set`, `nothing_connected` |
+| `autopost_save_connection(provider, account_id, account_name, token_cipher, refresh_cipher, token_expires_at, refresh_expires_at, scopes, options)` | marketing.autopost_connect, step-up, 30/h | `token_cipher` null for Meta only; refreshes or clears this provider's destinations; picks the plain ones (Page named Lucento, Page named KlaroPH, the Instagram account linked to the Lucento Page, the only channel, the TikTok account) |
+| `autopost_set_destination(key, option_id)` | marketing.autopost_destination, step-up, 60/h | only from the connection's options, of the right kind; null clears |
+| `autopost_disconnect(provider)` | marketing.autopost_disconnect, step-up, 20/h | cancels its jobs not under way; deletes tokens and destinations |
+| `autopost_credentials(key)` | marketing.autopost_credentials, 120/h | the destination's ciphertexts, for the console's Check |
+| `autopost_record_check(key, ok, note)` | marketing.autopost_check, 120/h | keeps the Check's answer on the destination (Settings and the posts show it); cleared when the destination or its token changes; one that passed also clears its account's failed renewal |
+| `autopost_save_token(provider, account_id, …)` | marketing.autopost_token, 120/h | after a refresh in a Check, or its error; only for that account (a reconnect meanwhile is left alone) |
+| `autopost_job_action(job, action)` | marketing.decide | `retry` (failed, uncertain or stopped, approved current version, only when Mission Control may post it now: `not_allowed` says why not), `posted` (uncertain), `by_hand` (stopped ones too) |
+| `autopost_card(card, version, off)` | marketing.decide | `stale_version`; `busy` while a step is under way; `already_started` once a step began |
+
+Console (granted to anon; each checks its secret first): `ingest_autopost_claim(tick_secret, app_secret, limit)` (both
+secrets), `ingest_autopost_result(app_secret, job, lease, result)` (a repeated "posted" or "uncertain" changes
+nothing), `ingest_autopost_token(app_secret, provider, account_id, …)`.
+
+Clock: `mc.autopost_kick()` (pg_cron `mc-autopost`, every minute: off / no address / nothing due / a step still leased
+→ nothing; else one `net.http_post` to the tick address with the Vault secret) and `mc.autopost_setup(url)` (owner,
+SQL editor: rotates the `autopost` secret into Vault as `mc_autopost_tick`, records the address, schedules the job).
+
+The board's cards gain `autopost {enabled, off, covers, posts_any, blocked, due_at, late_until, targets[{label, target,
+destination, mode, connected, destination_name, check_ok (false also while its account's renewal failed), checked_at,
+job (with `stop_note` when stopped)}]}`; the board gains `autopost` (the settings: the clock, connections, destinations
+with their last Check, and `work_due`); the summary gains `autopost {failed[], uncertain[], drafts_waiting[], counts,
+accounts {chosen, working, reconnect[], chosen_keys[], refused[]}, clock {set, last_run, work_due}}` (each list ≤ 10,
+by slot; one Page that can't post is named, not its whole account). The lists keep an approved post's problems until
+they are handled, however old (owner, 17 Nov): a step stopped after its window closed (not by the owner, not blocked)
+is listed with the failed ones (`stopped`). Each card's job says `confirmed` when the owner answered "It's posted".
+
+## 6. Console
+
+- `POST /api/autopost/tick` (exempt from the session gate; the bearer must be 64 hex; `maxDuration` 60 s): claim (up to
+  4) → each job's step, side by side → its result under its lease. Every platform request ends within 40 s of the
+  start, and a publishing call isn't started with less than 12 s left (an upload: 20 s), so the function never stops
+  mid-publish; each result is then saved with up to 3 time-limited tries by 56 s (if it still doesn't land, the next
+  claim judges the step as above). Tokens are renewed once per provider per run. Never logs or answers a token, a
+  caption or a link with a signature, and before the secrets are checked it says nothing about its configuration.
+- Steps per target:
+  - **Facebook Reel**: start an upload session and let Meta fetch the video from a presigned Blob link (ahead) →
+    `ready` → at the slot finish with `video_state=PUBLISHED` and the caption → `posted` (link `facebook.com/reel/<id>`).
+  - **Instagram Reel**: create a REELS container from the presigned link (ahead) → poll `status_code` → `ready` → at the
+    slot `media_publish` → `posted` (the permalink).
+  - **Facebook photo** (either Page): `/{page}/photos` with the presigned link, the caption and `alt_text_custom` →
+    `posted`.
+  - **YouTube**: resumable upload streamed from Blob (title, description, public, not made for kids) → `posted`, or
+    `uncertain` when YouTube kept it private.
+  - **TikTok**: refresh the daily token if needed → inbox upload (`/v2/post/publish/inbox/video/init/`, one chunk) →
+    `sent_to_drafts`.
+- Errors: 429/5xx/network → `failed` retryable; 4xx (permissions, media) → `failed` with the platform's message; an
+  expired or revoked token → `failed` "Reconnect <platform> in Settings"; a timeout after a publish call → `uncertain`.
+- Settings › Auto-posting: the switch, the clock line, each provider (Connect / Reconnect / Check / Disconnect; the
+  Pages and Instagram account to use). OAuth: Connect (a Server Action) verifies a fresh authenticator code, keeps the
+  state, the PKCE verifier (Google) and the return address in a signed, HttpOnly, 10-minute cookie scoped to
+  `/settings/connect`, and sends the owner to the platform. The platform returns to
+  `/settings/connect/<provider>/callback`; the session cookies are SameSite=Strict and don't come with a return from
+  another site, so that page (exempt from the session gate, reading nothing) only passes the answer on to
+  `/settings/connect/<provider>/finish` with a navigation of its own (meta refresh, no script). /finish is gated like
+  every page: it checks the state against the cookie and the admin, exchanges the code, encrypts the tokens and calls
+  `autopost_save_connection` (whose step-up the code entered at Connect still covers).
+- Settings › Auto-posting (design review round 2): the chip and the first sentence say what will actually happen with
+  the accounts as they are ("On · nothing can post", "On · some can't post", naming them), never only "On"; the timing
+  rules and what stays the owner's ("Still yours", from what is connected) follow. Each destination keeps its last
+  Check on its row ("Works · checked 2 min ago", "Reconnect needed · checked 2 min ago"). An account that needs a
+  reconnect says so once: a notice with Reconnect as its main button and the cause under Details (the platform's
+  sentence first, a technical aside apart); its rows lose Check and Change until then, and the notice takes the focus
+  when a Check just turned it so. With nothing that can post, the switch steps back ("Turn auto-posting on anyway").
+  Turning on checks every account; an answer that still needs the owner is a warning. The posting clock: a label, its
+  state (Set up, Not set up, Stalled) and, when it stalled with something due, what to check in Supabase.
+- Settings (design review round 3): the account's notice is the one place that says "reconnect" (its header chip gives
+  way to it); its rows say what that means for them ("Can't post · checked 2 min ago"). The technical aside is a
+  sentence ("If MC_TOKEN_KEY was changed in Vercel since this account was connected, the saved sign-in can no longer
+  be opened."). A stalled clock leads the switch ("On · nothing is posting"); with every account refused it says "On,
+  but nothing posts: every account below needs a reconnect." Rows let Check wrap under them at large text. Disconnect
+  says what happens per platform (Facebook's is removed in Facebook; Google and TikTok are withdrawn there).
+- Marketing and Overview: while auto-posting is on and accounts can't post, one line says so at the top of Marketing
+  and in Overview's "Needs you now", with the way to Settings. A posting clock that stopped with something due comes
+  first ("Auto-posting is on, but nothing is posting: the posting clock has stopped (its last run was 3 h ago)").
+- Marketing card: while auto-posting is on every post has a plan sentence, also one the owner posts all of ("Mission
+  Control doesn't post this one: you post it in the Lucento Community group at the time"). Before the slot it names
+  both sides ("posts it on Facebook, Instagram and YouTube Mon 19:30. TikTok goes to your drafts…; you post it on … at
+  the time"), as a ▲ warning with a link to Settings when an account needs a reconnect ("YouTube won't post until you
+  reconnect it"). The panel ("Automatic posting") has each result after the slot (at the top of a settled card; the
+  card doesn't also say "Version 1 went out"), with the date when it went out on another day than its slot; Try again
+  (or "Post it now" past the window, naming the slot) only where another attempt can happen / I'll post it by hand /
+  It's posted. A step that can't go on says why: paused while auto-posting is off, waiting for a posting clock that
+  stopped, not posted in time, stopped (and why: "Stopped when auto-posting was turned off (Mon 16 Nov, 21:04)"), with
+  what the owner can do. The approve button says "Approve and post Mon 19:30" only when Mission Control will post it
+  (not blocked, an account that can post). The chip, banner and filters agree: "Partly posted · 2 platforms need you" counts a
+  platform that failed, couldn't be confirmed or was stopped after another went out; "Approved · reconnect needed"
+  when every account it would go to needs one.
+- Marketing card (design review round 3): a step whose account can't post says "Won't post: reconnect needed" ("Post it
+  yourself, or reconnect YouTube in Settings"), and one waiting on a stopped clock "Waiting for the posting clock": the
+  chip and the "Needs you" filter count both, never "Posting…". A launch post approved early names where it goes on the
+  one condition ("posts it on Facebook, Instagram and YouTube Mon 19:30 if you've marked Lucento as live by then"). A
+  day or more late, the button says how late ("Post it now (2 days late)") and asks first (owner, 17 Nov: nothing goes
+  out late by surprise). "Posted · you confirmed it" when the owner answered for an unconfirmed step. A platform whose
+  app isn't set up says "Not set up" (no Connect offer), and no advice once its window is over. Where the card's own
+  "I posted it / Don't post it" block shows, the panel's buttons are secondary. A group post says what approving means
+  ("approve it, then you post it in the Lucento Community group at the time"); the page subtitle says what auto-posting
+  does. A code prompt can be put away (Cancel).
+- Design review round 4 (owner, 17 Nov: fix all, a critic confirms the list, then merge):
+  - **Each by-hand platform gets its own answer** once the slot has begun: "Did you post it on TikTok?" **[Yes]
+    [Don't post it there]**, one row per platform ("Did you post it there?" with several); no "Not yet". A platform that
+    didn't go out offers **Don't post it there** beside **I'll post it by hand** (`not_posting`: the owner's, answered at
+    once). The card keeps `by_hand_posted` / `by_hand_skipped`; `by_hand_done_at` is set once every entry has an answer
+    (an entry added later is asked about again). History records each answer.
+  - **"It's posted" can be taken back** ("Not posted after all", `not_posted`): only the owner's own confirmation; the
+    step is unconfirmed again and back on Overview, and with nothing else out the post is no longer in the apps.
+  - **The posting clock's stall counts from when the work became due** (`work_due_since`: a step sent again counts from
+    then, a post approved, reconnected or turned on again from then): no "nothing is posting" in the minute after "Post
+    it now"; a step due and not picked up says "Posting within a minute". Chip, banner, rows and the clock's own chip
+    use the same rule (red, ■).
+  - **One main button per card**: beside the card's own "has passed" block, a plain "Post it now" (under a day late)
+    leads and "I posted it" is plain; one "Don't post" control after the slot (the block's; "Don't post this one…" is
+    for before). A late "Post it now" is never the main button; its question takes the focus.
+  - **After "I posted it"** the plan line is gone (no plan after the slot) and the platform lines say "Posted by you".
+  - **One name for a post that didn't publish**: "Didn't go out" (rows, chip "Approved · didn't go out", the week's
+    line "1 didn't go out", Overview "The Instagram video for Mon 19:30 didn't go out"); counts say their unit
+    ("2 platforms need you"; the week picker names platforms: "Instagram didn't go out · YouTube to check").
+  - "1 more post needs you: Fri 13 Nov ›" after an answer (the page's own "Needs you" rule), "No other post needs you
+    this week" when none.
+  - Settings: a refusal the whole account shares (the saved sign-in can't be opened) is recorded on every destination of
+    it, so no row keeps a stale "Works"; otherwise the other rows keep Check and Change. The account's chip says
+    "Reconnect needed". "What goes where" follows what is chosen (a Page not chosen says so); "Reels start uploading 20
+    minutes early; YouTube, TikTok and Page posts start at the slot". Overview always shows auto-posting's lines (the
+    three-line cap folds only the others). Accounts are named in lists ("Facebook, Instagram and YouTube"), never "its
+    accounts"; quoted words on Marketing use “typographic” quotes.
+  - After the critic's confirmation (11 of 13 fixed): "Approved · didn't go out" for any approved post whose slot
+    passed without going out (the week's line says the same); "Partly posted · 3 platforms need you" counts every
+    platform the card asks about, a by-hand one still to answer included (each once); the account notice's button says
+    "Reconnect" (the notice names the account; screen readers hear it), full width in a narrow notice; a by-hand
+    platform's row says its answer ("Posted by you", "Not posting it there"); "Yours to post: …" under the results;
+    "What goes where" warns that YouTube may keep uploads private until Google has audited the app.
+
+## 7. Security and privacy
+
+- Only the owner's own accounts; tokens never leave the console server unencrypted; the database holds ciphertext only
+  and no API role can read the tables. The tick secret lets its holder ask for a posting run, never post anything that
+  isn't approved and due; the claim also needs the console's app secret.
+- What the platforms receive is what the owner approved (videos, pictures, captions, alt text), sent from the owner's
+  console to the owner's accounts. No customer data, ever.
+- Revoking access: Disconnect in Settings deletes the tokens and withdraws the sign-in at Google and TikTok (their
+  revoke endpoints; the answer says when it couldn't); Facebook's is removed in Facebook (Settings › Business
+  integrations), as for Google (Account › Security › Your connections to third-party apps) or TikTok (Settings and
+  privacy › Security › Manage app permissions) when the withdrawal didn't go through.
+- Security review (2026-11-17, before merging): no critical or high finding. Fixed: a post whose result wasn't saved
+  could be posted again (M1); "post this one by hand" while a step was posting (L1); a renewal overwriting a newer
+  connection (L2); a sign-in refusal or "connected" notice from a link that wasn't this sign-in's (L3); the tick naming
+  its missing settings (L4); the Meta user token kept and nothing revoked on Disconnect (L5). Kept on purpose: every
+  listed Page's own token (so a Page can be chosen without reconnecting; the owner's Pages are few).
+
+## 8. Tests
+
+- SQL `tools/sql-verify/autopost_suite.sql` (62 checks: secrets and grants, the map, due times, connections and picks,
+  every job step and refusal, coverage and due_soon, cancellations (with why) and starting over, missed, a run that
+  never reported, busy, renewals for one account only, Meta without a user token, posts in the apps by hand and launch
+  posts blocked, Checks kept and cleared, `work_due`, stopped steps sent now or taken by hand, the accounts' health, a
+  refused account posting nothing until reconnected, a disconnected platform asked about, by hand per platform, the
+  summary keeping problems until handled (stopped ones too) with the clock, a confirmed post, per-platform answers,
+  "Don't post it there", "It's posted" taken back, the stall's due-since time, History with the automatic steps, launch
+  rules, the clock's guards, the board, the summary, the audit) and race MC6 in `concurrency.mjs` (two claims at once:
+  each job handed out once).
+  `catch_up_check.mjs` part E pastes APPLY_AUTOPOST.sql the owner's way.
+- Console (`lucento-mission-control`): unit tests `autopost-crypto` (encryption, additional data, the state cookie,
+  PKCE), `autopost-runner` (every target's steps against fake platforms, the retry/uncertain rules, the deadline, one
+  token renewal per run), `autopost-words` (the card's lines, Approve's words, Marketing's status, filters and Overview
+  lines with auto-posting) and `autopost-routes` (the tick's secrets, the callback page, /finish's refusals); end to end
+  `settings-autopost.spec.ts` on the local stack's seeded connections and results.
+- Owner's first run: Check on each destination, then one approved post watched at its slot.

@@ -1,7 +1,8 @@
 # Lucento launch film
 
 Lucento's first official product film: **93.3 seconds, 1920 × 1080, 30 fps**, plus a **vertical 1080 × 1920**
-version. It is built in Remotion from real captures of Lucento 0.5.8 and carries an original synthesized score.
+version. It is built in Remotion from real captures of Lucento 0.5.14 (refreshed 2026-11-19; the first cut used 0.5.8) and
+carries an original synthesized score. In the vertical version every caption is centred.
 30-second and 15-second cuts, in both shapes, come from the same source.
 
 | Deliverable | Where |
@@ -27,7 +28,8 @@ npm run render:vertical                  # → out/lucento-launch-film-vertical.
 npm run score                            # regenerate the music (needs Python with numpy and scipy)
 ```
 
-Rendering takes about 10 minutes on this PC.
+On 2026-11-19 the master took 21 minutes to render on this PC with other apps open, the vertical 9 minutes and each cut
+3–6 minutes. Shut the screenshot emulator down first: it holds about 2.5 GB of memory.
 
 - Rendering stills of the cut-downs needs `--muted`. Remotion's audio mixer fails on image-only renders of those
   compositions; video renders are fine.
@@ -42,5 +44,5 @@ Rendering takes about 10 minutes on this PC.
 | Typeface | `FONT` in `src/launch-film/theme.ts` |
 | Music | `tools/compose_score.py` (plans for all three lengths), then `python tools/compose_score.py`. To use a licensed track instead, replace `public/launch-film/audio/score.wav` |
 | Narration | Record `VOICEOVER.md`, add the WAV to `public/launch-film/audio/`, and add an `<Audio>` at frame 0 in `src/launch-film/audio/Soundtrack.tsx` |
-| Screens (after an app update) | Re-capture with `tools/capture/` (see its README), then `python tools/prepare_screens.py out/capture`. Crop boxes in the scenes assume the 0.5.8 layouts |
+| Screens (after an app update) | Copy `public/launch-film/screens` to `out/screens-before`, re-capture with `tools/capture/` (see its README), run `python tools/prepare_screens.py out/capture`, then `python tools/remap_boxes.py out/screens-before public/launch-film/screens`: it reports every crop box that moved or changed. Crop boxes in the scenes match the 0.5.14 layouts |
 | Scene timing | `src/launch-film/timeline.ts` and the matching `SCENES` in `tools/compose_score.py` (keep cuts on bar lines: 80 frames) |

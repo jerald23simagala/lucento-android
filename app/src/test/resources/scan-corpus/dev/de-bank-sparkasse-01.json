@@ -1,0 +1,253 @@
+{
+  "id": "de-bank-sparkasse-01",
+  "country": "DE",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "Sparkasse KoelnBonn",
+      "Kontoauszug 10/2026  Blatt 1/2",
+      "Girokonto  IBAN DE12 3705 0198 1234 5678 90  BIC COLSDE33XXX",
+      "Kontowaehrung EUR",
+      "Herrn",
+      "Lukas Schneider",
+      "Venloer Str. 211",
+      "50823 Koeln",
+      "Kontostand am 30.09.2026  1.874,22",
+      "Buchungstag  Wert  Buchungstext / Verwendungszweck  Betrag",
+      "01.10.2026  01.10.2026  Dauerauftrag  -1.234,56",
+      "Hausverwaltung Rhein GmbH",
+      "Miete Oktober 2026 Whg 3 OG links",
+      "01.10.2026  01.10.2026  Lastschrift  -39,99",
+      "Vodafone GmbH",
+      "Mobilfunk 10/2026 Kd-Nr 123456789",
+      "02.10.2026  02.10.2026  Kartenzahlung  -28,47",
+      "REWE Markt GmbH//Koeln/DE",
+      "2026-10-01T18:12 Debitk.0",
+      "04.10.2026  04.10.2026  Bargeldauszahlung  -100,00",
+      "GA NR00001234 BLZ37050198 0",
+      "04.10/10.41UHR KOELN EHRENFELD",
+      "06.10.2026  06.10.2026  Lastschrift  -55,08",
+      "Rundfunk ARD, ZDF, DRadio",
+      "Beitragsnummer 123456789 Zeitraum 10.2026",
+      "08.10.2026  08.10.2026  Kartenzahlung  -17,85",
+      "DM Drogerie Markt//Koeln/DE",
+      "2026-10-07T12:40 Debitk.0",
+      "10.10.2026  10.10.2026  Online-Ueberweisung  -50,00",
+      "Anna Weber",
+      "Geburtstag Geschenk",
+      "12.10.2026  12.10.2026  Lastschrift  -10,99",
+      "PayPal Europe S.a.r.l. et Cie S.C.A",
+      "1039284756123 PP.1234.PP . Spotify, Ihr Einkauf bei Spotify",
+      "15.10.2026  15.10.2026  Gutschrift  3.215,80",
+      "Muster Technik GmbH",
+      "Gehalt Oktober 2026",
+      "Uebertrag auf Blatt 2  3.553,08",
+      "Blatt 1/2"
+    ],
+    [
+      "Sparkasse KoelnBonn  Kontoauszug 10/2026  Girokonto  IBAN DE12 3705 0198 1234 5678 90",
+      "Blatt 2/2",
+      "Buchungstag  Wert  Buchungstext / Verwendungszweck  Betrag",
+      "Uebertrag von Blatt 1  3.553,08",
+      "16.10.2026  16.10.2026  Lastschrift  -96,00",
+      "RheinEnergie AG",
+      "Abschlag Strom/Gas 10/2026 VK 4711223344",
+      "18.10.2026  18.10.2026  Kartenzahlung  -64,30",
+      "ARAL Station 281234//Koeln/DE",
+      "2026-10-17T09:05 Debitk.0",
+      "20.10.2026  20.10.2026  Lastschrift  -79,90",
+      "DB Fernverkehr AG",
+      "Fahrkarte 2026-10-24 Koeln-Berlin Auftrag Q7X2MB",
+      "22.10.2026  22.10.2026  Echtzeit-Gutschrift  45,00",
+      "Jonas Becker",
+      "Konzertkarte",
+      "25.10.2026  25.10.2026  Kartenzahlung  -41,12",
+      "EDEKA Center Koeln//Koeln/DE",
+      "2026-10-24T17:55 Debitk.0",
+      "28.10.2026  28.10.2026  Lastschrift  -48,75",
+      "HUK-COBURG",
+      "Kfz-Versicherung 10/2026 Vertrag 99-123456",
+      "29.10.2026  29.10.2026  Lastschrift  -29,90",
+      "FitX Deutschland GmbH",
+      "Mitgliedsbeitrag 11/2026",
+      "30.10.2026  30.10.2026  Rueckbuchung Lastschrift  29,90",
+      "FitX Deutschland GmbH",
+      "Widerspruch Mitgliedsbeitrag 11/2026",
+      "31.10.2026  31.10.2026  Entgelt  -6,95",
+      "Kontofuehrung 10/2026",
+      "Kontostand am 31.10.2026 um 20:00 Uhr  3.261,06",
+      "Bitte erheben Sie Einwendungen gegen einzelne Buchungen unverzueglich.",
+      "Guthaben sind als Einlagen nach Massgabe des Einlagensicherungsgesetzes entschaedigungsfaehig.",
+      "Blatt 2/2"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Sparkasse KoelnBonn",
+        "currency": "EUR",
+        "currencyEvidence": "EXPLICIT",
+        "openingBalance": "1874.22",
+        "closingBalance": "3261.06",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Hausverwaltung Rhein",
+            "amount": "1234.56",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Hausverwaltung Rhein"
+          },
+          {
+            "date": "2026-10-01",
+            "description": "Vodafone GmbH",
+            "amount": "39.99",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Vodafone"
+          },
+          {
+            "date": "2026-10-02",
+            "description": "REWE Markt GmbH",
+            "amount": "28.47",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "REWE"
+          },
+          {
+            "date": "2026-10-04",
+            "description": "Bargeldauszahlung",
+            "amount": "100.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-06",
+            "description": "Rundfunk ARD, ZDF, DRadio",
+            "amount": "55.08",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "ARD ZDF Deutschlandradio Beitragsservice"
+          },
+          {
+            "date": "2026-10-08",
+            "description": "DM Drogerie Markt",
+            "amount": "17.85",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "dm-drogerie markt"
+          },
+          {
+            "date": "2026-10-10",
+            "description": "Anna Weber",
+            "amount": "50.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-12",
+            "description": "Ihr Einkauf bei Spotify",
+            "amount": "10.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Gehalt Oktober 2026",
+            "amount": "3215.80",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "RheinEnergie AG",
+            "amount": "96.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "RheinEnergie"
+          },
+          {
+            "date": "2026-10-18",
+            "description": "ARAL Station",
+            "amount": "64.30",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Aral"
+          },
+          {
+            "date": "2026-10-20",
+            "description": "DB Fernverkehr AG",
+            "amount": "79.90",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Deutsche Bahn"
+          },
+          {
+            "date": "2026-10-22",
+            "description": "Jonas Becker",
+            "amount": "45.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-25",
+            "description": "EDEKA Center",
+            "amount": "41.12",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "EDEKA"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "HUK-COBURG",
+            "amount": "48.75",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "HUK-COBURG"
+          },
+          {
+            "date": "2026-10-29",
+            "description": "FitX Deutschland",
+            "amount": "29.90",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "FitX"
+          },
+          {
+            "date": "2026-10-30",
+            "description": "Rueckbuchung Lastschrift",
+            "amount": "29.90",
+            "direction": "IN",
+            "kind": "REVERSAL",
+            "merchant": "FitX"
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Kontofuehrung",
+            "amount": "6.95",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "German Kontoauszug: each booking has a header line (Buchungstag, Wert, Buchungstext, signed amount like -1.234,56) and Verwendungszweck lines that contain dates and numbers which are not amounts. Uebertrag lines carry the balance between pages. A disputed direct debit is reversed (Rueckbuchung). Umlauts are written as ae/oe/ue as in the PDF text layer."
+}

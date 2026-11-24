@@ -26,11 +26,12 @@ plan simulator and its **Test store** switch on the Lucento Pro page.
    | Product id | Type | Set up |
    |---|---|---|
    | `lucento_pro` | Subscription | Base plan `monthly`: auto-renewing, 1 month, ₱149. Base plan `annual`: auto-renewing, 1 year, ₱1,190, with an offer (id e.g. `trial`) of a **7-day free trial**, eligibility "new customer acquisition: never had this subscription" |
-   | `lucento_pro_lifetime` | One-time product | One purchase option, ₱3,490. Founder price: a discounted offer at ₱2,990 for 60 days. The app shows the lowest offer Play lists |
+   | `lucento_pro_lifetime` | One-time product | One purchase option, ₱2,490 (lowered from ₱3,490 on 2026-11-21). No founder offer (the owner dropped it on 2026-11-21). The app shows the lowest offer Play lists |
    | `lucento_cloud` | Subscription | Base plans `monthly` (₱59) and `annual` (₱490). The app offers it only to Lifetime owners whose included year has ended |
 
-   Let Play convert the PHP prices for other countries, or set them by hand. The app shows Play's own price strings,
-   so no price is typed into the app.
+   Prices for the other countries come from the four regional tiers in [REGIONAL_PRICING.md](REGIONAL_PRICING.md),
+   set by `tools/play-pricing/` (owner decision 2026-11-21). Don't use Play Console's own conversion on these five
+   prices: it overwrites the tiers. The app shows Play's own price strings, so no price is typed into the app.
 5. **Licence key.** In Monetize with Play › Monetization setup › Licensing, copy the Base64 RSA public key into the GitHub
    repository **variable** (or secret) `LUCENTO_PLAY_LICENSE_KEY`, and into `local.properties` for local release
    builds. CI reads the variable first, then the secret. It is public by design. The phone checks every purchase's signature with it, and without it a release doesn't bill.

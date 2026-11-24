@@ -132,7 +132,11 @@ import androidx.compose.ui.focus.focusProperties
 @Serializable data class WalletDetailRoute(val walletId: Long)
 @Serializable data object GoalsRoute
 @Serializable data object DebtsRoute
-@Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE)
+/**
+ * Scheduled: [scheduleId] opens one schedule’s review sheet; [selectWalletId] opens All schedules in Select mode with the
+ * plans paying that card or loan selected (the editor’s “Adjust existing”).
+ */
+@Serializable data class RecurringRoute(val scheduleId: Long = NO_SCHEDULE, val selectWalletId: Long = NO_SCHEDULE)
 
 /**
  * The full-page recurring payment editor: [scheduleId] edits one; [debtWalletId] + [firstDueEpochDay] start a debt
@@ -169,6 +173,14 @@ import androidx.compose.ui.focus.focusProperties
 @Serializable data class TransactionViewRoute(val transactionId: Long)
 /** Dashboard "top spending" tile: Transactions filtered to one category in one month ("yyyy-MM"). */
 @Serializable data class CategoryTransactionsRoute(val categoryId: Long, val month: String)
+/** Milestones ("Progress" until 2026-11-23): the Awards card, then the budget year (owner, 2026-11-23: the year on top). */
+@Serializable data object ProgressRoute
+/** A month's recap ("yyyy-MM"; empty: the page's default month), from its square on Milestones or Home's check-in card. */
+@Serializable data class MonthRecapRoute(val month: String = "")
+/** The awards on their own page (owner, 2026-11-23): from Milestones' Awards button and a ceremony's "See all awards". */
+@Serializable data object AwardsRoute
+/** The monthly check-in's plan page for [month] ("yyyy-MM"). */
+@Serializable data class MonthPlanRoute(val month: String)
 /** The transaction composer: [start] is a [ComposerStart] name; [typeHint] a TransactionType name or empty. */
 @Serializable data class ComposerRoute(val start: String = "TYPE", val walletId: Long = NO_WALLET, val typeHint: String = "")
 
@@ -278,6 +290,13 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val haptics = rememberHaptics()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // Short messages (a Pro wall met again, owner 2026-11-19) show in the app's snackbar unless a sheet is open.
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    androidx.compose.runtime.DisposableEffect(messageHosts, snackbarHostState, scope) {
+        val appHost = com.lucento.app.core.designsystem.component.MessageHost(snackbarHostState, scope)
+        messageHosts?.app = appHost
+        onDispose { if (messageHosts?.app === appHost) messageHosts.app = null }
+    }
     val generation = preferences.setupGeneration
     val appViewModel: AppViewModel = viewModel(key = "app-$generation", factory = AppViewModel.Factory)
 
@@ -300,6 +319,24 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
 
     var showProfile by rememberSaveable { mutableStateOf(false) }
+    // Follow Lucento, opened from the profile menu once it has closed.
+    var showFollow by rememberSaveable { mutableStateOf(false) }
+    // A Pro theme tried on lasts while the profile sheet is open (owner, 2026-11-19).
+    val themeTrial = com.lucento.app.feature.profile.LocalThemeTrial.current
+    LaunchedEffect(showProfile) { if (!showProfile) themeTrial.end() }
+    // A theme tried on and taken to the plan page becomes the theme once Pro arrives (owner, 2026-11-19). The real plan
+    // decides (never the view model's first, empty list), and it is let go only once the saved theme is that one.
+    val themeAfterPurchase by themeTrial.afterPurchase.collectAsStateWithLifecycle()
+    val heldPlan = com.lucento.app.feature.pro.LocalEntitlements.current
+    val lockedForSave by appViewModel.lockedThemes.collectAsStateWithLifecycle()
+    LaunchedEffect(themeAfterPurchase, heldPlan, lockedForSave, preferences.themeId) {
+        val theme = themeAfterPurchase ?: return@LaunchedEffect
+        val unlocked = theme.name !in com.lucento.app.domain.entitlement.ProGates.lockedThemeIds(heldPlan, System.currentTimeMillis())
+        when {
+            preferences.themeId == theme -> themeTrial.clearAfterPurchase()
+            unlocked -> appViewModel.setThemeId(theme)
+        }
+    }
     // The tab a pushed screen belongs to, so the dock keeps it highlighted (e.g. Goals opened from Home).
     var selectedTab by rememberSaveable { mutableStateOf("home") }
     // Each tap on Home in the dock asks Home to show its top (owner round 10); Back from a sub-page keeps the place.
@@ -435,8 +472,14 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     }
     val back: () -> Unit = { navController.popBackStack() }
     val focused = currentDestination.isFocused()
+    // A screen’s own bottom bar can stand in for the dock (Scheduled’s Select mode, LocalHideDock).
+    var dockHidden by remember { mutableStateOf(false) }
+    val hideDock: (Boolean) -> Unit = remember { { hidden -> dockHidden = hidden } }
 
-    CompositionLocalProvider(com.lucento.app.core.designsystem.component.LocalSpotlight provides spotlight) {
+    CompositionLocalProvider(
+        com.lucento.app.core.designsystem.component.LocalSpotlight provides spotlight,
+        com.lucento.app.core.designsystem.component.LocalHideDock provides hideDock,
+    ) {
         Box(Modifier.fillMaxSize()) {
             Scaffold(
                 // While the welcome covers the app, only it is there for TalkBack and focus (like the lock screen):
@@ -450,18 +493,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 },
                 containerColor = MaterialTheme.colorScheme.background,
                 snackbarHost = {
-                    SnackbarHost(snackbarHostState) { data ->
-                        Snackbar(
-                            snackbarData = data,
-                            shape = MaterialTheme.shapes.medium,
-                            containerColor = MaterialTheme.colorScheme.inverseSurface,
-                            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                        )
-                    }
+                    SnackbarHost(snackbarHostState) { data -> com.lucento.app.core.designsystem.component.LucentoSnackbar(data) }
                 },
                 bottomBar = {
                     AnimatedVisibility(
-                        visible = !focused,
+                        visible = !focused && !dockHidden,
                         enter = slideInVertically { it } + fadeIn(),
                         exit = slideOutVertically { it } + fadeOut(),
                     ) {
@@ -558,6 +594,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onTransfer = { openTransfer() },
                                         onScanReceipt = { openComposer(ComposerStart.SCAN) },
                                         onOpenCategory = { id, month -> push(CategoryTransactionsRoute(id, month.toString())) },
+                                        onOpenMilestones = { push(ProgressRoute) },
+                                        onOpenMonthRecap = { month -> push(MonthRecapRoute(month.toString())) },
+                                        onOpenAwards = { push(AwardsRoute) },
+                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
                                     ),
                                 )
                             }
@@ -605,14 +645,58 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onBack = null,
                                         onChooseCategories = { push(CategorySetupRoute) },
                                         onManageCategories = { push(CategoriesRoute) },
+                                        onOpenScheduled = { push(RecurringRoute()) },
+                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
                                     )
+                                }
+                            }
+                            pushed<ProgressRoute>(reducedMotion) {
+                                com.lucento.app.feature.progress.ProgressScreen(
+                                    onBack = back,
+                                    onOpenMonth = { month -> push(MonthRecapRoute(month.toString())) },
+                                    onOpenAwards = { push(AwardsRoute) },
+                                )
+                            }
+                            pushed<MonthRecapRoute>(reducedMotion) { entry ->
+                                val route = entry.toRoute<MonthRecapRoute>()
+                                com.lucento.app.feature.progress.MonthRecapScreen(
+                                    onBack = back,
+                                    initialMonth = route.month.takeIf { it.isNotEmpty() }?.let { runCatching { java.time.YearMonth.parse(it) }.getOrNull() },
+                                    onOpenInsights = if (features.isEnabled(Feature.INSIGHTS)) ({ push(InsightsRoute) }) else null,
+                                )
+                            }
+                            pushed<AwardsRoute>(reducedMotion) {
+                                com.lucento.app.feature.awards.AwardsScreen(onBack = back)
+                            }
+                            pushed<MonthPlanRoute>(reducedMotion) { entry ->
+                                val route = entry.toRoute<MonthPlanRoute>()
+                                val month = runCatching { java.time.YearMonth.parse(route.month) }.getOrNull()
+                                Gated(Feature.BUDGETS, features, enableFeature, back) {
+                                    if (month == null) {
+                                        LaunchedEffect(Unit) { back() }
+                                    } else {
+                                        val fmt = com.lucento.app.core.designsystem.component.amountFormat()
+                                        com.lucento.app.feature.budget.MonthPlanScreen(
+                                            month = month,
+                                            onBack = back,
+                                            onDone = { total ->
+                                                back()
+                                                // With the total it now adds up to, unless amounts are hidden (critic r2, P3-8).
+                                                val name = com.lucento.app.feature.home.monthLabel(month)
+                                                notify(if (total == null || fmt.hidden) "$name is planned" else "$name is planned: ${fmt.format(total)}")
+                                            },
+                                        )
+                                    }
                                 }
                             }
                             pushed<InsightsRoute>(reducedMotion) {
                                 Gated(Feature.INSIGHTS, features, enableFeature, back) { InsightsScreen(onBack = back, onAsk = { push(AskRoute) }) }
                             }
                             pushed<AskRoute>(reducedMotion) {
-                                Gated(Feature.INSIGHTS, features, enableFeature, back) { com.lucento.app.feature.ask.AskLucentoScreen(onBack = back) }
+                                Gated(Feature.INSIGHTS, features, enableFeature, back) {
+                                    // Voice entry turns the microphone on or off everywhere: here as in the composer.
+                                    com.lucento.app.feature.ask.AskLucentoScreen(onBack = back, voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY))
+                                }
                             }
 
                             pushed<WalletDetailRoute>(reducedMotion) { entry ->
@@ -644,6 +728,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     RecurringScreen(
                                         onBack = back,
                                         openScheduleId = route.scheduleId.takeIf { it != NO_SCHEDULE },
+                                        selectWalletId = route.selectWalletId.takeIf { it != NO_SCHEDULE },
                                         onAddSchedule = { push(RecurringEditRoute()) },
                                         onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
                                         onOpenWallet = { id -> push(WalletDetailRoute(id)) },
@@ -663,6 +748,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         onSaved = {
                                             back()
                                             notify("Recurring payment saved")
+                                        },
+                                        // The duplicate warning’s “Adjust existing”: leave the editor (and a Scheduled page under it, so
+                                        // Back doesn’t land on a second one) for Scheduled with that debt’s plans selected.
+                                        onAdjustExisting = { debtId ->
+                                            // Only from the editor on top: a second tap during the exit does nothing.
+                                            if (navController.currentBackStackEntry?.id == entry.id) {
+                                                navController.popBackStack()
+                                                if (navController.currentDestination?.hasRoute(RecurringRoute::class) == true) navController.popBackStack()
+                                                push(RecurringRoute(selectWalletId = debtId))
+                                            }
                                         },
                                     )
                                   }
@@ -899,11 +994,16 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ProfileDestination.PRO -> push(ProRoute())
                         ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
                         ProfileDestination.SIGN_OUT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, signOut = true))
+                        ProfileDestination.FOLLOW -> showFollow = true
                     }
                 },
                 onDismiss = { showProfile = false },
             )
         }
+    }
+
+    if (showFollow) {
+        com.lucento.app.feature.profile.FollowSheet(onDismiss = { showFollow = false })
     }
 
     // Lucento Pro: once, after a plan ends — what changed, and that nothing was removed.
@@ -940,6 +1040,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 transferNote = null
             },
             sourceNote = transferNote,
+            recentTransfers = editorState.transfers.values,
         )
     }
 }

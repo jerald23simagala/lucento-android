@@ -6,25 +6,28 @@ CSV export stays the spreadsheet of transactions.
 
 ## File
 
-Schema version **1** (`BackupMigrations.CURRENT`). Top-level fields:
+Schema version **6** (`BackupMigrations.CURRENT`). Top-level fields:
 
 | Field | Meaning |
 |---|---|
-| `schemaVersion` | Integer. This app writes 2 and can read older versions through `BackupMigrations`. A newer version is refused. |
+| `schemaVersion` | Integer. This app writes 6 (since 2026-11-22: the customisations that follow the account, below) and reads every older version through `BackupMigrations`. A newer version is refused. |
 | `appVersion` | The Lucento version that wrote the file (`BuildConfig.VERSION_NAME`). |
 | `exportedAt` | ISO-8601 instant. |
 | `wallets`, `categories`, `transactions`, `budgets`, `goals`, `goalContributions`, `recurring`, `debtTerms` | The Room rows. |
 | `deletions` | Unpushed and historical sync tombstones (`table`, stable `id`, `deletedAt`), so a restore can still tell the server about a delete. |
-| `settings` | Theme, main currency, enabled features, display name, onboarding and category-setup flags, default wallet, guide step, acknowledged budget month, Smarter reading. |
+| `settings` | Theme mode, main currency, enabled features, display name, onboarding and category-setup flags, default wallet, guide step, acknowledged budget month, Smarter reading (restored only as off, below). Since version 6 also the colour theme (`themeId`), Show cents, the Wallets view, hidden module offers and exchange rates online: each is null when the phone had no value of its own (the default), so a file never presents a default as a choice. Together these are the settings that follow the account in cloud sync (docs/SYNC.md "Settings"), plus the setup flags. |
 
 Amounts are integer minor units plus an ISO 4217 `currency`. Calendar dates are `YYYY-MM-DD`. Instants are ISO-8601 UTC.
 The stable id is the row's `client_uuid` (field name `id` in the file). Room's numeric id never leaves the device;
 foreign keys in the file are the parent's stable id.
 
 Not in the file: auth tokens, sessions, the Supabase key, the sync cursor, the synced account id, crash-report and
-usage preferences, the one-time local-data notice, `dirty` / `synced_at` / `base_revision`, and goal photo files.
-A custom goal photo stays on the phone that took it. Unknown fields, including anything named like a token, make the
-file invalid.
+usage preferences, the one-time local-data notice, the monthly check-in's two months (they follow the account in sync,
+docs/SYNC.md, but like the notices they are only about which card to show this month), which awards this phone already
+knows (`achievements_known`), `dirty` / `synced_at` / `base_revision`, and goal photo files.
+Each phone also keeps for itself online voice, Ask Lucento's AI answers (on or off, and the agreement to what they
+send), app lock, hiding Lucento in recent apps and hidden amounts. A custom goal photo stays on the phone that took it. Unknown fields, including anything
+named like a token, make the file invalid.
 
 ## Restore
 
@@ -38,13 +41,20 @@ The preview shows how many of each record the file contains and the earliest and
   category when the normalized name (trimmed, case-folded, internal spaces collapsed) and the kind both match, and
   every transaction, budget and schedule that used the file id is pointed at the local one. The preview says how many
   were matched. The same name with a different kind is a conflict: the preview says so and Merge keeps both.
-  Records only on this phone stay. Device preferences stay, except a default wallet that the merge removed.
+  Records only on this phone stay. This phone's preferences stay as they are (the file's are not applied), except a
+  default wallet that the merge removed.
 - **Replace** makes the file the whole ledger inside one Room transaction. Every restored row’s `updatedAt` (and a
   goal contribution’s `createdAt`, which sync sends as `updated_at`) is set to the restore time. The push has no
   base revision, so the server treats it as concurrent and skips it unless `updated_at` is strictly newer
   (`lucento_reject_stale_update`). Ids that were only on this phone are recorded as unpushed deletions, and sync
   uploads those tombstones with the current time. Preferences in the file replace theme, currency and the other
-  settings listed above. Crash reports are left alone.
+  settings listed above, but only where they change what the phone shows, and a value equal to the default is written as
+  no value (`applyBackupSettingsInto`). A version 6 customisation that is null in the file (no choice of its own, or a
+  version 5 or older file) leaves this phone's own. A Lucento Pro theme is restored only where the plan allows it
+  (`ProGates.themeAllowed`, read after the stored plan loads), so a file can't unlock one. Smarter reading is turned
+  off by a file that has it off, but never on: that needs this phone's own consent. The budget moment never goes back to
+  an earlier month. What the restore changes is the person's own change, so with sync on it goes up to the account and
+  the other phones (the Replace confirmation says so). Crash reports are left alone.
 
 If the write fails, the transaction rolls back and the previous ledger remains.
 
@@ -58,4 +68,7 @@ later `updatedAt` wins. The file does not pretend to be based on a server revisi
 called wallets `accounts` and stored dates as numbers (epoch milliseconds, or epoch days for calendar dates). The
 step renames and converts them and adds the collections version 0 did not have. Version 2 (app v10) adds
 `institutionId` to wallets and `month` / `effectiveFrom` to budgets; a version 1 file has none of them and reads as "no
-institution" and "every month". A new schema version adds the next step.
+institution" and "every month". Version 6 adds `themeId`, `showCents`, `walletsView`, `moduleOffersHidden` and
+`fxRatesOnline` to `settings`; the step from version 5 gives them null ("keep the phone's own"), and a version 5 file
+that already holds one of them is invalid. Lucento builds before version 6 refuse a version 6 file as "from a newer
+Lucento". A new schema version adds the next step.

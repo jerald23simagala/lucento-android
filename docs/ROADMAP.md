@@ -89,7 +89,8 @@ Next: on-device learning from corrections (M5), optional opt-in remote interpret
 Done: Room v6 sync bookkeeping (emulator-tested migration), push/pull/merge engine with tombstones and
 last-write-wins, WorkManager scheduling, Settings → Cloud sync, Supabase schema + RLS applied and verified.
 Remaining: Google OAuth clients + Supabase Google provider (blocks real sign-in), an end-to-end two-device test,
-recurring-schedule sync, syncing preferences.
+recurring-schedule sync. Syncing preferences: built 2026-11-22 (settings follow the account, docs/SYNC.md "Settings";
+needs `20261122090000_user_settings.sql` on each project).
 
 ## In progress — dashboard refresh (`feature/dashboard-refresh`)
 - Home: working header (brand, sync status, disabled notifications placeholder, profile, month selector); Budget pace
@@ -229,6 +230,8 @@ recurring-schedule sync, syncing preferences.
 ## M3 — Budgets
 - Monthly overall + per-category limits, rollover option, progress bars, "safe to spend per day", 80%/100% states.
 - Deterministic period math (calendar months in user time zone, custom start day). Tests for edge months.
+  Calendar months are built. The custom start day and other budget periods (payday, weekly, biweekly) are planned as
+  Pro after launch: audited 2026-11-16, rules and outline in `docs/handover/NEXT_TASKS.md` › "Custom budget periods".
 
 ## M4 — Goals
 - Target amount/date, contributions (optionally linked to a savings wallet), progress, projected completion date
@@ -246,6 +249,14 @@ recurring-schedule sync, syncing preferences.
 ## M7 — Receipt scanning (on-device OCR)
 - CameraX + ML Kit Text Recognition (bundled model, works offline). Extract total, date, merchant with heuristics;
   editable result screen; images never leave the device and are discarded after save unless the user keeps them.
+
+## Done — Lucento Scan, financial document intelligence (2026-11-22, `feature/scan-document-intelligence`)
+- Audit and roadmap phases 0–3 (owner-approved 2026-11-22): Document Scanner, PDF import (text layer, password,
+  OCR fallback), several pages and several receipts per scan, global currency/date/terminology, US and PH
+  statement layouts, reconciliation against the ledger, merchant dictionaries (~1,950 entities, 7 regions) and
+  learning from the person's own ledger. Independent 112-document benchmark in CI. docs/SCAN.md.
+- Next: consented photo corpus and phone test; phase 4 (optional AI reading) and phase 5 (line items) await owner
+  decisions (NEXT_TASKS SC-N1…N6).
 
 ## M8 — Recurring transactions
 - Rules (daily/weekly/monthly/yearly, end date/count); WorkManager materializes due items idempotently
@@ -271,6 +282,10 @@ recurring-schedule sync, syncing preferences.
 - Play Console answers (Data safety, App content, listing, Google sign-in SHA-1s, testing tracks):
   docs/play/PLAY_STORE_SUBMISSION.md. Website refresh with pricing, terms and deletion pages (`feature/site-refresh`).
 - Owner: OT-15 (migration), OT-16 (Play Console), legal review.
+- 2026-11-16 (`fix/edge-to-edge-deprecated-apis`): Play Console flagged 0.5.10 for edge-to-edge APIs Android 15
+  deprecated (`setStatusBarColor`, `setNavigationBarColor`, `LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES`), all inside
+  androidx.activity's `enableEdgeToEdge`. Lucento now draws edge to edge itself (`SystemBars.kt` + themes), and CI fails
+  a release that calls them again (docs/QUALITY.md).
 
 ## Built — Home-screen widgets (2026-11-12, `feature/home-widgets`)
 - Owner chose widgets only, both free (after exploring a Quick Settings tile, a type-in-the-shade notification and
@@ -284,6 +299,92 @@ recurring-schedule sync, syncing preferences.
 - Every row's height is planned (`WidgetFit.kt`), so nothing is cut at any size from 85 % to 200 % text (a test sweeps
   6 widths × 7 heights × 7 text sizes). From a widget, Speak and Scan start in an already open composer, and the
   microphone and camera wait for the launch logo and App lock.
+
+## Built — Fast capture by default, voice in Ask Lucento (2026-11-15, `feature/fast-capture-ask-voice`)
+- Owner: speech in the composer is fast, Smarter reading made every message wait for Gemini, and new users expect fast
+  input. The composer's Smarter reading switch is gone; it is turned on only in Settings › Privacy & security, whose row
+  and consent dialog now say first that adding transactions gets slower. While it is on, the composer's note and its
+  "Gemini is reading…" reply say so (docs/CAPTURE.md). Without a plan that includes it (Free, a Lifetime after its
+  year) the switch is locked with a Pro note and messages are never sent to be refused.
+- Ask Lucento has the composer's microphone (`VoiceInput`, one implementation for both screens; Voice entry shows or
+  hides both). A spoken question is asked when listening ends; words that can't be asked yet wait in the field
+  (docs/ASK.md "Speaking a question").
+
+## Built — Ask Lucento's AI answers on by default, confirmed once (2026-11-17, `feature/ai-answers-on-by-default`)
+- Owner: AI answers should be enabled, on Free too (10 questions a month; Pro 50 a day); Smarter reading stays Pro-only.
+  They are on for every signed-in account, and the first question shows what would be sent: nothing leaves the phone
+  until **Ask Gemini**; **Keep answers on this phone** turns them off (docs/ASK.md "Consent (v3)").
+- The allowance wording follows the plan ("N left this month" on Free, "N left today" with Pro). Privacy Policy and Terms
+  2026-11-17; the website's /privacy, privacy table and FAQ go live with the release that ships it.
+
+## Built — Tester round (2026-11-17, PRs #98–#101)
+- **Show cents** (#98): Settings › Money; off rounds every amount people read to whole units, never what they type.
+- **Shortcut palette** (#99): Home's shortcut tiles take each theme's own hues, measured to stay clear of the money colours.
+- **Account picker** (#100): Transfer, the transaction editor and the composer choose accounts from one picker, grouped
+  into four families with balances.
+- **Investments, spending money, two-figure Safe to spend, scheduled transfers** (#101, Room v14, waits for OT-38):
+  docs/CALCULATIONS.md "Safe to spend", "Money on hand", "Investments", "Scheduled outlook".
+
+## Built — Tester round 2026-11-18 (`feature/card-default-wallet` #107, `feature/scheduled-bulk-edit` #108, `feature/free-limits-pro-dialog` #109)
+- **A credit card can be the default wallet** (#107): expenses go to it; income and transfers go to cash, a bank or an
+  e-wallet. Home's hero reads "Assets"; the composer's picker "Select wallet to use".
+- **Scheduled bulk edit**: All schedules has a Select mode (Select all; Change day, Change amount, Pause / Resume,
+  Delete), each change in one step (docs/CALCULATIONS.md "Scheduled outlook").
+- **A second payment plan for one debt**: the scheduled-payment editor warns, with "Adjust existing" (Select mode with
+  that debt's plans selected) and "Add another".
+- **Free limits while setting up**: at 3 money wallets or 2 cards or loans the guided setup hides its add options and
+  says "You can edit these any time in Wallets.", with no mention of Pro; setup carries on.
+- **One Pro dialog at the tap**: every Pro wall (Add on a full count, a locked wallet type or currency, 6 / 12 months,
+  PDF statements, themes, sync, Smarter reading, Shared invites, the free AI allowance) is one dialog saying what the
+  Free plan includes, with **See Lucento Plan** and **Not now**; the inline lock notes are gone (docs/MONETIZATION.md §6.1).
+
+## Built — Pro experience: walls met again, previews (owner, 2026-11-19, `feature/pro-repeat-taps-previews`)
+- **A wall met again** in the same session is a short message with Unlock, in the app or inside the open sheet; the
+  first tap is still the dialog (#109).
+- **Insights 6 and 12 months**: a preview of the person's own months with the figures hidden, under the plan fact.
+- **Themes**: a Pro theme can be tried on in the profile sheet, never saved.
+- Audit and decisions: docs/monetization/PRO_EXPERIENCE_AUDIT_2026-11-19.md (no Home card, the dialog kept as built).
+
+## Built — Monthly budget card in three parts (2026-11-18, `feature/budget-card-constraints`)
+- Home's card: how much of the budget is spent (a half gauge), then Budget remaining and Spendable wallets side by side,
+  then Safe to spend, the lower of them, with the sentence that says which one set it. "To watch" has its own card.
+- The Budget tab shows the same two limits and Safe to spend under its hero, with Safe per day. The calculation is
+  the tester round's, unchanged (docs/CALCULATIONS.md "Home budget card and the Budget tab").
+
+## Built — Monthly check-in, Progress, Follow Lucento (owner, 2026-11-23, `feature/month-close`)
+- **Monthly check-in** (a tester: some costs aren't the same every month): a Home card from a month's last 3 days to the
+  7th of the next; the plan page is that month's budget with hints (yearly costs due, the same month last year, last
+  month's overspending), "Add something" for one-off amounts, and changes that start as that month's only. The Budget
+  tab plans up to 12 months ahead. Never a notification (that waits for opt-in reminders).
+- **Progress** replaces the awards sheet (a tester: awards were an outlier, a reward page with no function): a month's
+  recap from the app's own calculators, the 12-month year view (Pro, like Insights' 12 months) and the award cabinet with
+  Steady Month, Goal Reached and Loan Cleared (past progress recorded quietly on update).
+- **Follow Lucento** in the profile menu: Facebook, Instagram, TikTok and YouTube, opened by a tap; the Community group
+  stays for questions and ideas.
+- docs/CALCULATIONS.md "Monthly check-in" and "Progress recap" (now "Milestones recap"); no Room or Supabase change (two ledger settings in the
+  account document).
+
+## Built — AI allowance per month; Gemini is for Ask Lucento (owner, 2026-11-23, `feature/ai-allowance-monthly`)
+- Owner: $2 a month of AI per Pro account was too much against the subscription; "Gemini is generally for Ask use and
+  not for simple add transaction work". Every plan now runs per calendar month: **Free 5, Pro 45** (was 10 a month and
+  50 a day under a 400 monthly ceiling), at most about $0.23 a Pro account on Gemini 3.5 Flash-Lite, production's model
+  since the same day (docs/MONETIZATION.md §4.5).
+- Smarter reading stays a Pro opt-in in Settings, now with the caveat that each message uses one of the same AI
+  questions; the composer no longer mentions it, and everyone who had it on is asked again (docs/CAPTURE.md). A reply
+  Gemini read says how many AI questions are left; Ask says "N left this month" on every plan.
+- Server: `supabase/migrations/20261123120000_ai_allowance_monthly.sql`; website wording in lucento-website
+  `copy/ai-allowance-monthly`.
+
+## Built — Milestones: the budget year, Awards on their own page (owner, 2026-11-23, `feature/milestones-budget-year`)
+- Progress is now **Milestones**. Its year is the **budget year**: January to December as 12 flat colour squares in the
+  Budget tab's levels (on track, getting close, over, no budget), each with its month and the share of the budget used
+  ("so far" for the running month, an outline for months to come), the title and the year switcher on one line, and
+  the year's totals as a bulleted outline with its figures in bold. Pro, previewed on Free with the person's own months
+  in grey. Owner review the same day: the year on top; a month's recap moved to its own page, opened from its square
+  (Free too) and from Home's check-in card.
+- **Awards** has its own page, from the card at the top of Milestones (three small medals on its right) and from an
+  award ceremony's "See all awards".
+- docs/CALCULATIONS.md "Milestones recap"; no Room or Supabase change.
 
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).

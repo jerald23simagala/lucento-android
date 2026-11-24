@@ -1,0 +1,49 @@
+{
+  "id": "ph-receipt-ace-hardware-noise-01",
+  "country": "PH",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-10-29",
+  "pages": [
+    [
+      "ACE HARDWARE",
+      "Ace Hardware Philippines, Inc.",
+      "SM City Fairview, Quirino Hwy cor Regalado Ave., Quez0n City",
+      "VAT REG TIN: 000-404-883-00045",
+      "SI No. 0045-0091822  10/28/2026 2:31 PM",
+      "B0YSEN PERMACOAT LATEX 4L  1  1,185.00",
+      "PAlNT ROLLER 9IN W/ TRAY  1  329.75",
+      "MASKING TAPE 2IN  3 @ 65.00  195.00",
+      "OMNI LED BULB 9W  4 @ 99.75  399.00",
+      "TOTAL :  2,108.75",
+      "METROBANK VISA  ************7756  2,108.75",
+      "APPR 004418",
+      "VATable Sales  1,882.81",
+      "VAT Amount  225.94",
+      "VAT-Exempt Sales  0.00",
+      "Zero-Rated Sales  0.00",
+      "SM Advantage points: 21.09",
+      "THIS SERVES AS YOUR SALES INVOICE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "ACE Hardware",
+        "total": "2108.75",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-28",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "home_supplies",
+        "paymentInstrument": "Visa",
+        "instrumentLast4": "7756"
+      }
+    ]
+  },
+  "notes": "OCR noise: 'B0YSEN', 'PAlNT', 'Quez0n', stray colon after TOTAL. Metrobank-issued Visa (instrument Visa)."
+}

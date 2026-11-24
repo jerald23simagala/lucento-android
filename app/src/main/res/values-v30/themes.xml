@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 11+: draw into cutouts on every edge, as Android 15 does for apps targeting SDK 35+. -->
+    <style name="Theme.Lucento" parent="Base.Theme.Lucento">
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+    </style>
+</resources>

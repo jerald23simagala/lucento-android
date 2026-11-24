@@ -9,6 +9,7 @@ import com.lucento.app.domain.TransactionType.INCOME
 import com.lucento.app.domain.TransactionType.TRANSFER_OUT
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletType
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -225,5 +226,43 @@ class BatchEntryParserTest {
     @Test fun nothingToRecord() {
         assertTrue(parse("hello there").isEmpty())
         assertTrue(parse("   ").isEmpty())
+    }
+
+    // A message holding more than is read at once says so instead of dropping the rest silently (launch-film discovery,
+    // KNOWN_ISSUES "Found while verifying the launch film").
+
+    @Test fun aMessagePastTheRowLimitSaysHowManyWereLeftOut() {
+        val message = BatchEntryParser.parseMessage((1..33).joinToString(", ") { "coffee ${100 + it}" }, context)
+        assertEquals(BatchEntryParser.MAX_ROWS, message.items.size)
+        assertEquals(3, message.leftOut)
+        assertEquals(
+            "Read the first 30 transactions. Send the rest in another message.",
+            CaptureLimits.note(message.leftOut, message.inputCut),
+        )
+    }
+
+    @Test fun textPastTheInputLimitIsCalledOut() {
+        val message = BatchEntryParser.parseMessage("coffee 180 " + "x".repeat(BatchEntryParser.MAX_INPUT), context)
+        assertTrue(message.inputCut)
+        assertEquals(0, message.leftOut)
+        assertEquals(
+            "Read the first 2,000 characters. Send the rest in another message.",
+            CaptureLimits.note(message.leftOut, message.inputCut),
+        )
+    }
+
+    @Test fun anOrdinaryMessageCarriesNoLimitNote() = runBlocking {
+        val message = BatchEntryParser.parseMessage("Lunch 250, groceries 800", context)
+        assertEquals(0, message.leftOut)
+        assertEquals(false, message.inputCut)
+        val read = LocalTransactionInterpreter().interpretText("Lunch 250, groceries 800", context) as Interpretation.Candidates
+        assertNull(read.note)
+    }
+
+    @Test fun theInterpreterPutsTheLimitNoteInTheReply() = runBlocking {
+        val read = LocalTransactionInterpreter().interpretText((1..31).joinToString(", ") { "lunch ${200 + it}" }, context)
+            as Interpretation.Candidates
+        assertEquals(30, read.items.size)
+        assertEquals("Read the first 30 transactions. Send the rest in another message.", read.note)
     }
 }

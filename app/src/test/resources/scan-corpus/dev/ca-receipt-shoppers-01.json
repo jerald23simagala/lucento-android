@@ -1,0 +1,53 @@
+{
+  "id": "ca-receipt-shoppers-01",
+  "country": "CA",
+  "type": "RETAIL_RECEIPT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-15",
+  "pages": [
+    [
+      "SHOPPERS DRUG MART",
+      "#1074  388 Yonge St",
+      "Toronto ON  M5B 1S7",
+      "(416) 979-2424",
+      "HST# 81234 5678 RT0001",
+      "OCT 14 2026  12:48  REG 03  TRN 5521",
+      "ADVIL LIQUI-GELS 40  12.99 H",
+      "LIFE BRAND VITAMIN C 500MG  9.99 H",
+      "KLEENEX ULTRA 6PK  8.99 H",
+      "DENTYNE ICE  1.79 H",
+      "COCA-COLA 591ML  2.49 H",
+      "SUBTOTAL  36.25",
+      "HST 13%  4.71",
+      "TOTAL  $40.96",
+      "INTERAC  $40.96",
+      "ACCT: CHEQUING",
+      "CARD: ************2051",
+      "AUTH#: 019284",
+      "APPROVED - THANK YOU",
+      "PC Optimum points earned: 360",
+      "PC Optimum balance: 18,420",
+      "H = HST APPLICABLE"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "Shoppers Drug Mart",
+        "total": "40.96",
+        "currency": "CAD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-14",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "pharmacy",
+        "paymentInstrument": "Interac",
+        "instrumentLast4": "2051"
+      }
+    ]
+  },
+  "notes": "Only '$' printed; Toronto ON address and HST make it CAD. Loyalty points balance is not money."
+}

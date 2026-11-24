@@ -198,6 +198,15 @@ fun ReportSheet(
     val openPro = com.lucento.app.feature.pro.LocalOpenPro.current
     var report by remember(initial) { mutableStateOf(initial) }
     var message by remember { mutableStateOf<String?>(null) }
+    var pdfWall by remember { mutableStateOf(false) }
+    if (pdfWall) {
+        com.lucento.app.feature.pro.ProWallDialog(
+            com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS),
+            onDismiss = { pdfWall = false },
+            // The report sheet closes first, then the plan page opens.
+            open = { feature -> onDismiss(); openPro(feature) },
+        )
+    }
     val current = remember { YearMonth.now() }
     val saver = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) onSave(report, uri, context.contentResolver) { ok -> message = if (ok) "Saved as a PDF." else "The PDF couldn’t be saved. Try again." }
@@ -244,21 +253,21 @@ fun ReportSheet(
                 Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
                 Spacer(Modifier.height(Spacing.sm))
             }
-            if (pdfLocked) {
-                com.lucento.app.feature.pro.ProNote(
-                    com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS),
-                    from = com.lucento.app.domain.entitlement.ProFeature.PDF_STATEMENTS,
-                    open = { feature -> onDismiss(); openPro(feature) },
-                )
-                Spacer(Modifier.height(Spacing.lg))
-                return@Column
-            }
-            LucentoPrimaryButton(text = "Save as PDF", icon = Icons.Outlined.PictureAsPdf, onClick = { saver.launch(ReportPdfWriter.fileName(report)) })
+            // Save and Share are always offered; on a plan without PDFs they open the Pro dialog (owner, 2026-11-18).
+            LucentoPrimaryButton(
+                text = if (pdfLocked) "Save as PDF · Pro" else "Save as PDF",
+                icon = Icons.Outlined.PictureAsPdf,
+                onClick = { if (pdfLocked) pdfWall = true else saver.launch(ReportPdfWriter.fileName(report)) },
+            )
             Spacer(Modifier.height(Spacing.sm))
             LucentoSecondaryButton(
-                text = "Share",
+                text = if (pdfLocked) "Share · Pro" else "Share",
                 icon = Icons.Outlined.Share,
                 onClick = {
+                    if (pdfLocked) {
+                        pdfWall = true
+                        return@LucentoSecondaryButton
+                    }
                     onShare(report) { file ->
                         if (file == null) {
                             message = "The PDF couldn’t be prepared. Try again."

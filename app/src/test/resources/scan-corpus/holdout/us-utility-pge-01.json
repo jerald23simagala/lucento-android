@@ -1,0 +1,55 @@
+{
+  "id": "us-utility-pge-01",
+  "country": "US",
+  "type": "UTILITY_BILL",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-11-10",
+  "pages": [
+    [
+      "PG&E",
+      "ENERGY STATEMENT",
+      "www.pge.com/MyEnergy",
+      "Account No: 1234567890-1",
+      "Statement Date: 10/18/2026",
+      "Due Date: 11/09/2026",
+      "Service For:",
+      "DANIEL PARK",
+      "2290 BUSH ST APT 5",
+      "SAN FRANCISCO, CA 94115",
+      "Questions about your bill?",
+      "Monday-Friday 7 a.m.-9 p.m.  Saturday 8 a.m.-6 p.m.  Phone: 1-866-743-0335",
+      "Your Account Summary",
+      "Amount Due on Previous Statement  $187.44",
+      "Payment(s) Received Since Last Statement  -187.44",
+      "Previous Unpaid Balance  $0.00",
+      "Current PG&E Electric Delivery Charges  $79.62",
+      "CleanPowerSF Electric Generation Charges  38.15",
+      "Current Gas Charges  41.87",
+      "Total Amount Due by 11/09/2026  $159.64",
+      "Electric usage this period: 214.000000 kWh, 30 billing days",
+      "Gas usage this period: 18.000000 Therms",
+      "Please return this portion with your payment.",
+      "Amount Due  $159.64  Amount Enclosed  $__________"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "RECEIPT",
+        "merchant": "PG&E",
+        "total": "159.64",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "date": "2026-10-18",
+        "dateAmbiguous": false,
+        "direction": "OUT",
+        "category": "utilities",
+        "paymentInstrument": null,
+        "instrumentLast4": null
+      }
+    ]
+  },
+  "notes": "Electric delivery + CleanPowerSF generation + gas = amount due. Usage figures with six decimals are not money."
+}

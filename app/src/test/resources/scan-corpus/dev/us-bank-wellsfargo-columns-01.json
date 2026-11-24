@@ -1,0 +1,252 @@
+{
+  "id": "us-bank-wellsfargo-columns-01",
+  "country": "US",
+  "type": "BANK_STATEMENT",
+  "source": "PDF_TEXT",
+  "script": "LATIN",
+  "noise": false,
+  "today": "2026-10-06",
+  "pages": [
+    [
+      "Everyday Checking",
+      "Account number: 9182044417  September 1, 2026 - September 30, 2026  Page 1 of 2",
+      "JORDAN KIM",
+      "1530 NW 57TH ST UNIT 204",
+      "SEATTLE WA 98107-3361",
+      "Questions?",
+      "Available by phone 24 hours a day, 7 days a week:",
+      "1-800-TO-WELLS (1-800-869-3557)",
+      "Online: wellsfargo.com",
+      "Write: Wells Fargo Bank, N.A. (182)",
+      "P.O. Box 6995",
+      "Portland, OR 97228-6995",
+      "Statement period activity summary",
+      "Beginning balance on 9/1  $1,034.56",
+      "Deposits/Additions  4,045.30",
+      "Withdrawals/Subtractions  - 1,768.65",
+      "Ending balance on 9/30  $3,311.21",
+      "Account number: 9182044417",
+      "JORDAN KIM",
+      "Washington account terms and conditions apply",
+      "For Direct Deposit use",
+      "Routing Number (RTN): 125008547",
+      "Transaction history",
+      "Check  Deposits/  Withdrawals/  Ending daily",
+      "Date  Number  Description  Additions  Subtractions  balance",
+      "9/1  Online Transfer From Way2Save Savings xxxxxx5678 Ref #Ib0Gv7Tbq4 on 09/01/26  300.00  1,334.56",
+      "9/2  Purchase authorized on 08/31 Starbucks Store 12345 Seattle WA S386243612345678 Card 1234  6.45",
+      "9/2  ATM Withdrawal authorized on 09/02 1000 2nd Ave Seattle WA 0004321 ATM ID 0021T Card 1234  100.00  1,228.11",
+      "9/3  Zelle to Lopez Maria on 09/03 Ref #RP0Y8Xkq3Z Rent Share  700.00  528.11",
+      "9/5  Northwind Studio Payroll 090526 xxxxx4417 Jordan Kim  1,842.65  2,370.76",
+      "9/8  Purchase authorized on 09/05 Sq *Blue Bottle Coffee Seattle WA  9.80",
+      "S586248612345678 Card 1234",
+      "9/8  Recurring Payment authorized on 09/06 Spotify USA 877-7781161 NY  11.99  2,348.97",
+      "S466249901234567 Card 1234",
+      "9/9  1187  Check  145.00  2,203.97",
+      "9/10  Puget Sound Ener Utility Pmt 090926 220011873 Jordan Kim  96.42  2,107.55",
+      "9/12  Purchase authorized on 09/11 Amazon.com*2K7Pw0Ab3 Amzn.com/bill WA  38.99  2,068.56",
+      "S386254701234567 Card 1234",
+      "9/15  Venmo Cashout 1023456789 PPD ID 3264681992 Jordan Kim  60.00  2,128.56",
+      "Sheet Seq = 0284113",
+      "Sheet 00001 of 00002"
+    ],
+    [
+      "Everyday Checking  Account number: 9182044417  September 1, 2026 - September 30, 2026  Page 2 of 2",
+      "Transaction history (continued)",
+      "Check  Deposits/  Withdrawals/  Ending daily",
+      "Date  Number  Description  Additions  Subtractions  balance",
+      "9/16  Purchase authorized on 09/14 Tst* The Habit - Seattle Seattle WA S306257812345678 Card 1234  16.37  2,112.19",
+      "9/19  Northwind Studio Payroll 091926 xxxxx4417 Jordan Kim  1,842.65  3,954.84",
+      "9/22  Online Transfer to Kim J Wells Fargo Active Cash Visa Card xxxx2204 Ref #Ib0H3Wq8Ns on  450.00  3,504.84",
+      "09/22/26",
+      "9/23  Purchase authorized on 09/22 Safeway #1551 Seattle WA P00000000123456789 Card 1234  72.18  3,432.66",
+      "9/25  Purchase authorized on 09/24 Apple.Com/Bill 866-712-7753 CA S386267801234567 Card 1234  9.99  3,422.67",
+      "9/26  T-Mobile Pcs Svc 092526 3381457 Jordan Kim  70.00  3,352.67",
+      "9/29  Purchase authorized on 09/27 Uber *Eats Help.Uber.Com CA S306270912345678 Card 1234  31.46  3,321.21",
+      "9/30  Monthly Service Fee  10.00  3,311.21",
+      "Ending balance on 9/30  3,311.21",
+      "Totals  $4,045.30  $1,768.65",
+      "The Ending Daily Balance does not reflect any pending withdrawals or holds on deposited funds that may have been outstanding",
+      "on your account when your transactions posted. If you had insufficient available funds when a transaction posted, fees may have",
+      "been assessed.",
+      "Monthly service fee summary",
+      "Fee period 09/01/2026 - 09/30/2026  Standard monthly service fee $10.00  You paid $10.00",
+      "The fee is shown in the Transaction history on the last day of the fee period.",
+      "Sheet Seq = 0284114",
+      "Sheet 00002 of 00002"
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "CHECKING",
+        "institution": "Wells Fargo",
+        "currency": "USD",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "1034.56",
+        "closingBalance": "3311.21",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-09-01",
+            "description": "Online Transfer From Way2Save",
+            "amount": "300.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-02",
+            "description": "Starbucks Store 12345",
+            "amount": "6.45",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Starbucks"
+          },
+          {
+            "date": "2026-09-02",
+            "description": "ATM Withdrawal authorized on 09/02",
+            "amount": "100.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-03",
+            "description": "Zelle to Lopez Maria",
+            "amount": "700.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-05",
+            "description": "Northwind Studio Payroll",
+            "amount": "1842.65",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-08",
+            "description": "Sq *Blue Bottle Coffee",
+            "amount": "9.80",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Blue Bottle Coffee"
+          },
+          {
+            "date": "2026-09-08",
+            "description": "Spotify USA",
+            "amount": "11.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Spotify"
+          },
+          {
+            "date": "2026-09-09",
+            "description": "1187",
+            "amount": "145.00",
+            "direction": "OUT",
+            "kind": "CHECK",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-10",
+            "description": "Puget Sound Ener",
+            "amount": "96.42",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Puget Sound Energy"
+          },
+          {
+            "date": "2026-09-12",
+            "description": "Amazon.com*2K7Pw0Ab3",
+            "amount": "38.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Amazon"
+          },
+          {
+            "date": "2026-09-15",
+            "description": "Venmo Cashout",
+            "amount": "60.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-16",
+            "description": "Tst* The Habit",
+            "amount": "16.37",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Habit"
+          },
+          {
+            "date": "2026-09-19",
+            "description": "Northwind Studio Payroll",
+            "amount": "1842.65",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-22",
+            "description": "Active Cash Visa Card xxxx2204",
+            "amount": "450.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-09-23",
+            "description": "Safeway #1551",
+            "amount": "72.18",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Safeway"
+          },
+          {
+            "date": "2026-09-25",
+            "description": "Apple.Com/Bill",
+            "amount": "9.99",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Apple"
+          },
+          {
+            "date": "2026-09-26",
+            "description": "T-Mobile",
+            "amount": "70.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "T-Mobile"
+          },
+          {
+            "date": "2026-09-29",
+            "description": "Uber *Eats",
+            "amount": "31.46",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Uber Eats"
+          },
+          {
+            "date": "2026-09-30",
+            "description": "Monthly Service Fee",
+            "amount": "10.00",
+            "direction": "OUT",
+            "kind": "FEE",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Credit/debit columns collapse into one amount cell per line; only the last line of each day carries the ending daily balance. Some descriptions wrap onto a second line. Dates are the posting-date column. Fee summary block repeats $10.00 but is not a second fee."
+}

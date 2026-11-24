@@ -53,6 +53,12 @@ data class WalletsUiState(
 
     /** What the list shows after the side filter. */
     val shown: List<Wallet> get() = WalletsOverview.filter(wallets, side)
+
+    /** The wallets for the editor's early plan check, or null while the list is still loading (the save still checks). */
+    val planWallets: List<Wallet>? get() = if (loading) null else wallets
+
+    /** The main currency for that check: null while loading, never the "USD" placeholder. */
+    val planMainCurrency: String? get() = if (loading) null else primaryCurrency
 }
 
 /** Editable form state for creating or updating a wallet. */
@@ -62,7 +68,7 @@ data class WalletDraft(
     val type: WalletType = WalletType.CASH,
     val currencyCode: String,
     val amountText: String = "",
-    /** "Default wallet": new transactions go here. Only kept for spendable types (cash, bank, e-wallet). */
+    /** "Default wallet": new transactions go here. Kept for cash, bank, e-wallets and credit cards (expenses only). */
     val isDefault: Boolean = false,
     // Debt details, kept only for a card or loan (see DebtTerms).
     /** Yearly interest rate as typed, e.g. "12.5"; optional. */
@@ -85,6 +91,14 @@ data class WalletDraft(
     val institutionId: String? = null,
     /** Multicurrency: for a wallet in another currency, 1 unit = this many of the main currency, as typed ("63.69"). */
     val fxRateText: String = "",
+    /** v14 (tester round, 2026-11-17): the kind of investment, owned thing or loan; null = not chosen. */
+    val kind: com.lucento.app.domain.WalletKind? = null,
+    /** v14: the icon for a wallet without a bank logo ([com.lucento.app.domain.WalletIcon] key); null = its kind's or type's. */
+    val iconKey: String? = null,
+    /** v14: counts as spending money for Safe to spend; null = untouched, the type's default. */
+    val spendable: Boolean? = null,
+    /** v14: a card's part of its credit counted as spending money, as typed. */
+    val spendableCreditText: String = "",
 )
 
 sealed interface DraftError {
@@ -99,7 +113,12 @@ sealed interface DraftError {
     data class TypeLocked(val usage: WalletUsage) : DraftError
     data object NotFound : DraftError
     /** Lucento Pro: the plan doesn't allow this wallet; [message] says the limit and that nothing existing changes. */
-    data class PlanLimit(val feature: com.lucento.app.domain.entitlement.ProFeature, val message: String) : DraftError
+    data class PlanLimit(
+        val feature: com.lucento.app.domain.entitlement.ProFeature,
+        val message: String,
+        val used: Int? = null,
+        val limit: com.lucento.app.domain.entitlement.Limit? = null,
+    ) : DraftError
     data object InterestInvalid : DraftError
     data object TermInvalid : DraftError
     data object InstallmentInvalid : DraftError
@@ -116,6 +135,10 @@ sealed interface DraftError {
     data object AmountDueInvalid : DraftError
     /** The amount due is more than the card's balance. */
     data object AmountDueTooHigh : DraftError
+    /** A card counted as spending money needs how much of its credit counts: a number above zero. */
+    data object SpendableCreditInvalid : DraftError
+    /** More of the card's credit than its limit. */
+    data object SpendableCreditTooHigh : DraftError
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -180,6 +203,11 @@ class WalletsViewModel(
 
     private var saving = false
 
+    /** Tester round (2026-11-17): counts wallet [id] as spending money for Safe to spend, or not. */
+    fun setSpendable(id: Long, spendable: Boolean) {
+        viewModelScope.launch { runCatching { wallets.setSpendable(id, spendable) } }
+    }
+
     /**
      * Validates and persists [draft]. [onResult] receives the first error (null on success) and the saved wallet's id.
      * Re-entrant taps while a save is in flight are ignored to prevent duplicate wallets. Creating a card or loan also
@@ -224,6 +252,20 @@ class WalletsViewModel(
             null
         }
 
+        // Tester round (2026-11-17): the spending-money choice, and for a card the credit it counts ([CardSpending]).
+        val spending = CardSpending.of(draft.type, draft.spendable, draft.spendableCreditText, debt?.creditLimit, draft.currencyCode, decimalSeparator)
+        val (spendable, spendableCredit) = when (spending) {
+            CardSpending.Unreadable -> return onResult(DraftError.SpendableCreditInvalid, null)
+            CardSpending.AboveLimit -> return onResult(DraftError.SpendableCreditTooHigh, null)
+            is CardSpending.Save -> spending.spendable to spending.credit
+        }
+        val extras = com.lucento.app.data.repository.WalletExtras(
+            kind = draft.kind?.takeIf { it.type == draft.type },
+            iconKey = draft.iconKey,
+            spendable = spendable,
+            spendableCredit = spendableCredit,
+        )
+
         saving = true
         viewModelScope.launch {
             // Multicurrency: a wallet in another currency is valued at a rate into the main currency (required).
@@ -236,9 +278,9 @@ class WalletsViewModel(
             val result = try {
                 val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
                 if (draft.id == null) {
-                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate, unbilledAtSetup = unbilled)
+                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate, unbilledAtSetup = unbilled, extras = extras)
                 } else {
-                    wallets.update(draft.id, draft.name, draft.type, amount, debt, institution).also { saved ->
+                    wallets.update(draft.id, draft.name, draft.type, amount, debt, institution, extras).also { saved ->
                         if (saved is WalletRepository.SaveResult.Saved && rate != null) wallets.setFxBasis(draft.id, rate)
                     }
                 }
@@ -266,6 +308,8 @@ class WalletsViewModel(
                     WalletRepository.SaveResult.NotFound, WalletRepository.SaveResult.NotPermitted -> DraftError.NotFound
                     is WalletRepository.SaveResult.LimitReached -> DraftError.PlanLimit(
                         result.feature, com.lucento.app.feature.pro.ProCopy.limitReachedLine(result.feature, result.used, result.limit),
+                        used = result.used,
+                        limit = result.limit,
                     )
                     is WalletRepository.SaveResult.ProRequired ->
                         DraftError.PlanLimit(result.feature, com.lucento.app.feature.pro.ProCopy.lockedLine(result.feature))
@@ -329,11 +373,21 @@ class WalletsViewModel(
         return DebtParse.Valid(DebtTerms(interestRateBps = rate, repayment = DebtRepayment.MONTHLY, termMonths = months, installment = installment))
     }
 
+    /**
+     * The editor's draft of [wallet] with its real Default switch, once the list (and so the default) has loaded: a tap
+     * on Edit while it loads opens the editor a moment later rather than with the switch off, which saving would apply
+     * (a default card edited from the budget card stopped being the default; QA 2026-11-19).
+     */
+    suspend fun draftFor(wallet: Wallet): WalletDraft {
+        val loaded = uiState.first { !it.loading }
+        return wallet.toDraft(isDefault = wallet.id == loaded.defaultWalletId)
+    }
+
     /** Makes the saved wallet the default, or stops it being one (unticked, or changed to a non-spending type). */
     private suspend fun applyDefault(id: Long, draft: WalletDraft) {
         val current = preferences.preferences.first().defaultWalletId
         when {
-            draft.isDefault && draft.type.isSpendable -> if (current != id) preferences.setDefaultWallet(id)
+            draft.isDefault && draft.type.canBeDefault -> if (current != id) preferences.setDefaultWallet(id)
             current == id -> preferences.setDefaultWallet(null)
         }
     }
@@ -350,5 +404,39 @@ class WalletsViewModel(
 
     companion object {
         val Factory = containerFactory { WalletsViewModel(it.wallets, it.preferences, it.categories, it.transactions) }
+    }
+}
+
+/**
+ * What the wallet editor saves for spending money (tester round, 2026-11-17). A card counts credit only with a limit:
+ * the credit entered must read as an amount ([Unreadable]) no larger than the limit ([AboveLimit]). Without a limit
+ * (cleared, or a type changed to card) the choice saves as off rather than being refused — the switch can't be used
+ * without one, so refusing would leave no way to save (QA, 2026-11-17). A card's credit turned off is kept as zero, not
+ * cleared, so the change syncs. Other types keep their choice and never count credit.
+ */
+internal sealed interface CardSpending {
+    data class Save(val spendable: Boolean?, val credit: Money?) : CardSpending
+    data object Unreadable : CardSpending
+    data object AboveLimit : CardSpending
+
+    companion object {
+        fun of(
+            type: WalletType,
+            spendable: Boolean?,
+            creditText: String,
+            limit: Money?,
+            currencyCode: String,
+            decimalSeparator: Char,
+        ): CardSpending {
+            if (type != WalletType.CREDIT_CARD) return Save(spendable, null)
+            if (spendable == true && limit != null) {
+                val credit = (MoneyParser.parse(creditText, currencyCode, decimalSeparator) as? MoneyParser.Result.Success)
+                    ?.money?.takeIf { it.amountMinor > 0L } ?: return Unreadable
+                return if (credit > limit) AboveLimit else Save(true, credit)
+            }
+            val choice = if (spendable == true) false else spendable
+            val credit = if (creditText.isNotBlank() || spendable == true) Money.zero(currencyCode) else null
+            return Save(choice, credit)
+        }
     }
 }

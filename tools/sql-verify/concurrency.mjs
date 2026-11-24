@@ -1,6 +1,7 @@
-// Concurrency checks for the row ceilings and the usage-count caps (20261111090000_cloud_write_gate_and_quotas.sql):
-// several sessions race one limit at the same moment, which PGlite (one connection) can't do. Needs a real, THROWAWAY
-// Postgres 15+ server, reached as its superuser `postgres`:
+// Concurrency checks for the row ceilings and the usage-count caps (20261111090000_cloud_write_gate_and_quotas.sql) and
+// for Mission Control's Marketing approvals (20261117090000_mission_control_marketing.sql: one advisory lock serialises
+// every writer, and the feedback reader waits for them): several sessions race at the same moment, which PGlite (one
+// connection) can't do. Needs a real, THROWAWAY Postgres 15+ server, reached as its superuser `postgres`:
 //
 //   DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres node concurrency.mjs
 //
@@ -172,6 +173,267 @@ try {
     check(
       outcomes.filter(Boolean).length === 25 && rows[0].n === 25,
       `C4 forty concurrent anonymous counts with new install ids, daily total 25: exactly ${rows[0].n} stored`,
+    );
+  }
+
+  // ---------------------------------------------------------------- Marketing approvals (MARKETING_APPROVALS.md §3.1)
+  // Each race: session A opens a transaction and makes its call, which takes the marketing lock and keeps it until A
+  // commits; session B makes its call meanwhile and must wait (seen as a lock B's own backend hasn't been granted), then
+  // act on what A committed. B usually waits for the marketing lock (advisory); two calls by the same admin (MC3) are
+  // already serialised one step earlier, on the gate's hourly counter row (a transaction lock), and that is just as good.
+  const admin = '7a1b5c2e-0000-4000-8000-0000000000a1';
+  const adminSession = '7a1b5c2e-0000-4000-8000-0000000000a2';
+  await setup.query(
+    `insert into auth.users (id, email, email_confirmed_at, aud, role) values ($1, 'ops@lucento-test.invalid', now(), 'authenticated', 'authenticated')`,
+    [admin],
+  );
+  await setup.query(`insert into mc.admins (user_id, email, display_name) values ($1, 'ops@lucento-test.invalid', 'Ops')`, [admin]);
+  await setup.query(`insert into auth.sessions (id, user_id, aal, created_at) values ($1, $2, 'aal2', now())`, [adminSession, admin]);
+  const secret = (await setup.query(`select mc.rotate_ingest_secret('marketing') as s`)).rows[0].s;
+  // The owner in Mission Control: signed in, verified code (aal2), within the session's 12 hours.
+  const asOwner = async () => {
+    const c = await connect();
+    await c.query(`select set_config('request.jwt.claims', $1, false)`,
+      [JSON.stringify({ sub: admin, role: 'authenticated', aal: 'aal2', session_id: adminSession })]);
+    await c.query('set role authenticated');
+    return c;
+  };
+  // Claude's tool, through the console's routes: anon with the marketing secret.
+  const asClaude = async () => {
+    const c = await connect();
+    await c.query('set role anon');
+    return c;
+  };
+  const card = (key, version, extra = {}) => ({
+    key, position: 0, kind: 'post', phase: 'any', title: `Race ${key}`, slot_day: null, slot_time: null, slot_label: '',
+    platforms: ['Lucento Page'], version, changes: version > 1 ? `Version ${version}` : null, caption: `Caption ${version}`,
+    truth: 'pass. T1', media: [], ...extra,
+  });
+  const pack = (key, cards) => ({ pack: { key, title: `Race ${key}`, starts_on: '2026-11-23', ends_on: '2026-11-29' }, cards });
+  const push = (c, p) =>
+    c.query(`select mc_api.ingest_marketing_pack($1, 'test', $2::jsonb) as j`, [secret, JSON.stringify(p)]).then((r) => r.rows[0].j);
+  const decide = (c, id, version, decision, note = null) =>
+    c.query(`select mc_api.marketing_decide($1, $2, $3, $4, null) as j`, [id, version, decision, note]).then((r) => r.rows[0].j);
+  const cardRow = async (key) =>
+    (await setup.query(`select id, state, current_version, decided_at from mc.marketing_cards where key = $1`, [key])).rows[0];
+  const pidOf = async (c) => (await c.query('select pg_backend_pid() as p')).rows[0].p;
+  const waitingForLock = async (pid) => {
+    await new Promise((r) => setTimeout(r, 300));
+    return (await setup.query(`select count(*)::int as n from pg_locks where pid = $1 and not granted`, [pid])).rows[0].n;
+  };
+  {
+    const c = await asClaude();
+    const created = await push(c, pack('race-1', [card('r1', 1), card('r2', 1), card('r4', 1)]));
+    await c.end();
+    check(created.ok && created.cards.every((x) => x.result === 'created'), `M-setup Claude pushes three text-only posts (${JSON.stringify(created.cards)})`);
+  }
+
+  // MC1: the owner approves version 1 while Claude pushes version 2. The push waits, then revises the approved post: it
+  // waits for the owner again, the approval cleared.
+  {
+    const r1 = await cardRow('r1');
+    const [a, b] = [await asOwner(), await asClaude()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const approved = await decide(a, r1.id, 1, 'approve');
+    const pushing = push(b, pack('race-1', [card('r1', 2)]));
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const pushed = await pushing;
+    await Promise.all([a.end(), b.end()]);
+    const after = await cardRow('r1');
+    check(
+      approved.ok && approved.state === 'approved' && waited >= 1 && pushed.cards[0].result === 'revised'
+        && after.state === 'waiting' && after.current_version === 2 && after.decided_at === null,
+      `MC1 approve v1 racing a push of v2: the push waits (${waited}) and revises; the post waits again at v2 (${after.state}, v${after.current_version})`,
+    );
+  }
+
+  // MC2: the other order. Claude's push of version 3 holds the lock; the owner's approval of version 2 waits, then is
+  // refused as stale: version 3 is what the owner has to see.
+  {
+    const r1 = await cardRow('r1');
+    const [a, b] = [await asClaude(), await asOwner()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const pushed = await push(a, pack('race-1', [card('r1', 3)]));
+    const deciding = decide(b, r1.id, 2, 'approve');
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const decided = await deciding;
+    await Promise.all([a.end(), b.end()]);
+    const after = await cardRow('r1');
+    check(
+      pushed.cards[0].result === 'revised' && waited >= 1 && decided.error === 'stale_version' && decided.current_version === 3
+        && after.state === 'waiting' && after.current_version === 3,
+      `MC2 a push of v3 racing approve v2: the approval waits (${waited}) and is refused (${decided.error}); the post stays waiting at v${after.current_version}`,
+    );
+  }
+
+  // MC3: two approvals of one post (two devices). The second waits (here on the gate's counter row, which the first
+  // already updated) and finds it approved: one decision, one log entry.
+  {
+    const r2 = await cardRow('r2');
+    const [a, b] = [await asOwner(), await asOwner()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const first = await decide(a, r2.id, 1, 'approve');
+    const secondCall = decide(b, r2.id, 1, 'approve');
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const second = await secondCall;
+    await Promise.all([a.end(), b.end()]);
+    const { rows } = await setup.query(`select count(*)::int as n from mc.marketing_log where card_id = $1 and kind = 'approved'`, [r2.id]);
+    check(
+      first.ok && waited >= 1 && second.error === 'bad_state' && rows[0].n === 1 && (await cardRow('r2')).state === 'approved',
+      `MC3 two approvals of one post at once: one is stored, the other waits (${waited}) and gets ${second.error} (log entries ${rows[0].n})`,
+    );
+  }
+
+  // MC4: the same new pack pushed twice at once (a retry while the first is still running). The second waits and finds
+  // everything there: one post, one version, one file, and the same pathname to upload in both answers.
+  {
+    const media = [{ file: 'race-3.mp4', content_type: 'video/mp4', bytes: 4321, sha256: 'a'.repeat(64), width: 1080, height: 1920, duration_ms: 12700 }];
+    const body = pack('race-3', [card('r3', 1, { kind: 'short', media })]);
+    const [a, b] = [await asClaude(), await asClaude()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const first = await push(a, body);
+    const secondCall = push(b, body);
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const second = await secondCall;
+    await Promise.all([a.end(), b.end()]);
+    const { rows } = await setup.query(
+      `select (select count(*) from mc.marketing_cards where key = 'r3')::int as cards,
+              (select count(*) from mc.marketing_versions v join mc.marketing_cards c on c.id = v.card_id where c.key = 'r3')::int as versions,
+              (select count(*) from mc.marketing_files f join mc.marketing_cards c on c.id = f.card_id where c.key = 'r3')::int as files`,
+    );
+    check(
+      first.cards[0].result === 'created' && waited >= 1 && second.cards[0].result === 'unchanged'
+        && rows[0].cards === 1 && rows[0].versions === 1 && rows[0].files === 1
+        && first.uploads.length === 1 && second.uploads.length === 1 && first.uploads[0].pathname === second.uploads[0].pathname,
+      `MC4 one pack pushed twice at once: created, then unchanged after waiting (${waited}); ${rows[0].cards} post, ${rows[0].versions} version, ${rows[0].files} file, one pathname`,
+    );
+  }
+
+  // MC5: Claude's feedback while the owner's request is being written. The reader waits for the writer's lock, so the
+  // request is in the answer and the cursor never moves past an entry that was still on its way.
+  {
+    const r4 = await cardRow('r4');
+    const [a, b] = [await asOwner(), await asClaude()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const asked = await decide(a, r4.id, 1, 'request_change', 'Race note: shorter hook');
+    const reading = b.query(`select mc_api.ingest_marketing_feedback($1, null, 0) as j`, [secret]).then((r) => r.rows[0].j);
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const fed = await reading;
+    await Promise.all([a.end(), b.end()]);
+    const { rows } = await setup.query(`select max(id)::int as id from mc.marketing_log where card_id = $1 and kind = 'changes'`, [r4.id]);
+    check(
+      asked.ok && waited >= 1 && fed.ok && fed.events.some((e) => e.id === rows[0].id && e.note === 'Race note: shorter hook')
+        && fed.cursor >= rows[0].id && fed.open_requests.some((o) => o.log_id === rows[0].id),
+      `MC5 the feedback reader waits (${waited}) for a request being written and returns it (cursor ${fed.cursor}, request ${rows[0].id})`,
+    );
+  }
+
+  // MC6 (auto-posting, MARKETING_AUTOPOST.md): two posting runs claim at once. The second waits for the first's lock,
+  // then finds every due step leased: each job is handed out once, so nothing can be posted twice.
+  {
+    const tick = (await setup.query(`select mc.rotate_ingest_secret('autopost') as s`)).rows[0].s;
+    const app = (await setup.query(`select mc.rotate_ingest_secret('app') as s`)).rows[0].s;
+    const cipher = 'v1:AAAAAAAAAAAAAAAA:dG9rZW4:AAAAAAAAAAAAAAAAAAAAAA';
+    await setup.query(
+      `insert into mc.autopost_connections (provider, account_id, account_name, token_cipher, options, connected_by)
+       values ('meta', '1001', 'Ops', $1, '[]', $2)`, [cipher, admin]);
+    await setup.query(
+      `insert into mc.autopost_destinations (key, provider, external_id, name, token_cipher, set_by)
+       values ('lucento_page', 'meta', '501', 'Lucento', $1, $2), ('instagram', 'meta', '17841', 'lucentoapp', $1, $2)`,
+      [cipher, admin]);
+    await setup.query(`update mc.settings set value = 'true' where key = 'autopost_enabled'`);
+    await setup.query(`update mc.autopost_state set clock_set_at = now() where id`);
+    // A post due a minute ago, in Manila time, in a pack around today.
+    const { rows: [t] } = await setup.query(
+      `select to_char((now() at time zone 'Asia/Manila')::date - 1, 'YYYY-MM-DD') as starts,
+              to_char((now() at time zone 'Asia/Manila')::date + 5, 'YYYY-MM-DD') as ends,
+              to_char(now() at time zone 'Asia/Manila' - interval '1 minute', 'YYYY-MM-DD') as day,
+              to_char(now() at time zone 'Asia/Manila' - interval '1 minute', 'HH24:MI') as time`);
+    const c = await asClaude();
+    const pushed = await push(c, { pack: { key: 'race-auto', title: 'Race auto', starts_on: t.starts, ends_on: t.ends },
+      cards: [card('auto1', 1, { kind: 'short', platforms: ['FB + IG Reels'], slot_day: t.day, slot_time: t.time })] });
+    await c.end();
+    const row = await cardRow('auto1');
+    const o = await asOwner();
+    const approved = await decide(o, row.id, 1, 'approve');
+    await o.end();
+    const claim = (cl) =>
+      cl.query(`select mc_api.ingest_autopost_claim($1, $2, 10) as j`, [tick, app]).then((r) => r.rows[0].j);
+    const [a, b] = [await asClaude(), await asClaude()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const first = await claim(a);
+    const secondCall = claim(b);
+    const waited = await waitingForLock(bPid);
+    await a.query('commit');
+    const second = await secondCall;
+    await Promise.all([a.end(), b.end()]);
+    const { rows } = await setup.query(
+      `select count(*)::int as jobs, count(distinct lease_id)::int as leases from mc.autopost_jobs where card_id = $1`, [row.id]);
+    check(
+      pushed.ok && approved.ok && first.ok && first.jobs.length === 2 && waited >= 1 && second.ok && second.jobs.length === 0
+        && rows[0].jobs === 2 && rows[0].leases === 2,
+      `MC6 two posting runs claim at once: the second waits (${waited}) and gets nothing (${second.jobs?.length}); ${rows[0].jobs} jobs, ${rows[0].leases} leases`,
+    );
+  }
+
+  // MC7 (Tasks, OWNER_TASKS.md §2): the owner marks a task done while Claude moves it to Waiting, in both orders. The
+  // second waits for the tasks lock, then acts on what the first committed: after Claude's move the owner's row version
+  // is stale; after the owner's done Claude can't move a closed task. Never a lost update.
+  {
+    const key = (await setup.query(`select mc.rotate_ingest_secret('tasks') as s`)).rows[0].s;
+    const task = (code) => ({
+      code, title: `Race ${code}`, area: 'Database', priority: 'soon',
+      content: { why: 'A task the race test marks from both sides.', parts: [{ steps: [{ text: 'Do the one step.' }] }] },
+    });
+    const c = await asClaude();
+    const pushed = (await c.query(`select mc_api.ingest_tasks_push($1, $2::jsonb) as j`,
+      [key, JSON.stringify([task('RT-1'), task('RT-2')])])).rows[0].j;
+    await c.end();
+    const rv = async (code) => Number((await setup.query(`select row_version from mc.tasks where code = $1`, [code])).rows[0].row_version);
+    const act = (cl, code, version) =>
+      cl.query(`select mc_api.task_act($1, $2, 'done', null) as j`, [code, version]).then((r) => r.rows[0].j);
+    const wait = (cl, code) =>
+      cl.query(`select mc_api.ingest_tasks_update($1, $2, 'wait', null, 'Launch day') as j`, [key, code]).then((r) => r.rows[0].j);
+
+    // Claude first, the owner waiting.
+    const seen1 = await rv('RT-1');
+    const [a, b] = [await asClaude(), await asOwner()];
+    const bPid = await pidOf(b);
+    await a.query('begin');
+    const moved = await wait(a, 'RT-1');
+    const marking = act(b, 'RT-1', seen1);
+    const waited1 = await waitingForLock(bPid);
+    await a.query('commit');
+    const marked = await marking;
+    await Promise.all([a.end(), b.end()]);
+
+    // The owner first, Claude waiting.
+    const seen2 = await rv('RT-2');
+    const [o, cl] = [await asOwner(), await asClaude()];
+    const clPid = await pidOf(cl);
+    await o.query('begin');
+    const done = await act(o, 'RT-2', seen2);
+    const moving = wait(cl, 'RT-2');
+    const waited2 = await waitingForLock(clPid);
+    await o.query('commit');
+    const refused = await moving;
+    await Promise.all([o.end(), cl.end()]);
+    const { rows } = await setup.query(`select code, status from mc.tasks where code in ('RT-1', 'RT-2') order by code`);
+    check(
+      pushed.ok && moved.ok && waited1 >= 1 && marked.error === 'stale' && done.ok && waited2 >= 1 && refused.error === 'not_allowed'
+        && rows[0].status === 'waiting' && rows[1].status === 'done',
+      `MC7 the owner's done and Claude's move at once, both orders: the second waits (${waited1}, ${waited2}) and gets ${marked.error} / ${refused.error}; ${rows.map((x) => `${x.code} ${x.status}`).join(', ')}`,
     );
   }
 

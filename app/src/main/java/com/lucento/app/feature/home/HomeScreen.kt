@@ -4,8 +4,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.TooltipBox
@@ -146,7 +144,6 @@ import com.lucento.app.core.designsystem.component.CardHeader
 import com.lucento.app.core.designsystem.component.CardOverline
 import com.lucento.app.core.designsystem.component.LucentoBottomSheet
 import com.lucento.app.core.designsystem.component.LucentoPrimaryButton
-import com.lucento.app.core.designsystem.component.ProgressRing
 import com.lucento.app.core.designsystem.component.ShareBar
 import com.lucento.app.core.designsystem.theme.OverlineStyle
 import com.lucento.app.domain.CategoryBudgetLine
@@ -200,6 +197,7 @@ import java.time.LocalDate
 import com.lucento.app.domain.WellnessTier
 import com.lucento.app.feature.wallets.WalletDraft
 import com.lucento.app.feature.wallets.WalletEditorSheet
+import com.lucento.app.feature.wallets.toDraft
 import com.lucento.app.feature.wallets.WalletsViewModel
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -255,11 +253,23 @@ data class HomeActions(
     val onDismissSpacePrompt: () -> Unit = {},
     /** A "top spending" tile: that category's transactions in the shown month. */
     val onOpenCategory: (Long, YearMonth) -> Unit = { _, _ -> },
+    /** Tester round (2026-11-17): counts a wallet as spending money for Safe to spend, or not. */
+    val onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
+    /** Opens a wallet's editor on the dashboard (a card's counted credit, from the spending money sheet). */
+    val onEditWallet: (com.lucento.app.domain.Wallet) -> Unit = {},
+    /** The Milestones page ("Progress" until 2026-11-23): the Awards card and the budget year. */
+    val onOpenMilestones: () -> Unit = {},
+    /** A month's recap on its own page: the monthly check-in card's "See <month>'s recap". */
+    val onOpenMonthRecap: (YearMonth) -> Unit = {},
+    /** The awards on their own page (owner, 2026-11-23): an award ceremony's "See all awards". */
+    val onOpenAwards: () -> Unit = {},
+    /** The monthly check-in: plan this month's budget (or next month's, in the last days of this one). */
+    val onPlanMonth: (YearMonth) -> Unit = {},
 )
 
 /**
  * The dashboard, top to bottom: a pinned header ("Dashboard", sync status, payments bell, profile) and month selector;
- * the net wallet balance card; the month's budget with its top two categories; shortcuts; getting started (only until
+ * the net worth card; the month's budget with its top two categories; shortcuts; getting started (only until
  * the basics are in place); upcoming scheduled transactions; recent transactions. Every month-dependent section follows
  * the one selected month. Every figure comes from [HomeUiState].
  *
@@ -278,7 +288,8 @@ fun HomeScreen(
     walletsViewModel: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory),
 ) {
     // The app's root provides LocalAmountsHidden from the same saved choice; the dashboard is where it's switched.
-    HomeDashboard(actions, scrollToTop, viewModel, walletsViewModel)
+    val withWallets = remember(actions, walletsViewModel) { actions.copy(onSetSpendable = walletsViewModel::setSpendable) }
+    HomeDashboard(withWallets, scrollToTop, viewModel, walletsViewModel)
 }
 
 @Composable
@@ -289,14 +300,21 @@ private fun HomeDashboard(
     walletsViewModel: WalletsViewModel,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // The plan check reads Home's own wallet list (the active wallets), null while Home is still loading.
+    val planWallets = if (state.loading) null else state.wallets
+    val walletScope = rememberCoroutineScope()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    // A card from the budget card opens with its real Default switch, so a default card stays the default.
+    val dashboardActions = remember(actions) {
+        actions.copy(onEditWallet = { wallet -> walletScope.launch { editingWallet = walletsViewModel.draftFor(wallet) } })
+    }
+    // Add wallet: the editor on Cash, the type sheet when money wallets are full, or the Pro dialog (owner, 2026-11-18).
+    val addWallet = com.lucento.app.feature.wallets.rememberAddWallet(planWallets, state.primaryCurrency) { editingWallet = it }
     var showSync by remember { mutableStateOf(false) }
-    var showAwards by remember { mutableStateOf(false) }
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
     // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
     var ceremony by rememberSaveable { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
     var ceremonyAlso by rememberSaveable { mutableStateOf<List<com.lucento.app.domain.Achievement>>(emptyList()) }
-    var replaying by remember { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
-    var replayingPro by remember { mutableStateOf(false) }
 
     // Part D: milestones. The first time they exist, what's already earned is recorded quietly; after that each new
     // one is acknowledged once — this runs only when the stored records change, i.e. after a committed write.
@@ -304,15 +322,19 @@ private fun HomeDashboard(
         if (state.loading) return@LaunchedEffect
         if (state.needsMilestoneBaseline) viewModel.baselineMilestones(state.earned)
     }
+    // Awards an update added: what they already earn is recorded quietly, so the update brings no ceremony for the past.
+    LaunchedEffect(state.loading, state.needsMilestoneBaseline, state.awardsNewHere, state.earned) {
+        if (state.loading || state.needsMilestoneBaseline || state.awardsNewHere.isEmpty()) return@LaunchedEffect
+        viewModel.recordNewAwardsQuietly(state.earned intersect state.awardsNewHere)
+    }
     // Anyone who has recorded something doesn't need the + spotlight (also clears it for people who record from elsewhere).
     LaunchedEffect(state.loading, state.recordedCount > 0) {
         if (!state.loading && state.recordedCount > 0) viewModel.dismissAddSpotlight()
     }
-    // One ceremony for whatever was earned together; anything earned while one is open (or while the cabinet is, where
-    // the person is already looking at their awards) is presented after it closes.
-    LaunchedEffect(state.milestoneToShow, ceremony == null, showAwards) {
+    // One ceremony for whatever was earned together; anything earned while one is open is presented after it closes.
+    LaunchedEffect(state.milestoneToShow, ceremony == null) {
         val award = state.milestoneToShow ?: return@LaunchedEffect
-        if (ceremony != null || showAwards) return@LaunchedEffect
+        if (ceremony != null) return@LaunchedEffect
         ceremony = award
         ceremonyAlso = ArrayList(state.milestonesAlsoNew)
         viewModel.acknowledgeMilestones(listOf(award) + state.milestonesAlsoNew)
@@ -382,7 +404,7 @@ private fun HomeDashboard(
                     WelcomePanel(
                         // A Partner's phone: the Shared Space's Owner adds wallets (the panel then says so).
                         onAddWallet = if (com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure) {
-                            { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) }
+                            addWallet
                         } else {
                             null
                         },
@@ -390,15 +412,24 @@ private fun HomeDashboard(
                 }
                 HomeContent.Overview -> Overview(
                     state = state,
-                    actions = actions,
+                    actions = dashboardActions,
                     onSelectMonth = viewModel::selectMonth,
                     onDismissLocalDataNotice = viewModel::dismissLocalDataNotice,
                     onDismissOverridden = viewModel::dismissOverridden,
                     onTurnOn = viewModel::turnOn,
                     onHideOffers = viewModel::hideModuleOffers,
-                    onAddWallet = { editingWallet = WalletDraft(currencyCode = state.primaryCurrency) },
-                    onOpenMilestones = { showAwards = true },
+                    onAddWallet = addWallet,
+                    onOpenMilestones = actions.onOpenMilestones,
                     onDismissSpotlight = viewModel::dismissAddSpotlight,
+                    onDismissCheckIn = { card ->
+                        // A quiet close with a way back (design review 2026-11-23): the card returns with Undo. The
+                        // message names what stops (critic r2, P3-8).
+                        viewModel.dismissCheckIn(card) { undo -> messageHosts?.top?.show(checkInHiddenMessage(card), "Undo", undo) }
+                    },
+                    onSeeRecap = { month ->
+                        viewModel.markRecapSeen(month)
+                        actions.onOpenMonthRecap(month)
+                    },
                 )
             }
         }
@@ -427,26 +458,8 @@ private fun HomeDashboard(
             onSave = walletsViewModel::save,
             onDelete = walletsViewModel::delete,
             onDismiss = { editingWallet = null },
-        )
-    }
-    if (showAwards) {
-        com.lucento.app.feature.awards.AwardsSheet(
-            earned = state.earned,
-            facts = state.awardFacts,
-            onDismiss = { showAwards = false },
-            onReplay = { replaying = it },
-            proMemberSince = state.proMemberSince,
-            onReplayPro = { replayingPro = true },
-        )
-    }
-    replaying?.let { award ->
-        com.lucento.app.feature.awards.AwardCeremony(award, earnedCount = state.earned.size, onDismiss = { replaying = null })
-    }
-    if (replayingPro) {
-        com.lucento.app.feature.awards.ProMedalCeremony(
-            onDismiss = { replayingPro = false },
-            replay = true,
-            memberSince = state.proMemberSince?.let { com.lucento.app.feature.awards.memberSinceLabel(it) },
+            activeWallets = planWallets,
+            mainCurrency = state.primaryCurrency.takeIf { planWallets != null },
         )
     }
     ceremony?.let { award ->
@@ -457,7 +470,7 @@ private fun HomeDashboard(
             onDismiss = { ceremony = null },
             onSeeAll = {
                 ceremony = null
-                showAwards = true
+                actions.onOpenAwards()
             },
         )
     }
@@ -823,8 +836,11 @@ private fun SyncStatusChip(status: CloudStatus, details: SyncDetails, onClick: (
                 0f
             }
             Icon(icon, contentDescription = null, tint = tone.content, modifier = Modifier.size(16.dp).graphicsLayer { rotationZ = angle })
-            // At large text sizes the icon alone keeps the header readable; the status is still announced in full.
-            if (!largeText()) {
+            // At large text sizes, or at 130 % on a narrow phone, the icon alone keeps "Dashboard" whole (critic r3); the
+            // status is still announced in full.
+            val iconOnly = largeText() ||
+                (LocalDensity.current.fontScale >= 1.3f && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 400)
+            if (!iconOnly) {
                 Spacer(Modifier.width(Spacing.xs))
                 Text(label, style = MaterialTheme.typography.labelMedium, color = tone.content, maxLines = 1)
             }
@@ -1027,6 +1043,8 @@ private fun Overview(
     onAddWallet: () -> Unit = {},
     onOpenMilestones: () -> Unit = {},
     onDismissSpotlight: () -> Unit = {},
+    onDismissCheckIn: (com.lucento.app.domain.MonthCheckIn.Card) -> Unit = {},
+    onSeeRecap: (YearMonth) -> Unit = {},
 ) {
     val f = state.features
     val canEdit = com.lucento.app.feature.sharedspace.LocalSharedAccess.current.canManageStructure
@@ -1047,6 +1065,24 @@ private fun Overview(
         if (state.showAddSpotlight) {
             AddSpotlightCard(onRecord = { actions.onAddTransaction(null) }, onDismiss = onDismissSpotlight)
         }
+        // The monthly check-in, on the month it's about. A Partner's phone isn't asked to plan: the Owner sets the budget.
+        val checkIn = state.checkIn?.takeIf { state.isCurrentMonth }?.let { card ->
+            when {
+                canEdit -> card
+                card.recap != null -> com.lucento.app.domain.MonthCheckIn.Card(plan = null, recap = card.recap)
+                else -> null
+            }
+        }
+        if (checkIn != null) {
+            MonthCheckInCard(
+                card = checkIn,
+                today = state.today,
+                budget = state.checkInBudget,
+                onPlan = actions.onPlanMonth,
+                onRecap = onSeeRecap,
+                onDismiss = { onDismissCheckIn(checkIn) },
+            )
+        }
 
         state.monthComposition?.let { WalletBalanceCard(state, it, actions.onOpenWallets) }
 
@@ -1058,8 +1094,13 @@ private fun Overview(
             MonthlyBudgetCard(
                 state, plan, burn,
                 open = if (state.expenseCategoryCount == 0) actions.onChooseCategories else actions.onOpenBudget,
-                onOpenCategory = { actions.onOpenCategory(it, state.month) },
+                onSetSpendable = actions.onSetSpendable,
+                onEditCard = actions.onEditWallet,
+                onReviewDue = { actions.onOpenRecurring(null) },
             )
+            if (state.expenseCategoryCount > 0 && plan.hasBudget) {
+                WatchCard(state, onOpen = { actions.onOpenCategory(it, state.month) }, onSeeAll = actions.onOpenBudget)
+            }
         } else {
             CashFlowCard(state, onOpenInsights = if (f.isEnabled(Feature.INSIGHTS)) actions.onOpenInsights else null)
         }
@@ -1232,7 +1273,7 @@ private fun quickLinkName(feature: Feature): String = when (feature) {
     else -> feature.title
 }
 
-// ------------------------------------------------------------------ Dashboard: net wallet balance card
+// ------------------------------------------------------------------ Dashboard: net worth card
 
 // The card's face (Figma "Net wallet balance") comes from the theme (LucentoTheme.spec.balanceCard): the same in light
 // and dark mode, like a physical card.
@@ -1241,7 +1282,7 @@ private val CardFigureStyle = AmountStyles.large.copy(fontSize = 20.sp, letterSp
 /**
  * The dashboard's focal point, drawn as a physical card: ID-1 proportions (it only grows for large text), a soft drop
  * shadow, a thin light edge, a glossy sheen across the top and a faint guilloché pattern like printed security lines.
- * Label and amount sit together at the top; Wallets and Debt & Loans along the bottom edge. Opens Wallets.
+ * Label and amount sit together at the top; Assets and Debts & loans along the bottom edge. Opens Wallets.
  */
 @Composable
 private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthComposition, onOpen: () -> Unit) {
@@ -1249,7 +1290,8 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val spec = LucentoTheme.spec
     val face = spec.balanceCard
     val owed = -composition.totalLiabilities
-    val label = if (state.isCurrentMonth) "Net Wallet Balance" else "Net Wallet Balance · end of ${monthLabel(state.month)}"
+    // One name for the figure everywhere: Progress, Insights, Reports and Ask say "Net worth" too (owner, 2026-11-23).
+    val label = if (state.isCurrentMonth) "Net worth" else "Net worth · end of ${monthLabel(state.month)}"
     val history = state.balanceHistory
     val netWorthSpoken = spokenAmount(composition.netWorth, signed = true)
     val assetsSpoken = spokenAmount(composition.totalAssets, signed = true)
@@ -1257,8 +1299,8 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
     val changeSpoken = if (history.size > 1) spokenAmount(history.last().netWorth - history.first().netWorth, signed = true, showPlus = true) else ""
     val spoken = buildString {
         append("$label $netWorthSpoken. ")
-        append("Wallets $assetsSpoken. ")
-        append("Debt and loans $owedSpoken. ")
+        append("Assets $assetsSpoken. ") // the label the card shows
+        append("Debts and loans $owedSpoken. ")
         if (history.size > 1) {
             append("Compared with the end of ${monthLabel(history.first().month)}: ")
             append(changeSpoken)
@@ -1311,11 +1353,12 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         // Label and (i) together on the left; the brand stays on the right.
                         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                             // Caps like every other card's overline; TalkBack reads the spoken summary instead.
+                            // Two lines at large text sizes, so "NET WORTH" is never cut on a narrow phone (critic r3).
                             Text(
                                 label.uppercase(Locale.getDefault()),
                                 style = Hierarchy.cardOverline,
                                 color = face.inkMuted,
-                                maxLines = 1,
+                                maxLines = if (largeText()) 2 else 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.weight(1f, fill = false).clearAndSetSemantics { contentDescription = spoken },
                             )
@@ -1326,7 +1369,7 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                         Spacer(Modifier.width(5.dp))
                         Image(painterResource(com.lucento.app.R.drawable.lucento_wordmark_dark), contentDescription = null, modifier = Modifier.height(15.dp))
                     }
-                    // Right under its label: one reading, "Net Wallet Balance −$2,339.35".
+                    // Right under its label: one reading, "Net worth −$2,339.35".
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MoneyText(
                             money = composition.netWorth,
@@ -1354,13 +1397,13 @@ private fun WalletBalanceCard(state: HomeUiState, composition: NetWorthCompositi
                     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
                     if (cardWidth >= 330.dp * textScale) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.weight(1f))
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.weight(1f))
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Assets", composition.totalAssets, Modifier.weight(1f))
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.weight(1f))
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Wallets", composition.totalAssets, Modifier.fillMaxWidth())
-                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debt & Loans", owed, Modifier.fillMaxWidth())
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_wallet, 46.dp, "Assets", composition.totalAssets, Modifier.fillMaxWidth())
+                            CardFigure(com.lucento.app.R.drawable.ic_dash_layers, 38.dp, "Debts & loans", owed, Modifier.fillMaxWidth())
                         }
                     }
                 }
@@ -1398,6 +1441,11 @@ private fun DrawScope.drawCardSurface() {
     )
 }
 
+/** What net worth means, for the (i) beside it. */
+internal const val BALANCE_INFO = "What you have in your wallets minus what you owe on cards and loans. Wallets in other " +
+    "currencies count at their value in your main currency, from the rates saved with their movements. A wallet with no " +
+    "rate yet isn’t included."
+
 /** The (i) beside the label: what the figure means, one tap away (tooltip; also on long-press). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1406,11 +1454,13 @@ private fun BalanceInfo() {
     val scope = rememberCoroutineScope()
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = { PlainTooltip { Text("What you have in your wallets minus what you owe on cards and loans. Nothing is converted between currencies.") } },
+        // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): foreign wallets count at their carrying value from the
+        // rates saved with their movements; one with no rate yet stays out ("Not in your totals yet" on its page).
+        tooltip = { PlainTooltip { Text(BALANCE_INFO) } },
         state = tip,
     ) {
         IconButton(onClick = { scope.launch { tip.show() } }, modifier = Modifier.size(Sizes.minTouch)) {
-            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net wallet balance means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
+            Icon(painterResource(com.lucento.app.R.drawable.ic_dash_info), contentDescription = "What net worth means", tint = LucentoTheme.spec.balanceCard.inkMuted, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -1492,7 +1542,9 @@ private fun MonthlyBudgetCard(
     plan: BudgetPlan,
     burn: BudgetBurn,
     open: () -> Unit,
-    onOpenCategory: (Long) -> Unit,
+    onSetSpendable: (Long, Boolean) -> Unit = { _, _ -> },
+    onEditCard: (com.lucento.app.domain.Wallet) -> Unit = {},
+    onReviewDue: (() -> Unit)? = null,
 ) {
     val setupNeeded = state.expenseCategoryCount == 0
     val verdict = paceVerdict(plan, burn.pace, state.isCurrentMonth)
@@ -1518,27 +1570,28 @@ private fun MonthlyBudgetCard(
                 LucentoTextButton(text = "Set amounts", onClick = open)
             }
             else -> {
-                val formula = HomeStateBuilder.budgetFormula(plan, state.safeToSpend)
-                val textScale = LocalDensity.current.fontScale
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    // Side by side from a 360dp-wide phone up; stacked on narrower screens and at large text.
-                    if (maxWidth >= 286.dp && textScale < 1.3f) {
-                        // The ring is exactly as wide as the formula under it, and "To watch" is as tall as both.
-                        val left = ((maxWidth - Spacing.lg) * 0.54f).coerceAtMost(184.dp)
-                        MatchedHeightPair(
-                            firstWidth = left,
-                            gap = Spacing.lg,
-                            first = { BudgetFigures(plan, burn, formula, ringSize = left) },
-                            second = { WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = true) },
-                        )
-                    } else {
-                        // The ring grows with the text inside it, so "100%" never spills over the stroke.
-                        val ring = (140.dp * textScale.coerceIn(1f, 1.4f)).coerceAtMost(maxWidth)
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-                            BudgetFigures(plan, burn, formula, ringSize = ring)
-                            WatchPanel(state, onOpenCategory, onSeeAll = open, fillHeight = false)
-                        }
-                    }
+                // Owner's redesign (2026-11-18), in three parts: A, how much of the budget is spent; B, the two limits on
+                // spending (Budget remaining and Spendable wallets); C, Safe to spend, the lower of the two. B and C are the
+                // Budget tab's panel too, so the two pages can't disagree.
+                BudgetOverview(plan, burn)
+                // The limits' grid has its own outline, so space alone separates it from the overview.
+                Spacer(Modifier.height(Spacing.lg))
+                val safe = state.safeToSpend
+                val capacity = safe?.let { SpendingCapacity.of(it) }
+                if (safe != null && capacity != null) {
+                    SpendingCapacityBlock(
+                        capacity = capacity,
+                        safe = safe,
+                        wallets = state.wallets,
+                        mainCurrency = state.primaryCurrency,
+                        onSetSpendable = onSetSpendable,
+                        onEditCard = onEditCard,
+                        onReviewDue = onReviewDue,
+                    )
+                } else {
+                    // A past month closes on what was left, or how far over it went.
+                    val over = plan.remaining.isNegative
+                    FormulaResult(if (over) "Overspent" else "Remaining", plan.remaining, warning = over)
                 }
             }
         }
@@ -1577,139 +1630,18 @@ private fun BudgetBar(used: Float, monthGone: Float?, color: Color, description:
 }
 
 /**
- * Lays [first] out at [firstWidth] and [second] beside it in the rest of the width, stretched to the taller of the two,
- * so the "To watch" panel always ends level with the formula. Measured directly: the ring's figures animate and
- * shrink to fit, which intrinsic-height rows can't ask about.
- */
-@Composable
-private fun MatchedHeightPair(
-    firstWidth: Dp,
-    gap: Dp,
-    first: @Composable () -> Unit,
-    second: @Composable () -> Unit,
-) {
-    Layout(contents = listOf(first, second)) { (firsts, seconds), constraints ->
-        val firstPx = firstWidth.roundToPx().coerceAtMost(constraints.maxWidth)
-        val secondPx = (constraints.maxWidth - firstPx - gap.roundToPx()).coerceAtLeast(0)
-        val a = firsts.map { it.measure(Constraints.fixedWidth(firstPx)) }
-        val aHeight = a.maxOfOrNull { it.height } ?: 0
-        val height = maxOf(aHeight, seconds.maxOfOrNull { it.minIntrinsicHeight(secondPx) } ?: 0)
-        val b = seconds.map { it.measure(Constraints.fixed(secondPx, height)) }
-        layout(constraints.maxWidth, height) {
-            a.forEach { it.placeRelative(0, 0) }
-            b.forEach { it.placeRelative(constraints.maxWidth - secondPx, 0) }
-        }
-    }
-}
-
-/**
- * The budget card's left half: the share used as a ring exactly [ringSize] wide, then the month's formula as a short
- * statement — Budget, Spent (budgeted + unbudgeted), Remaining (or Overspent), Bills due, and Safe to spend on a tinted
- * line (0 in red once nothing is left). A past month closes on Remaining. Every figure is from [BudgetFormula].
- */
-@Composable
-private fun BudgetFigures(plan: BudgetPlan, burn: BudgetBurn, formula: BudgetFormula, ringSize: Dp) {
-    val used = burn.consumedPercent ?: 0
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-        ProgressRing(
-            fraction = burn.consumedFraction,
-            description = "$used percent of the ${monthLabel(plan.month)} budget spent",
-            size = ringSize,
-            strokeWidth = 12.dp,
-            color = healthColor(plan.health),
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("$used%", style = AmountStyles.hero.copy(fontSize = 30.sp, lineHeight = 34.sp), maxLines = 1)
-                Text("spent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        BudgetFormulaLines(formula)
-    }
-}
-
-@Composable
-private fun BudgetFormulaLines(formula: BudgetFormula) {
-    val ext = LucentoTheme.extendedColors
-    val safe = formula.safeToSpend
-    val bills = formula.billsDue
-    // "Overspent" in red once spending passes the budget; "Remaining" in green otherwise. The word says it, not the colour.
-    val remainingLabel = if (formula.overspent) "Overspent" else "Remaining"
-    val remainingInk = if (formula.overspent) ext.negative else ext.positive
-    Column(Modifier.fillMaxWidth()) {
-        FormulaLine("Budget", formula.budget)
-        FormulaLine("Spent", formula.used)
-        // Spent is every expense: the part in budgeted categories plus the part outside them (as on the Budget page).
-        Column(Modifier.padding(start = Spacing.sm, top = Spacing.xxs, bottom = Spacing.xs)) {
-            FormulaLine("Budgeted", formula.budgeted, minor = true)
-            FormulaLine("Unbudgeted", formula.unbudgeted, minor = true)
-        }
-        Hairline(Modifier.padding(vertical = Spacing.xs))
-        if (safe != null && bills != null) {
-            FormulaLine(remainingLabel, formula.remaining, ink = remainingInk)
-            // A deduction, so it carries its minus sign as well as the red.
-            FormulaLine("Bills due", -bills, ink = if (bills.isZero) null else ext.negative)
-            Spacer(Modifier.height(Spacing.sm))
-            // Always here for this month: 0 in red once bills or overspending take the rest, and the caption says why.
-            FormulaResult(
-                "Safe to spend",
-                formula.safeToSpendShown ?: safe,
-                warning = formula.nothingSafe,
-                caption = when {
-                    !formula.nothingSafe -> null
-                    formula.overspent -> "You’re over budget this month"
-                    else -> "Bills due take what’s left"
-                },
-            )
-        } else {
-            Spacer(Modifier.height(Spacing.xxs))
-            FormulaResult(remainingLabel, formula.remaining, warning = formula.overspent)
-        }
-    }
-}
-
-/**
- * One line of the formula: the label and the figure, right-aligned and shrinking before it would wrap. [minor] lines
- * (the parts of Used) are smaller and muted; [ink] colours a line's label and figure (Remaining, Overspent, Bills due).
- * The sign is always in the figure itself.
- */
-@Composable
-private fun FormulaLine(label: String, money: Money, minor: Boolean = false, ink: Color? = null) {
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    val color = ink ?: if (minor) muted else MaterialTheme.colorScheme.onSurface
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .heightIn(min = if (minor) 18.dp else 24.dp)
-            .semantics(mergeDescendants = true) {},
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            label,
-            style = if (minor) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall,
-            color = ink ?: muted,
-            fontWeight = if (ink != null) FontWeight.SemiBold else null,
-            maxLines = 1,
-        )
-        Spacer(Modifier.width(Spacing.sm))
-        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-            MoneyText(
-                money = money,
-                style = if (minor) AmountStyles.small else AmountStyles.row,
-                color = color,
-                fractionScale = 1f,
-                minScale = 0.6f,
-            )
-        }
-    }
-}
-
-/**
  * The formula's answer on a tinted line: the label over the figure, green while there's money left, red when not
  * ([warning]); [caption] says why in words, so the state never rests on colour.
  */
 @Composable
-private fun FormulaResult(label: String, money: Money, warning: Boolean = money.isNegative, caption: String? = null) {
+private fun FormulaResult(
+    label: String,
+    money: Money,
+    warning: Boolean = money.isNegative,
+    caption: String? = null,
+    /** Opens how the figure is worked out: the whole panel is then the button, with an (i) after the label. */
+    onInfo: (() -> Unit)? = null,
+) {
     val ext = LucentoTheme.extendedColors
     val negative = warning
     val ink = if (negative) ext.negative else ext.positive
@@ -1718,10 +1650,31 @@ private fun FormulaResult(label: String, money: Money, warning: Boolean = money.
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .background(if (negative) ext.negativeContainer else ext.positiveContainer)
-            .padding(horizontal = Spacing.sm, vertical = Spacing.sm)
-            .semantics(mergeDescendants = true) {},
+            // Design review round 3: a 48dp (i) button beside the label cut it to "Safe to" on a 360dp phone. The panel
+            // itself is the button now (a far larger target), and the label wraps rather than clipping.
+            .then(
+                if (onInfo != null) {
+                    Modifier.clickable(role = Role.Button, onClickLabel = "How $label is worked out", onClick = onInfo)
+                } else {
+                    Modifier.semantics(mergeDescendants = true) {}
+                },
+            )
+            .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
     ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = ink, maxLines = 1)
+        Row(verticalAlignment = Alignment.Top) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                fontWeight = FontWeight.Bold,
+                color = ink,
+                maxLines = 2,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            if (onInfo != null) {
+                Spacer(Modifier.width(Spacing.xxs))
+                Icon(Icons.Outlined.Info, contentDescription = null, tint = ink, modifier = Modifier.padding(top = 1.dp).size(16.dp))
+            }
+        }
         MoneyText(
             money = money,
             style = AmountStyles.large,
@@ -1729,52 +1682,52 @@ private fun FormulaResult(label: String, money: Money, warning: Boolean = money.
             fractionScale = 1f,
             minScale = 0.6f,
         )
-        if (caption != null) Text(caption, style = MaterialTheme.typography.labelSmall, color = ink, maxLines = 2)
+        // Balanced lines, so a reason never ends on one stray word; three at most at large text sizes.
+        if (caption != null) {
+            Text(
+                caption,
+                style = MaterialTheme.typography.labelSmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
+                color = ink,
+                maxLines = 3,
+            )
+        }
     }
 }
 
 /**
- * The budget card's right half, "To watch": up to five budgeted categories closest to their limit, each with its share
- * used (coloured by its own status, and always in words), a compact bar and what's left, then "See all" in the bottom
- * right corner (the Budget tab). A tap on a row opens that category's transactions for the month. [fillHeight]: beside
- * the formula, the rows spread over the panel's full height.
+ * "To watch": up to five budgeted categories closest to their limit, each with its share used (coloured by its own
+ * status, and always in words), a bar and what's left. A tap on a row opens that category's transactions for the month;
+ * "See all" opens the Budget tab. Its own card under the Monthly budget card since the owner's redesign (2026-11-18), so
+ * the budget card ends on Safe to spend.
  */
 @Composable
-private fun WatchPanel(state: HomeUiState, onOpen: (Long) -> Unit, onSeeAll: () -> Unit, fillHeight: Boolean) {
-    val panel = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(panel)
-            .padding(horizontal = Spacing.md, vertical = Spacing.md),
-    ) {
-        Text(
-            "TO WATCH",
-            style = OverlineStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.clearAndSetSemantics { heading(); contentDescription = "To watch" },
+private fun WatchCard(state: HomeUiState, onOpen: (Long) -> Unit, onSeeAll: () -> Unit) {
+    LucentoCard(Modifier.fillMaxWidth(), contentPadding = Spacing.lg) {
+        CardOverline(
+            "To watch",
+            icon = Icons.Outlined.Category,
+            trailing = {
+                LucentoTextButton(
+                    text = "See all",
+                    onClick = onSeeAll,
+                    modifier = Modifier.semantics { contentDescription = "See all budget categories" },
+                )
+            },
         )
         Spacer(Modifier.height(Spacing.xs))
-        val body = if (fillHeight) Modifier.weight(1f) else Modifier
         if (state.watchLines.isEmpty()) {
-            Box(body.fillMaxWidth(), contentAlignment = Alignment.CenterStart) {
-                Text(
-                    "Nothing spent in your budgeted categories in ${monthLabel(state.month)} yet.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Text(
+                "Nothing spent in your budgeted categories in ${monthLabel(state.month)}" + if (state.isCurrentMonth) " yet." else ".",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = Spacing.xs),
+            )
         } else {
-            Column(body.fillMaxWidth(), verticalArrangement = if (fillHeight) Arrangement.SpaceEvenly else Arrangement.Top) {
-                state.watchLines.forEach { line -> WatchRow(line, onOpen) }
+            state.watchLines.forEachIndexed { index, line ->
+                if (index > 0) Hairline()
+                WatchRow(line, onOpen)
             }
         }
-        LucentoTextButton(
-            text = "See all",
-            onClick = onSeeAll,
-            modifier = Modifier.align(Alignment.End).semantics { contentDescription = "See all budget categories" },
-        )
     }
 }
 
@@ -1801,11 +1754,19 @@ private fun WatchRow(line: CategoryBudgetLine, onOpen: (Long) -> Unit) {
                 role = Role.Button
                 onClick(label = "Show $name transactions") { onOpen(line.category.id); true }
             }
-            .padding(vertical = Spacing.xs),
+            .padding(vertical = Spacing.sm),
         verticalArrangement = Arrangement.Center,
     ) {
-        // The name has the panel's full width (narrow phones would cut "Restaurants" beside a percentage).
-        Text(name, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // The card's full width: the name and what's left share the first line; at large text sizes what's left goes
+        // under the bar, so a long name keeps its room.
+        val inline = !largeText()
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(name, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (inline && leftText != null) {
+                Spacer(Modifier.width(Spacing.sm))
+                Text(leftText, style = AmountStyles.small, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+        }
         Spacer(Modifier.height(Spacing.xs))
         Row(verticalAlignment = Alignment.CenterVertically) {
             ShareBar(fraction = line.fraction, color = healthColor(line.health), modifier = Modifier.weight(1f))
@@ -1817,7 +1778,7 @@ private fun WatchRow(line: CategoryBudgetLine, onOpen: (Long) -> Unit) {
                 maxLines = 1,
             )
         }
-        if (leftText != null) {
+        if (!inline && leftText != null) {
             Spacer(Modifier.height(Spacing.xxs))
             Text(
                 leftText,
@@ -1876,18 +1837,20 @@ private fun ShortcutRow(
     val ext = LucentoTheme.extendedColors
     var offering by remember { mutableStateOf<Feature?>(null) }
     val offers = if (state.moduleOffersHidden) emptySet() else f.rediscoverable().toSet()
-    val brand = TonePair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
+    // One hue per shortcut from the theme (tester round, 2026-11-17); status colours stay for state.
+    val tones = ext.shortcuts
     fun module(feature: Feature, tone: TonePair, open: () -> Unit): Shortcut? = when {
         f.isEnabled(feature) -> Shortcut(quickLinkName(feature), shortcutSpokenName(feature), shortcutIcon(feature), tone, open)
         feature in offers -> Shortcut(quickLinkName(feature), shortcutSpokenName(feature), shortcutIcon(feature), tone, { offering = feature }, off = feature)
         else -> null
     }
     val items = listOfNotNull(
-        module(Feature.SAVINGS_GOALS, brand, actions.onOpenGoals),
-        module(Feature.INSIGHTS, brand, actions.onOpenInsights),
-        Shortcut("Awards", "Awards", Icons.Outlined.EmojiEvents, TonePair(ext.warningContainer, ext.warning), onOpenMilestones),
-        module(Feature.DEBTS_LOANS, TonePair(ext.negativeContainer, ext.negative), actions.onOpenDebts),
-        module(Feature.RECURRING, TonePair(ext.positiveContainer, ext.positive)) { actions.onOpenRecurring(null) },
+        module(Feature.SAVINGS_GOALS, tones.goals, actions.onOpenGoals),
+        module(Feature.INSIGHTS, tones.insights, actions.onOpenInsights),
+        // Milestones (owner, 2026-11-23; "Progress" until then): the Awards card and the budget year, each month's recap a tap away.
+        Shortcut("Milestones", "Milestones", Icons.Outlined.EmojiEvents, tones.awards, onOpenMilestones),
+        module(Feature.DEBTS_LOANS, tones.debts, actions.onOpenDebts),
+        module(Feature.RECURRING, tones.scheduled) { actions.onOpenRecurring(null) },
     )
     val haptics = rememberHaptics()
     val textScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
@@ -2097,7 +2060,9 @@ private fun CardDueRow(item: CardDue, today: LocalDate, onClick: () -> Unit) {
             Spacer(Modifier.height(Spacing.xs))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${item.cycle.dueDate.format(dateFormat)} · Not in Safe to spend",
+                    // Not a bill: the purchases were spending already (tester round, 2026-11-17: the money on hand does
+                    // set the payment aside, so "not in Safe to spend" no longer held).
+                    "${item.cycle.dueDate.format(dateFormat)} · Not new spending",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

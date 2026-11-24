@@ -1,0 +1,196 @@
+{
+  "id": "ph-bank-securitybank-photo-overlap-01",
+  "country": "PH",
+  "type": "BANK_STATEMENT",
+  "source": "PHOTO",
+  "script": "LATIN",
+  "noise": true,
+  "today": "2026-11-03",
+  "pages": [
+    [
+      "SECURITY BANK",
+      "Security Bank Corporation",
+      "STATEMENT OF ACCOUNT - ALL ACCESS ACCOUNT",
+      "JOANNA DELA CRUZ",
+      "Unit 12B The Grove Tower, C5 Road, Ugong, Pasig City 1604",
+      "Account Number  0000-0123-45678",
+      "Statement Period  10/01/2026 to 10/31/2026",
+      "Date  Description  Withdrawa1  Deposit  Balance",
+      "10/01/2026  Beginning Balance  17,450.30",
+      "10/01/2026  Payroll Credit - CONCENTRIX  24,350.00  41,800.30",
+      "10/02/2026  lnstaPay to GCash 0917xxx5512  2,000.00  39,800.30",
+      "10/04/2026  Bills Payment - PLDT  1,699.00  38,101.30",
+      "10/06/2026  POS - SM Supermarket Megamall  2,874.35  35,226.95",
+      "10/07/2026  ATM Withdrawal - SBC Ortigas  5,000.00  30,226.95",
+      "10/10/2026  Bills Payment - Meralco  2,215.70  28,011.25",
+      "10/12/2026  POS - Petr0n C5 Pasig  1,800.00  26,211.25",
+      "10/15/2026  Payroll Credit - CONCENTRIX  24,350.00  50,561.25",
+      "10/16/2026  Credit Card Payment - Security Bank Mastercard  6,500.00  44,061.25"
+    ],
+    [
+      "10/15/2026  Payroll Credit - CONCENTRIX  24,350.00  50,561.25",
+      "10/16/2026  Credit Card Payment - Security Bank Mastercard  6,500.00  44,061.25",
+      "10/18/2026  InstaPay from MARK DELA CRUZ - BDO  1,500.00  45,561.25",
+      "10/20/2026  POS - Mercury Drug Ortigas  645.25  44,916.00",
+      "10/21/2026  InstaPay to BDO - COOLBREEZE AIRCON SERVICES  5,300.00  39,616.00",
+      "10/25/2026  POS - The Landmark Makati  3,420.00  36,196.00",
+      "10/28/2026  Fund Transfer to Time Deposit 0000-0123-99881  10,000.00  26,196.00",
+      "10/31/2026  Interest Credit  9.85  26,205.85",
+      "10/31/2026  Withholding Tax  1.97  26,203.88",
+      "10/31/2026  Ending Balance  26,203.88",
+      "Total Withdrawals  41,456.27",
+      "Total Deposits  50,209.85",
+      "Security Bank is regulated by the Bangko Sentral ng Pilipinas.",
+      "Deposits are insured by PDIC up to P1 Million per depositor."
+    ]
+  ],
+  "expected": {
+    "documents": [
+      {
+        "kind": "STATEMENT",
+        "accountType": "SAVINGS",
+        "institution": "Security Bank",
+        "currency": "PHP",
+        "currencyEvidence": "CONTEXT",
+        "openingBalance": "17450.30",
+        "closingBalance": "26203.88",
+        "statementBalance": null,
+        "minimumPayment": null,
+        "paymentDueDate": null,
+        "creditLimit": null,
+        "availableCredit": null,
+        "transactions": [
+          {
+            "date": "2026-10-01",
+            "description": "Payroll Credit - CONCENTRIX",
+            "amount": "24350.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-02",
+            "description": "to GCash 0917xxx5512",
+            "amount": "2000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-04",
+            "description": "Bills Payment - PLDT",
+            "amount": "1699.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "PLDT"
+          },
+          {
+            "date": "2026-10-06",
+            "description": "SM Supermarket Megamall",
+            "amount": "2874.35",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "SM Supermarket"
+          },
+          {
+            "date": "2026-10-07",
+            "description": "SBC Ortigas",
+            "amount": "5000.00",
+            "direction": "OUT",
+            "kind": "ATM",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-10",
+            "description": "Bills Payment - Meralco",
+            "amount": "2215.70",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "Meralco"
+          },
+          {
+            "date": "2026-10-12",
+            "description": "C5 Pasig",
+            "amount": "1800.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Petron"
+          },
+          {
+            "date": "2026-10-15",
+            "description": "Payroll Credit - CONCENTRIX",
+            "amount": "24350.00",
+            "direction": "IN",
+            "kind": "PAYROLL",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-16",
+            "description": "Credit Card Payment - Security Bank",
+            "amount": "6500.00",
+            "direction": "OUT",
+            "kind": "PAYMENT_TO_CARD",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-18",
+            "description": "InstaPay from MARK DELA CRUZ",
+            "amount": "1500.00",
+            "direction": "IN",
+            "kind": "TRANSFER_IN",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-20",
+            "description": "Mercury Drug Ortigas",
+            "amount": "645.25",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "Mercury Drug"
+          },
+          {
+            "date": "2026-10-21",
+            "description": "COOLBREEZE AIRCON",
+            "amount": "5300.00",
+            "direction": "OUT",
+            "kind": "BILL_PAYMENT",
+            "merchant": "CoolBreeze Aircon Services"
+          },
+          {
+            "date": "2026-10-25",
+            "description": "The Landmark Makati",
+            "amount": "3420.00",
+            "direction": "OUT",
+            "kind": "PURCHASE",
+            "merchant": "The Landmark"
+          },
+          {
+            "date": "2026-10-28",
+            "description": "Fund Transfer to Time Deposit",
+            "amount": "10000.00",
+            "direction": "OUT",
+            "kind": "TRANSFER_OUT",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Interest Credit",
+            "amount": "9.85",
+            "direction": "IN",
+            "kind": "INTEREST_EARNED",
+            "merchant": null
+          },
+          {
+            "date": "2026-10-31",
+            "description": "Withholding Tax",
+            "amount": "1.97",
+            "direction": "OUT",
+            "kind": "OTHER",
+            "merchant": null
+          }
+        ]
+      }
+    ]
+  },
+  "notes": "Two overlapping photos: shot 2 repeats the 10/15 payroll and 10/16 card payment lines. OCR noise: 'lnstaPay', 'Petr0n', 'Withdrawa1'. The 10/21 InstaPay pays the aircon service invoice (a bill to a business, so BILL_PAYMENT with that merchant). Withholding tax on interest is kind OTHER."
+}

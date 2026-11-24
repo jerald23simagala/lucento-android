@@ -201,13 +201,11 @@ private fun ColumnScope.SoloPage(mode: SpaceMode.Solo, state: SharedSpaceUiState
             "budgets, goals, categories and scheduled payments.",
     )
     Spacer(Modifier.height(Spacing.lg))
-    if (!state.invitesIncluded) {
-        // Inviting is Pro; joining someone else's space is free, so the invitations above stay reviewable.
-        com.lucento.app.feature.pro.ProNote(
-            text = com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE),
-            from = com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE,
-        )
-        return
+    // Inviting is Pro; joining someone else's space is free, so the invitations above stay reviewable. Without it, Create
+    // opens the Pro dialog (owner, 2026-11-18).
+    var createWall by androidx.compose.runtime.remember { mutableStateOf(false) }
+    if (createWall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE), onDismiss = { createWall = false })
     }
     var name by rememberSaveable(state.suggestedName) { mutableStateOf(state.suggestedName) }
     NameField(value = name, onValueChange = { name = it }, label = "Your name in the Shared Space")
@@ -216,7 +214,7 @@ private fun ColumnScope.SoloPage(mode: SpaceMode.Solo, state: SharedSpaceUiState
         text = "Create a Shared Space",
         icon = Icons.Outlined.Group,
         enabled = !state.busy,
-        onClick = { viewModel.createSpace(name) },
+        onClick = { if (!state.invitesIncluded) createWall = true else viewModel.createSpace(name) },
     )
     Spacer(Modifier.height(Spacing.md))
     Text(
@@ -234,6 +232,10 @@ private fun ColumnScope.OwnerPage(snapshot: SharedSpaceSnapshot, state: SharedSp
     val haptics = rememberHaptics()
     var removing by rememberSaveable { mutableStateOf<String?>(null) }
     var closing by rememberSaveable { mutableStateOf(false) }
+    var inviteWall by androidx.compose.runtime.remember { mutableStateOf(false) }
+    if (inviteWall) {
+        com.lucento.app.feature.pro.ProWallDialog(com.lucento.app.feature.pro.ProWall(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE), onDismiss = { inviteWall = false })
+    }
 
     // Right after an invitation is sent: the system share sheet with a message to pass on (Lucento sends no email).
     LaunchedEffect(state.justInvited) {
@@ -268,11 +270,6 @@ private fun ColumnScope.OwnerPage(snapshot: SharedSpaceSnapshot, state: SharedSp
             onShare = { shareInvitation(context, pending.email, snapshot.ownerEmail) },
             onRevoke = { viewModel.revoke(pending.id) },
         )
-        // A space made on Pro that has since lapsed: the server allows no Partner on Free.
-        !state.invitesIncluded -> com.lucento.app.feature.pro.ProNote(
-            text = com.lucento.app.feature.pro.ProCopy.lockedLine(com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE),
-            from = com.lucento.app.domain.entitlement.ProFeature.SHARED_SPACE,
-        )
         else -> {
             Intro(
                 title = "Your Shared Space is ready",
@@ -296,8 +293,11 @@ private fun ColumnScope.OwnerPage(snapshot: SharedSpaceSnapshot, state: SharedSp
             LucentoPrimaryButton(
                 text = "Send invitation",
                 icon = Icons.Outlined.PersonAdd,
-                enabled = valid && !state.busy,
-                onClick = { viewModel.invite(email) { email = ""; haptics.confirm() } },
+                // Without invitations on the plan, Send answers with the Pro dialog straight away (no address needed).
+                enabled = (valid || !state.invitesIncluded) && !state.busy,
+                // A space made on Pro that has since lapsed: the server allows no Partner on Free, so Send opens the
+                // Pro dialog (owner, 2026-11-18).
+                onClick = { if (!state.invitesIncluded) inviteWall = true else viewModel.invite(email) { email = ""; haptics.confirm() } },
             )
             state.message?.let { message ->
                 Spacer(Modifier.height(Spacing.md))
