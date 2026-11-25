@@ -391,6 +391,13 @@ needs `20261122090000_user_settings.sql` on each project).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,
   stable signing via GitHub secrets, Play-ready release workflow.
 
+## Planned — Conversion (CRO) (2026-11-25, `docs/cro-plan`)
+- Plan: `docs/growth/CRO_PLAN.md`.
+- Before launch: measure every funnel step from the Play listing to Pro, with four more opt-in counts and tagged website
+  links.
+- After launch: one Play store listing experiment at a time, starting with screenshots; then setup, then the Pro path.
+- Tasks CRO-1…CRO-7 in NEXT_TASKS.
+
 ## In progress — Launch marketing (2026-11-14, `docs/launch-marketing`)
 - Strategy and rules: `docs/marketing/launch/` (PLAYBOOK, TRUTH_RULES, CHANNEL_KIT, OWNER_STEPS). ₱0 budget, faceless
   shorts on TikTok, Reels and YouTube Shorts, a weekly ready pack the owner schedules, borrowed audiences, and the

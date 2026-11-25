@@ -62,6 +62,23 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Conversion plan (CRO) (2026-11-25, `docs/cro-plan`)
+
+The plan is in docs/growth/CRO_PLAN.md. Owner's choices:
+- start with the Play listing → install;
+- four more opt-in usage counts for the Pro path;
+- tagged Play links on the website, with no site analytics.
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| CRO-1 | New migration: add `pro_dialog_shown`, `plan_page_viewed`, `purchase_started` and `purchase_completed` to `usage_events_event_allowlist`. The owner pastes it on lucento-test, then production, and Claude checks read-only | P0 before the launch build | Production must accept the names before any build sends them |
+| CRO-2 | App: the four counts and their props (`feature`, `from`, `plan`). **First,** drop a count the server rejects instead of retrying it first forever (`UsageCountsService.upload`). Also: the Privacy Policy line + `VERSION` + website `/privacy`, and the owner adds Analytics to Data safety › Purchase history | P0 in the launch build | With HF-1. A rejected count today blocks every later count from that phone |
+| CRO-3 | Website: Play links carry `referrer` tags. The source is the visitor's own or `website`, the medium is `website_<place>`, and the incoming tags are kept in `sessionStorage` only | P1 with `playListed` | No site analytics (owner) |
+| CRO-4 | Review both listings (first three screenshots, icon at search size, PH title call) → ranked fixes, asked as multiple choice | P1 before P-day | Evidence: the live listing and Play search for the `ASO_KEYWORDS.md` terms |
+| CRO-5 | Review setup → first entry (taps and seconds) and the plan page (trial visible, which plan is selected first, Lifetime framing) → ranked fixes | P1 | No walkthroughs (owner, 2026-11-25) |
+| CRO-6 | Funnel log in lucento-studio (private) and read-only `usage_events` queries | P1 before week 1 | No install or purchase numbers in this public repo |
+| CRO-7 | E1: screenshots, one variant, on the listing most visitors see; starts at P-day + 8 and runs at least 14 days | P1 | The owner uploads it from a Mission Control task |
+
 ## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
 
 The closed test's report (Testers Community, 25 Nov) found no bugs and asked for a rating option, sharing and help in
