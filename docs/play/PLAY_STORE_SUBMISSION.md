@@ -109,7 +109,7 @@ saves them to `/data/local/tmp/lucento-shots/delete-0*.png`), plus the public pa
 | Field | Value |
 |---|---|
 | App name (≤ 30) | Lucento: Budget Tracker (owner approved the graphics set 2026-11-08; the name puts the top search term in the field Play weighs most) |
-| Short description (≤ 80) | Type what you spent. Budgets, wallets, bills and goals. Offline, no bank login. |
+| Short description (≤ 80) | Expense tracker, budget planner & money manager. Type it like a text, offline. (78) |
 | Category / tags | Finance; tags: Budget, Personal finance, Expense tracker |
 | Contact email | lucentoapp@gmail.com |
 | Website | `https://www.lucentoapp.com` |
@@ -120,15 +120,31 @@ Copy rules: never promise "no ads" (ads may come to Free); never call local pars
 "best" or "#1" in graphics; name no third-party brands (GCash, Maya, Meralco) in metadata, since Play can reject
 unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the institution count from README.
 
-### Main listing, English (global default), 3313 characters
+Keywords (2026-11-25, after the closed test's report; evidence in `docs/play/ASO_KEYWORDS.md`):
+- The title carries "budget tracker". The short descriptions carry the next terms people type: "expense tracker",
+  "budget planner" and "money manager" globally; "expense tracker", "budget planner", "gastos", "ipon" and "utang" in the
+  Philippines, where the custom listing replaces the global text completely.
+- Both short descriptions say "offline": Play suggests an offline version of almost every core term, and none of the
+  leading apps claims it.
+- The full descriptions carry the long tail once each, in plain sentences: budget app, daily expenses, tracks your
+  spending, bills and subscriptions, debts, net worth over time, couples budgeting together. The Philippine listing adds
+  gastos, ipon and utang tracker, and listahan ng utang.
+- Short description rules (Google):
+  - no "free", "best", "#1", "top", "new", "sale", calls to action, emoji, special characters or capitals for emphasis;
+  - a single sentence takes no final period.
+- Never repeat a keyword for its own sake: Google ignores it, and repetitive keywords can get an app suspended.
+- After launch: Play Console › Grow users › Store performance gives the search terms by country. Store listing
+  experiments can test the short description.
 
-> Lucento is a budget planner and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. No bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
+### Main listing, English (global default), 3417 characters
+
+> Lucento is a budget app and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. Personal finance with no bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
+> Log your daily expenses the way you'd text a friend: "coffee 4.50, groceries 85, salary 3000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND
-> Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+> Give each category a monthly budget. Lucento tracks your spending against how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
 >
 > PLAN EACH MONTH, SEE YOUR YEAR
 > • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or a trip gets its own amount.
@@ -136,11 +152,11 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 > • Milestones shows your budget year month by month (Pro), and the awards you earn from your own records.
 >
 > EVERY ACCOUNT, ONE NET WORTH
-> Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of 409 banks and providers in 48 countries, so each account looks like the card you know. Lucento adds what you have and what you owe into one net worth.
+> Cash, bank accounts, e-wallets, savings, credit cards and loans, all in one money manager. Wallets can show the logo and colours of 409 banks and providers in 48 countries, so each account looks like the card you know. Lucento adds what you have and what you owe into one net worth and tracks it over time.
 >
 > BILLS, DEBTS AND SAVINGS GOALS
-> • Schedule bills, subscriptions and salary, and confirm them when they happen.
-> • Track loans and credit cards, and money others owe you.
+> • Track bills and subscriptions: schedule them with your salary, and confirm each one when it happens.
+> • Track debts, loans and credit cards, and money others owe you.
 > • Save toward goals with a target date and the monthly pace that gets you there.
 > • See where your money went with income and spending trends.
 >
@@ -159,24 +175,24 @@ unauthorised trademark use. Free limits come from `PlanCatalog`/`ProGates`; the 
 > • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
-> • Lucento Shared, so a partner can record from their own phone
+> • Lucento Shared, so couples can budget together, each recording from their own phone
 > • more questions for Ask Lucento, the AI adviser that answers from your own figures, and Smarter reading of what you type
 >
 > Choose monthly, yearly with a 7-day free trial, or Lifetime: one purchase that keeps Pro's on-phone features for good and includes 12 months of the online services (sync, Shared and AI). Subscriptions renew until you cancel in Google Play.
 >
 > Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
 
-### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3414 characters
+### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3502 characters
 
-Short description: Type your gastos like a text. Budget, ipon and utang in pesos, offline. (71)
+Short description: Expense tracker & budget planner for gastos, ipon and utang. Offline, in pesos. (79)
 
-> Lucento is a budget app and expense tracker made for how Filipinos handle money: cash, bank accounts, e-wallets, credit cards and loans, all in one clear view. Track your gastos, ipon and utang in pesos, with no bank login. You record it, and Lucento keeps it straight, even offline.
+> Lucento is a budget app and expense tracker made for how Filipinos handle money: cash, bank accounts, e-wallets, credit cards and loans, all in one clear view. It's a gastos tracker, ipon tracker and utang tracker in one, in pesos, with no bank login. You record it, and Lucento keeps it straight, even offline.
 >
 > TYPE IT LIKE A TEXT
-> Log spending the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
+> Log your daily gastos the way you'd text a friend: "jeep 13, load 100, electric bill 2450, sweldo 25000". Lucento turns it into transactions, picks the categories, and lets you check every row before anything is saved. You can also say it out loud, or scan receipts, bills and bank, card or e-wallet statements, which are read on your phone. Two home-screen widgets add a transaction in a tap or keep what's safe to spend in view.
 >
 > KNOW WHAT'S SAFE TO SPEND THIS MONTH
-> Give each category a monthly budget. Lucento compares what you've spent with how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
+> Give each category a monthly budget. Lucento tracks your spending against how much of the month has passed, sets aside the bills still due, and shows what's safe to spend. Your total budget is the sum of your categories, so the numbers always add up.
 >
 > PLAN EACH MONTH, SEE YOUR YEAR
 > • As a month ends, Lucento offers to plan the next one, so a yearly bill, a birthday or Christmas gets its own amount.
@@ -188,8 +204,8 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 >
 > BILLS, UTANG AND IPON GOALS
 > • Schedule bills, subscriptions and sweldo, and confirm them when they happen.
-> • Track loans and credit cards, and money others owe you (pautang).
-> • Save toward goals, like an emergency fund or a trip, with a target date and the monthly pace that gets you there.
+> • Keep a listahan ng utang: loans, credit cards, and money others owe you (pautang).
+> • Track your ipon: save toward goals, like an emergency fund or a trip, with a target date and the monthly pace that gets you there.
 > • See where your money went with income and spending trends.
 >
 > PRIVATE BY DESIGN
@@ -207,7 +223,7 @@ Short description: Type your gastos like a text. Budget, ipon and utang in pesos
 > • 6- and 12-month Insights, the budget year on Milestones, and PDF statements
 > • more themes
 > • cloud sync between phones
-> • Lucento Shared, so your partner can record from their own phone
+> • Lucento Shared, so couples can budget together, each recording from their own phone
 > • more questions for Ask Lucento, the AI adviser that answers from your own figures, and Smarter reading of what you type
 >
 > Choose monthly, yearly with a 7-day free trial, or Lifetime: one purchase that keeps Pro's on-phone features for good and includes 12 months of the online services (sync, Shared and AI). Subscriptions renew until you cancel in Google Play.
