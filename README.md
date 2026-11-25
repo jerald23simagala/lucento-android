@@ -10,7 +10,7 @@ and AI-assisted entry — built local-first: your data stays on your device and 
 > [docs/QUALITY.md](docs/QUALITY.md) for exactly what was and wasn't verified. Also: [docs/ROADMAP.md](docs/ROADMAP.md),
 > [docs/DESIGN.md](docs/DESIGN.md), [docs/CALCULATIONS.md](docs/CALCULATIONS.md), [CHANGELOG.md](CHANGELOG.md).
 
-## What works today (0.5.19)
+## What works today (0.5.20)
 - **Navigation**: a persistent dock — **Home · Transactions · (+) · Budget · Wallets** — whose central **+** opens the
   **transaction composer**; Insights, Savings goals, Milestones, Scheduled transactions and Debts & loans open from
   Home's Quick links, Categories from the Budget tab; the Home bell lists scheduled payments that are overdue or due this week; a **profile** button (optional name and photo — from the phone, or the Google account's picture on request — appearance, Settings, Enabled features).
@@ -95,6 +95,9 @@ and AI-assisted entry — built local-first: your data stays on your device and 
   optional app lock (fingerprint, face or screen lock) and Hide in recent apps. Signed in, **Delete account** removes the
   account and its cloud data (docs/ACCOUNT_DELETION.md); the Terms of Use and Privacy Policy open from Settings ›
   Privacy & security (docs/LEGAL.md).
+- **Help & feedback** (Settings): Questions and answers (the website's FAQ), Contact support (an email from your own
+  email app), Lucento Community, **Rate Lucento** and **Share Lucento**. Once the Play listing is public, Google Play's
+  rating card may appear after a save, at most every 90 days (docs/HELP_AND_FEEDBACK.md).
 - **Motion**: the mascot's gentle float and pose cross-fades; original Lottie net-flow glyphs, onboarding mark,
   empty states, receipt scan beam, saved confirmation, milestones; awards as medals presented by the mascot — bundled and
   reduced-motion aware.
