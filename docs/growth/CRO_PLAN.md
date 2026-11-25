@@ -30,7 +30,7 @@ This plan also keeps the owner's standing calls:
 | R3 | Setup finished | Install ids with `first_entry_saved` ÷ install ids with `onboarding_started` | `usage_events` (opt-in only) |
 | R4 | Setup drop-off | `onboarding_step_viewed` counted by `step` | `usage_events` |
 | R5 | Came back | `d1_return` and `d7_return` ÷ `onboarding_started`. Play's retained installers serve as a cross-check | `usage_events`, Play Console |
-| R6 | Reached the plan page | `plan_page_viewed` by `from` ÷ active install ids. Dialog → plan page = `plan_page_viewed{from=dialog}` ÷ `pro_dialog_shown` | `usage_events` (needs CRO-1 and CRO-2) |
+| R6 | Reached the plan page | `plan_page_viewed` by `from` ÷ active install ids. Wall → plan page, per feature = `plan_page_viewed{from=wall, feature=X}` ÷ `pro_dialog_shown{feature=X}` | `usage_events` (needs CRO-1 and CRO-2) |
 | R7 | Bought | `purchase_completed` ÷ `purchase_started`. Also trial starts, trial → paid, cancellations, and Lifetime vs yearly | `usage_events`, Play's subscription reports, and the server's purchase rows (read-only) |
 | R8 | Shares that install | Installs tagged `utm_source=app_share` | Play Console, UTM view (HF-5) |
 
@@ -77,7 +77,7 @@ that phone. The fix:
 | Count | Prop | Sent from |
 |---|---|---|
 | `pro_dialog_shown` | `feature`: the `ProFeature` the dialog names | `ProWallDialog` (`feature/pro/ProWall.kt`), the only Pro dialog. Repeat taps already show the snackbar instead, so it sends at most once per feature per session |
-| `plan_page_viewed` | `from`: `dialog`, `snackbar`, `settings`, `profile`, `plan_ended`, `preview` or `other` | The plan page. Its route must carry where it was opened from |
+| `plan_page_viewed` | `from`: `settings`, `profile`, `plan_ended`, `onboarding`, `wall` (the Pro dialog, the short message's Unlock or a lock note) or `other`; plus `feature` when a lock led there | The plan page, once per visit. Its route carries the door (`ProRoute.via`) next to the feature it already named. The dialog and the message aren't told apart: that would have meant changing every lock's call site before launch, and `pro_dialog_shown` already counts the dialogs |
 | `purchase_started` | `plan`: `monthly`, `annual`, `annual_trial` or `lifetime` | `ProViewModel.buy`, before Play's sheet opens |
 | `purchase_completed` | Same `plan` values | Only when Play confirms a new purchase in this session. Never on Restore or a refresh |
 
