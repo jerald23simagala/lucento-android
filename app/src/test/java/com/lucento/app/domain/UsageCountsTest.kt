@@ -14,7 +14,7 @@ class UsageCountsTest {
     private val hour = 60L * 60L * 1000L
     private val day = 24L * hour
 
-    @Test fun theAllowlistIsTheEightSpecEvents() {
+    @Test fun theAllowlistIsTheTwelveSpecEvents() {
         assertEquals(
             listOf(
                 "onboarding_started",
@@ -25,15 +25,96 @@ class UsageCountsTest {
                 "first_week_card_step_done",
                 "budget_suggestion_shown",
                 "budget_suggestion_accepted",
+                "pro_dialog_shown",
+                "plan_page_viewed",
+                "purchase_started",
+                "purchase_completed",
             ),
             UsageCounts.EVENTS,
         )
-        assertEquals(8, UsageCounts.EVENTS.distinct().size)
+        assertEquals(12, UsageCounts.EVENTS.distinct().size)
+        assertTrue(UsageCounts.EVENTS.all { it.length <= 40 })
+    }
+
+    /**
+     * The app's list and the server table's own check must name the same events: a name only the app knows is refused
+     * by the server (and was, before CRO-2, stuck at the front of the queue).
+     */
+    @Test fun theAllowlistMatchesTheLatestServerMigration() {
+        val dir = listOf(java.io.File("../supabase/migrations"), java.io.File("supabase/migrations")).firstOrNull { it.isDirectory }
+        org.junit.Assume.assumeTrue("the repo's supabase/migrations isn't reachable from here", dir != null)
+        val latest = dir!!.listFiles { f -> f.name.endsWith(".sql") }!!.sortedBy { it.name }
+            .map { it.readText() }
+            .last { it.contains("constraint usage_events_event_allowlist check") }
+        val check = latest.substringAfter("constraint usage_events_event_allowlist check").substringBefore(");")
+        val names = Regex("'([a-z0-9_]+)'").findAll(check).map { it.groupValues[1] }.toList()
+        assertEquals(UsageCounts.EVENTS.sorted(), names.sorted())
     }
 
     @Test fun propsDropAnythingOutsideTheAllowlist() {
         val kept = UsageCounts.props(mapOf("step" to "1", "amount" to "12.50", "note" to "coffee", "ms" to "40"))
         assertEquals(mapOf("step" to "1", "ms" to "40"), kept)
+        val pro = UsageCounts.props(mapOf("feature" to "money_wallets", "from" to "wall", "plan" to "annual", "price" to "1190"))
+        assertEquals(mapOf("feature" to "money_wallets", "from" to "wall", "plan" to "annual"), pro)
+    }
+
+    @Test fun onlyDataAndConstraintErrorsAreRefusals() {
+        assertTrue(UsageCounts.isRefusal("23514"))   // name outside the allowlist
+        assertTrue(UsageCounts.isRefusal("22023"))   // the reserved install id
+        assertFalse(UsageCounts.isRefusal(null))      // no answer at all: try again later
+        assertFalse(UsageCounts.isRefusal("42501"))   // permissions: a server problem, not this count's
+        assertFalse(UsageCounts.isRefusal("PGRST202"))
+        assertFalse(UsageCounts.isRefusal("2"))
+    }
+
+    @Test fun aRefusedCountIsDroppedAndTheOnesBehindItStillSend() = runBlocking {
+        val sent = mutableListOf<String>()
+        var offline = false
+        val store = Store()
+        val service = UsageCountsService(
+            load = { store.ledger },
+            save = { store.ledger = it },
+            send = UsageEventSender { _, event, _ ->
+                if (offline) throw IllegalStateException("offline")
+                if (event.name == UsageCounts.PURCHASE_STARTED) throw UsageEventRefused("23514")  // an older server
+                sent += event.name
+            },
+            deleteRemote = UsageEventDeleter { },
+            newInstallId = { "install" },
+            now = { 10 },
+            appVersion = "1.0",
+            launchInBackground = { block -> runBlocking { block() } },
+        )
+        service.setOptIn(true)
+        offline = true
+        service.record(UsageCounts.PURCHASE_STARTED, mapOf("plan" to "monthly"))
+        service.record(UsageCounts.PLAN_PAGE_VIEWED, mapOf("from" to "settings"))
+        assertEquals("no network keeps both", 2, store.ledger.queue.size)
+        offline = false
+        service.record(UsageCounts.D1_RETURN, mapOf("day_index" to "1"))
+        assertEquals(listOf(UsageCounts.PLAN_PAGE_VIEWED, UsageCounts.D1_RETURN), sent)
+        assertTrue("the refused one doesn't block the queue", store.ledger.queue.isEmpty())
+    }
+
+    @Test fun conversionPropsNameTheDoorAndThePlan() {
+        assertEquals(mapOf("from" to "settings"), ConversionCounts.planPageProps("settings", null))
+        assertEquals(mapOf("from" to "plan_ended"), ConversionCounts.planPageProps("plan_ended", null))
+        assertEquals(mapOf("from" to "onboarding", "feature" to "cloud_restore"), ConversionCounts.planPageProps("onboarding", "CLOUD_RESTORE"))
+        assertEquals(mapOf("from" to "wall", "feature" to "extra_themes"), ConversionCounts.planPageProps("", "EXTRA_THEMES"))
+        assertEquals(mapOf("from" to "other"), ConversionCounts.planPageProps("", null))
+        assertEquals(mapOf("from" to "other"), ConversionCounts.planPageProps("made-up door", null))
+
+        val sub = com.lucento.app.domain.entitlement.PlayProducts.PRO_SUBSCRIPTION
+        assertEquals("monthly", ConversionCounts.plan(sub, "P1M", withTrial = false))
+        assertEquals("annual", ConversionCounts.plan(sub, "P1Y", withTrial = false))
+        assertEquals("annual_trial", ConversionCounts.plan(sub, "P1Y", withTrial = true))
+        assertEquals("lifetime", ConversionCounts.plan(com.lucento.app.domain.entitlement.PlayProducts.PRO_LIFETIME, null, withTrial = false))
+        assertEquals("cloud_annual", ConversionCounts.plan(com.lucento.app.domain.entitlement.PlayProducts.CLOUD_ADDON, "P1Y", withTrial = false))
+        assertEquals("other", ConversionCounts.plan("something_else", "P1M", withTrial = false))
+        // Every value fits a prop and survives the on-phone queue's format.
+        val values = listOf("monthly", "annual", "annual_trial", "lifetime", "cloud_monthly", "cloud_annual", "other") +
+            com.lucento.app.domain.entitlement.ProFeature.entries.map { ConversionCounts.feature(it.name) }
+        assertTrue(values.all { it.length <= UsageCounts.MAX_PROP_LENGTH && Regex("[a-z0-9_]+").matches(it) })
     }
 
     @Test fun optingInOnWelcomeQueuesTheStartEventAndOptingOutClearsIt() {

@@ -14,8 +14,11 @@ import com.lucento.app.data.billing.VerifyOutcome
 import com.lucento.app.data.entitlement.EntitlementManager
 import com.lucento.app.data.entitlement.RefreshOutcome
 import com.lucento.app.data.entitlement.ReleaseOutcome
+import com.lucento.app.domain.ConversionCounts
+import com.lucento.app.domain.UsageCounts
 import com.lucento.app.domain.entitlement.EntitlementState
 import com.lucento.app.domain.entitlement.PlayProducts
+import com.lucento.app.domain.entitlement.ProFeature
 import com.lucento.app.domain.entitlement.PurchaseInterpreter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,6 +71,11 @@ class ProViewModel(
     private val clock: () -> Long = System::currentTimeMillis,
     /** The signed-in account's email, null while signed out (only whether there is one matters here). */
     signedInEmail: kotlinx.coroutines.flow.Flow<String?> = flowOf(""),
+    /**
+     * One opt-in usage count (docs/growth/CRO_PLAN.md, CRO-2): plan_page_viewed, purchase_started, purchase_completed.
+     * The app container's sends it off this page's scope and drops it while counts are off.
+     */
+    private val recordUsage: (String, Map<String, String>) -> Unit = { _, _ -> },
 ) : ViewModel() {
     private data class Local(
         val prices: List<ProductPrice> = emptyList(),
@@ -77,6 +85,8 @@ class ProViewModel(
         val purchaseMessage: String? = null,
         /** The product of the purchase in flight, so its result can be worded. */
         val buying: String? = null,
+        /** The same purchase as a count names its plan ([ConversionCounts.plan]). */
+        val buyingPlan: String? = null,
         /** Counts purchases started here, so an answer meant for one that's already settled is never applied twice. */
         val attempt: Int = 0,
     )
@@ -116,7 +126,14 @@ class ProViewModel(
                     settleAlreadyOwned(local.value.attempt)
                     return@collect
                 }
-                local.update { it.copy(purchasing = false, buying = null, purchaseMessage = ProCopy.purchaseResult(result, it.buying)) }
+                // Counted only for a purchase started on this page, never for a Restore or an older order settling.
+                val started = local.value
+                if (result == PurchaseResult.Completed && started.purchasing && started.buyingPlan != null) {
+                    recordUsage(UsageCounts.PURCHASE_COMPLETED, mapOf("plan" to started.buyingPlan))
+                }
+                local.update {
+                    it.copy(purchasing = false, buying = null, buyingPlan = null, purchaseMessage = ProCopy.purchaseResult(result, it.buying))
+                }
                 // A completed purchase is already on its way through Play's update; a refresh also asks the server.
                 if (result == PurchaseResult.Completed) runCatching { entitlements.refresh() }
             }
@@ -130,12 +147,29 @@ class ProViewModel(
         }
     }
 
+    private var openedNoted = false
+
+    /**
+     * The page is on screen: the opt-in count plan_page_viewed, once for this page (it lives as long as the page is in
+     * the back stack, so coming Back from a deeper page or turning the phone isn't a second visit).
+     */
+    fun noteOpened(feature: ProFeature?, via: String?) {
+        if (openedNoted) return
+        openedNoted = true
+        recordUsage(UsageCounts.PLAN_PAGE_VIEWED, ConversionCounts.planPageProps(via, feature?.name))
+    }
+
     /** Opens Google Play's purchase sheet for [price]. One at a time; how it went arrives from Play. */
     fun buy(activity: Activity, price: ProductPrice) {
         if (local.value.purchasing) return
+        val plan = ConversionCounts.plan(price.productId, price.billingPeriodIso, withTrial = price.freeTrialPeriodIso != null)
         local.update {
-            it.copy(purchasing = true, buying = price.productId, purchaseMessage = null, message = null, attempt = it.attempt + 1)
+            it.copy(
+                purchasing = true, buying = price.productId, buyingPlan = plan, purchaseMessage = null, message = null,
+                attempt = it.attempt + 1,
+            )
         }
+        recordUsage(UsageCounts.PURCHASE_STARTED, mapOf("plan" to plan))
         val attempt = local.value.attempt
         viewModelScope.launch {
             // Google Play refuses a new Lifetime while it still holds one Lucento ended (a refund that didn't remove it).
@@ -213,6 +247,7 @@ class ProViewModel(
             ProViewModel(
                 it.entitlements, it.purchaseSource, it.planSimulator, currentUserId = it.auth::currentUserId,
                 signedInEmail = it.auth.observeSignedInEmail(),
+                recordUsage = it::recordUsage,
             )
         }
     }

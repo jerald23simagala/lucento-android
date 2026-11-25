@@ -182,7 +182,14 @@ class AppContainer(application: Application) {
     val appLock: com.lucento.app.core.security.AppLockSession by lazy { com.lucento.app.core.security.AppLockSession() }
 
     /** Pro walls met this session (owner, 2026-11-19): the first tap a dialog, later taps a short message. In memory. */
-    val proWalls: com.lucento.app.feature.pro.ProWallMemory by lazy { com.lucento.app.feature.pro.ProWallMemory() }
+    val proWalls: com.lucento.app.feature.pro.ProWallMemory by lazy {
+        com.lucento.app.feature.pro.ProWallMemory(onFirstShown = { feature ->
+            recordUsage(
+                com.lucento.app.domain.UsageCounts.PRO_DIALOG_SHOWN,
+                mapOf("feature" to com.lucento.app.domain.ConversionCounts.feature(feature.name)),
+            )
+        })
+    }
 
     /** A Pro theme tried on in the profile sheet, never saved (owner, 2026-11-19). In memory. */
     val themeTrial: com.lucento.app.feature.profile.ThemeTrial by lazy { com.lucento.app.feature.profile.ThemeTrial() }
@@ -593,6 +600,14 @@ class AppContainer(application: Application) {
             appVersion = BuildConfig.VERSION_NAME,
             launchInBackground = { block -> usageScope.launch { block() } },
         )
+    }
+
+    /**
+     * One opt-in usage count from anywhere in the app, off the caller's scope, so a page that closes (Google Play's
+     * purchase sheet returning, Back) never cancels it. Nothing is queued or sent while counts are off.
+     */
+    fun recordUsage(name: String, props: Map<String, String> = emptyMap()) {
+        usageScope.launch { runCatching { usageCounts.record(name, props) } }
     }
 
     /** Sign-out and account switching. Wipes the local ledger before another account can sync. */

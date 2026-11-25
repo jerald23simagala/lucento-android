@@ -3,10 +3,19 @@ package com.lucento.app.domain
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** Inserts one anonymous event. Implementations must not read the table back. */
+/**
+ * Inserts one anonymous event. Implementations must not read the table back. Throws [UsageEventRefused] when the server
+ * will never take this event, and any other exception when it couldn't be reached (the event is tried again later).
+ */
 fun interface UsageEventSender {
     suspend fun insert(installId: String, event: UsageEvent, appVersion: String)
 }
+
+/**
+ * The server refused this count for good ([UsageCounts.isRefusal]), for example a name an older server doesn't list yet.
+ * The queue drops it and goes on: kept, it would sit at the front and stop every later count from this phone.
+ */
+class UsageEventRefused(val sqlState: String?) : Exception("usage count refused ($sqlState)")
 
 /** Calls delete_usage_events. Must not select the table. */
 fun interface UsageEventDeleter {
@@ -15,7 +24,8 @@ fun interface UsageEventDeleter {
 
 /**
  * Queues events on the device and uploads them only while the person has opted in.
- * A failed upload leaves the event queued. Opting out clears the queue and does not upload it.
+ * An upload that can't reach the server leaves the event queued; one the server refuses is dropped. Opting out clears the
+ * queue and does not upload it.
  */
 class UsageCountsService(
     private val load: suspend () -> UsageLedger,
@@ -171,17 +181,20 @@ class UsageCountsService(
         val installId = ledger.installId ?: return
         val waiting = UsageLedgerLogic.drain(ledger)
         if (waiting.isEmpty()) return
-        var sent = 0
+        // Sent or refused: either way it leaves the front of the queue. Only "couldn't reach the server" keeps it.
+        var done = 0
         for (event in waiting) {
             try {
                 send.insert(installId, event, appVersion.take(UsageCounts.MAX_APP_VERSION))
-                sent++
+                done++
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
+            } catch (_: UsageEventRefused) {
+                done++
             } catch (_: Exception) {
                 break
             }
         }
-        if (sent > 0) save(UsageLedgerLogic.acknowledge(load(), sent))
+        if (done > 0) save(UsageLedgerLogic.acknowledge(load(), done))
     }
 }

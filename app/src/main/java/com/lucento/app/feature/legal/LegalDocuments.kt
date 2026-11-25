@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-26"
-    const val UPDATED = "26 November 2026"
+    const val VERSION = "2026-11-27"
+    const val UPDATED = "27 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -277,9 +277,10 @@ object LegalDocuments {
                 listOf(
                     "Crash reports send what went wrong in the app’s code — never amounts, names or notes — to Google " +
                         "Firebase Crashlytics.",
-                    "Usage counts send event names and timings (such as which setup screen was opened), with a random " +
-                        "number for this install and the app version — never amounts or what you type. They’re kept for " +
-                        "90 days, and turning them off deletes what was sent.",
+                    "Usage counts send event names and timings (such as which setup screen was opened, or that the " +
+                        "Lucento Plan page was opened or a plan bought), with a random number for this install and the " +
+                        "app version — never amounts or what you type. They’re kept for 90 days, and turning them off " +
+                        "deletes what was sent.",
                 ),
             ),
             Section(
