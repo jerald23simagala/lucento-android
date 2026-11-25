@@ -44,6 +44,7 @@ import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.WorkspacePremium
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.ToggleOn
@@ -281,10 +282,11 @@ fun ProfileSheet(
                     onClick = { open(ProfileDestination.SIGN_OUT) },
                 )
             }
-            // Lucento's public pages open in the browser only on a tap; sharing goes through the phone's own share sheet.
+            // Lucento's public pages open in the browser only on a tap; rating opens Google Play, and sharing goes through the
+            // phone's own share sheet (feature/help/LucentoActions, shared with Settings › Help & feedback).
             val context = androidx.compose.ui.platform.LocalContext.current
             fun browse(url: String) {
-                runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
+                com.lucento.app.feature.help.LucentoActions.browse(context, url)
             }
             FieldHeader("Community", Modifier.padding(top = Spacing.lg))
             // The Group is where people ask and suggest; news and tips now come from the channels under Follow Lucento.
@@ -293,6 +295,8 @@ fun ProfileSheet(
                 title = "Lucento Community",
                 summary = "Questions, ideas and help, in our Facebook group",
                 onClick = { browse(com.lucento.app.core.LucentoLinks.COMMUNITY) },
+                external = true,
+                onClickLabel = "Open in Facebook",
             )
             Hairline(inset = inset)
             NavRow(
@@ -307,19 +311,26 @@ fun ProfileSheet(
                 title = "Lucento website",
                 summary = "lucentoapp.com",
                 onClick = { browse(com.lucento.app.core.LucentoLinks.WEBSITE) },
+                external = true,
+                onClickLabel = "Open in your browser",
             )
             Hairline(inset = inset)
             NavRow(
                 icon = Icons.Outlined.Share,
                 title = "Share Lucento",
                 summary = "Tell a friend about Lucento",
-                onClick = {
-                    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(android.content.Intent.EXTRA_TEXT, com.lucento.app.core.LucentoLinks.shareMessage())
-                    }
-                    runCatching { context.startActivity(android.content.Intent.createChooser(send, "Share Lucento")) }
-                },
+                onClick = { com.lucento.app.feature.help.LucentoActions.share(context) },
+                external = true,
+                onClickLabel = "Share",
+            )
+            Hairline(inset = inset)
+            NavRow(
+                icon = Icons.Outlined.StarOutline,
+                title = "Rate Lucento",
+                summary = "Leave a rating or review on Google Play",
+                onClick = { com.lucento.app.feature.help.LucentoActions.openPlayListing(context) },
+                external = true,
+                onClickLabel = "Open Google Play",
             )
             Spacer(Modifier.height(Spacing.lg))
             Text(

@@ -16,6 +16,18 @@
 - **Add transactions:** "Into" is one field that opens the wallet picker (grouped, with balances) instead of a row of
   chips, and every row shows its wallet, so rows from different wallets in one message can be set before saving.
 
+## Unreleased — Help & feedback (closed-test report, 2026-11-25)
+
+- **Settings › Help & feedback:** Questions and answers (the website's FAQ), Contact support (an email to us from your
+  own email app, with the app and Android version below your message), Lucento Community, **Rate Lucento** (Google
+  Play) and Share Lucento. Testers looked for these in Settings; the profile menu keeps its Community group and gains
+  Rate Lucento.
+- **Google Play's rating card**, once Lucento is public on Google Play: after a save, for someone who has used Lucento
+  for a week and recorded 20 incomes and expenses, at most once every 90 days. Google Play shows it and keeps any
+  rating; Lucento never learns it.
+- After launch, Share Lucento's Google Play link is tagged so Play Console can count visits that came from sharing.
+- The Privacy Policy (26 November 2026) says what the rating card and these rows do.
+
 ## 0.5.19 (version code 24) — 2026-11-23
 
 - **Progress is now Milestones.** It opens with the Awards card, which shows three small medals: the latest one

@@ -7,11 +7,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.CloudSync
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.ToggleOn
 import androidx.compose.material.icons.outlined.Widgets
 import androidx.compose.material.icons.outlined.WorkspacePremium
@@ -24,9 +29,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.lucento.app.BuildConfig
+import com.lucento.app.core.LucentoLinks
 import com.lucento.app.core.designsystem.component.Hairline
+import com.lucento.app.core.designsystem.component.LocalMessageHosts
 import com.lucento.app.core.designsystem.component.LucentoMark
 import com.lucento.app.core.designsystem.component.NavRow
 import com.lucento.app.core.designsystem.component.SectionHeader
@@ -34,6 +44,8 @@ import com.lucento.app.core.designsystem.theme.Sizes
 import com.lucento.app.core.designsystem.theme.Spacing
 import com.lucento.app.data.preferences.UserPreferences
 import com.lucento.app.domain.Feature
+import com.lucento.app.feature.help.LucentoActions
+import com.lucento.app.feature.legal.LegalDocuments
 
 /**
  * The Settings landing page (P2-4): one row per page, each saying what is set there, then About. Replaces the single
@@ -118,6 +130,8 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
         )
         if (showWidgets) com.lucento.app.feature.widget.WidgetsSheet(onDismiss = { showWidgets = false })
 
+        HelpAndFeedback(inset)
+
         SectionHeader("About", Modifier.padding(top = Spacing.section))
         Row(verticalAlignment = Alignment.CenterVertically) {
             LucentoMark(size = 40.dp, animate = false)
@@ -139,6 +153,76 @@ internal fun SettingsHub(current: SettingsUiState, onOpenPage: (SettingsPage) ->
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * Help & feedback (tester report 2026-11-25, docs/HELP_AND_FEEDBACK.md): answers, a way to reach us, the community, a
+ * rating and a share, in Settings where testers looked for them. Each row hands over to another app on a tap, so Lucento
+ * sends nothing; when the phone has no app for it, a message says what to do instead.
+ */
+@Composable
+private fun HelpAndFeedback(inset: androidx.compose.ui.unit.Dp) {
+    val context = LocalContext.current
+    val messages = LocalMessageHosts.current
+    val clipboard = LocalClipboardManager.current
+    fun cannotOpen(url: String) = messages?.top?.show("Nothing on this phone can open $url")
+
+    SectionHeader("Help & feedback", Modifier.padding(top = Spacing.section))
+    NavRow(
+        icon = Icons.AutoMirrored.Outlined.HelpOutline,
+        title = "Questions and answers",
+        summary = "Common questions, answered on lucentoapp.com",
+        onClick = { if (!LucentoActions.browse(context, LucentoLinks.FAQ)) cannotOpen(LucentoLinks.FAQ) },
+        wrapTitle = true,
+        external = true,
+        onClickLabel = "Open in your browser",
+    )
+    Hairline(inset = inset)
+    NavRow(
+        icon = Icons.Outlined.MailOutline,
+        title = "Contact support",
+        summary = "Email ${LegalDocuments.CONTACT_EMAIL} · we reply by email",
+        onClick = {
+            if (!LucentoActions.emailSupport(context)) {
+                messages?.top?.show("No email app on this phone. Write to ${LegalDocuments.CONTACT_EMAIL}", actionLabel = "Copy") {
+                    clipboard.setText(AnnotatedString(LegalDocuments.CONTACT_EMAIL))
+                }
+            }
+        },
+        wrapTitle = true,
+        external = true,
+        onClickLabel = "Write an email",
+    )
+    Hairline(inset = inset)
+    NavRow(
+        icon = Icons.Outlined.Forum,
+        title = "Lucento Community",
+        summary = "Questions, ideas and help, in our Facebook group",
+        onClick = { if (!LucentoActions.browse(context, LucentoLinks.COMMUNITY)) cannotOpen(LucentoLinks.COMMUNITY) },
+        wrapTitle = true,
+        external = true,
+        onClickLabel = "Open in Facebook",
+    )
+    Hairline(inset = inset)
+    NavRow(
+        icon = Icons.Outlined.StarOutline,
+        title = "Rate Lucento",
+        summary = "Leave a rating or review on Google Play",
+        onClick = { if (!LucentoActions.openPlayListing(context)) cannotOpen(LucentoLinks.PLAY_STORE) },
+        wrapTitle = true,
+        external = true,
+        onClickLabel = "Open Google Play",
+    )
+    Hairline(inset = inset)
+    NavRow(
+        icon = Icons.Outlined.Share,
+        title = "Share Lucento",
+        summary = "Tell a friend about Lucento",
+        onClick = { LucentoActions.share(context) },
+        wrapTitle = true,
+        external = true,
+        onClickLabel = "Share",
+    )
 }
 
 /** The Account & sync row's summary: who is signed in and how sync stands, or that the data stays on this phone. */

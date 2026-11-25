@@ -40,6 +40,11 @@ Google accounts get no metadata, because their consent is given by continuing.
   document scanner. The cloud sync section adds settings (above). Re-dated because 0.5.15 carried the scanning text alone
   under 2026-11-22, so each date names one text. Not a new Lucento network path. The website's `legal.ts` is
   regenerated with this release.
+- Version 2026-11-26 (0.5.20): "Rating, sharing and contacting us" (docs/HELP_AND_FEEDBACK.md). Once the listing is
+  public, Lucento may ask Google Play to show its rating card after a save (a week of use, at most every 90 days); Play
+  decides and keeps any rating, and Lucento never learns it. Rate, Share, Contact support and Lucento's pages only open
+  other apps on a tap, and a support email starts with the app version, Android version and phone model, which the
+  person can delete. Not a new Lucento network path. The website's `legal.ts` is regenerated with this release.
 
 ## Keeping the website in step
 

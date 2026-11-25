@@ -15,6 +15,17 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Help & feedback and the rating card (2026-11-25, `feature/help-and-feedback`)
+
+- **HF-K1 The rating card can't be seen before launch.** It waits for `LucentoLinks.PLAY_LISTING_PUBLIC`, debug builds
+  aren't on Play, and Google Play never says whether the card showed. Only the rule and the record are tested (JVM).
+  First real check after launch: NEXT_TASKS HF-5.
+- **HF-K2 Contact support's details depend on the email app.** The subject and the version lines go as Android's
+  standard email extras; an email app that ignores them opens a blank email to the right address. Nothing is lost: the
+  person writes as usual.
+- **HF-K3 Two "Help" places until PR #77 is rebased.** The draft Contact support form adds its own "Help" section to
+  Settings; rebasing it onto this one is NEXT_TASKS HF-4.
+
 ## Tester round (2026-11-24, `feature/tester-round-2026-11-24`)
 
 - **TR4-K1 Card statement skips are kept on this phone.** "Skip this statement" is stored in this phone's

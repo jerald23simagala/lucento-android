@@ -62,6 +62,21 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
+
+The closed test's report (Testers Community, 25 Nov) found no bugs and asked for a rating option, sharing and help in
+Settings, a walkthrough and store keywords. Owner's choices: a small 0.5.20 before the production-access application
+(OT-43, closed test ends Mon 30 Nov), the Rate row plus Play's rating card, **no walkthrough, checklist or tab hints**
+(owner: "interested people will explore"), and a keyword-led short description. Details: docs/HELP_AND_FEEDBACK.md.
+
+| # | Task | Priority | Notes |
+|---|---|---|---|
+| HF-1 | **Launch build:** flip `LucentoLinks.PLAY_LISTING_PUBLIC` (with the website's `playListed`): Share Lucento then sends the tagged Play link, and the rating card can be asked for | P0 at launch | One flag drives both; closed testers are never asked before it (TRUTH_RULES T25) |
+| HF-2 | Regenerate the website's privacy text for version 2026-11-26 (`python tools/legal/export_legal.py ../lucento-website/src/data/legal.ts`) and deploy it with 0.5.20 | P1 | Website PR with the release |
+| HF-3 | Paste the new short descriptions (both listings) in Play Console | P1 | Owner task in Mission Control; texts in docs/play/PLAY_STORE_SUBMISSION.md §4 |
+| HF-4 | Draft PR #77 (Contact support form): rebase on this, so its Contact support page takes the email row's place in Help & feedback instead of a second "Help" section | P2 | Needs its database migrations and the owner's phone test, as before |
+| HF-5 | After launch: check one tagged share link in Play Console › Conversion analysis (UTM source `app_share`), and the first rating cards on a phone installed from Play | P2 | Neither can be seen before the listing is public |
+
 ## Tester round 2026-11-24 — follow-ups (`feature/tester-round-2026-11-24`)
 
 Owner's choices (2026-11-24): the Budget tab leads with Spent; "Into" is a field that opens the wallet picker; card
@@ -483,7 +498,8 @@ microphone) and 5 (an hourglass), and the cheer kept for the award. Next:
   shows as text. Don't copy another app's card designs (the tester's reference is a mood, not a template).
 - **Website**: `src/data/plans.ts` still lists "What your net worth is made of" as Pro, and `index.astro` mentions it;
   update both to the new Insights (donut, net worth over time) when this merges.
-- **Play listing public**: flip `LucentoLinks.PLAY_LISTING_PUBLIC` to true so "Share Lucento" sends the Play link.
+- **Play listing public**: flip `LucentoLinks.PLAY_LISTING_PUBLIC` to true so "Share Lucento" sends the Play link
+  (tagged since 0.5.20) and the rating card can be asked for (HF-1).
 - Ask Lucento PDFs print the website and Community links as text (PdfDocument can't add link annotations); viewers
   auto-link them.
 

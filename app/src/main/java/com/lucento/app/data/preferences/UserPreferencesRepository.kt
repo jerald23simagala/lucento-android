@@ -184,6 +184,12 @@ data class UserPreferences(
     val appLockUsed: Boolean = false,
     /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
     val addSpotlightSeen: Boolean = false,
+    /**
+     * When this phone last asked Google Play for its rating card (epoch millis), or null if it never has
+     * ([com.lucento.app.domain.ReviewPromptPolicy]). A fact about the phone, like the notices: kept across sign-outs and
+     * never synced, since Google Play's own limit is per phone and Google account, not per Lucento account.
+     */
+    val ratingCardAskedAt: Long? = null,
     /** Wallets screen: rows or card faces. Kept across sign-outs like the theme, and follows the account. */
     val walletsViewMode: WalletsViewMode = WalletsViewMode.CARDS,
     /**
@@ -350,6 +356,7 @@ class UserPreferencesRepository internal constructor(
         val insightsVisited = booleanPreferencesKey("insights_visited")
         val appLockUsed = booleanPreferencesKey("app_lock_used")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
+        val ratingCardAskedAt = longPreferencesKey("rating_card_asked_at")
         val walletsViewMode = stringPreferencesKey("wallets_view_mode")
         val profilePhotoVersion = longPreferencesKey("profile_photo_version")
         val profilePhotoChoice = stringPreferencesKey("profile_photo_choice")
@@ -429,6 +436,7 @@ class UserPreferencesRepository internal constructor(
                 // Installs that turned lock on before this flag existed count too.
                 appLockUsed = p[Keys.appLockUsed] ?: (p[Keys.appLock] ?: false),
                 addSpotlightSeen = p[Keys.addSpotlightSeen] ?: false,
+                ratingCardAskedAt = p[Keys.ratingCardAskedAt],
                 walletsViewMode = WalletsViewMode.fromKey(p[Keys.walletsViewMode]),
                 profilePhotoVersion = p[Keys.profilePhotoVersion],
                 profilePhotoChoice = ProfilePhotoChoice.fromKey(p[Keys.profilePhotoChoice]),
@@ -815,6 +823,11 @@ class UserPreferencesRepository internal constructor(
 
     suspend fun setAddSpotlightSeen() {
         trackedEdit { it[Keys.addSpotlightSeen] = true }
+    }
+
+    /** This phone asked Google Play for its rating card at [atMillis] ([com.lucento.app.domain.ReviewPromptPolicy]). */
+    suspend fun setRatingCardAsked(atMillis: Long) {
+        trackedEdit { it[Keys.ratingCardAskedAt] = atMillis }
     }
 
     /** Lucento Pro's welcome: these plans have been welcomed (stored when it starts, so it never loops). */
