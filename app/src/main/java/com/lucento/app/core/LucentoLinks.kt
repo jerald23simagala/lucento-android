@@ -23,16 +23,37 @@ object LucentoLinks {
 
     /** One of Lucento's channels: its name, what to look for there, where it opens and its logo (tinted where drawn). */
     data class Channel(val name: String, val subtitle: String, val url: String, @androidx.annotation.DrawableRes val icon: Int)
-    const val PLAY_STORE = "https://play.google.com/store/apps/details?id=com.lucento.app"
+
+    /** The released app's id on Google Play; test builds add `.debug` to their own id, so never read it from the build. */
+    const val PLAY_PACKAGE = "com.lucento.app"
 
     /**
-     * Flip to true when the Google Play listing is public (production track live): "Share Lucento" then sends the Play
-     * link instead of the website. Until then the Play link would show "item not found" to anyone outside testing.
+     * Lucento's Play listing. "Rate Lucento" opens it in the Play Store app (Google's documented way: this https link
+     * aimed at `com.android.vending`), or in the browser on a phone without the Play Store.
+     */
+    const val PLAY_STORE = "https://play.google.com/store/apps/details?id=$PLAY_PACKAGE"
+
+    /**
+     * The listing as "Share Lucento" sends it: tagged `app_share` / `referral` (docs/marketing/launch/CHANNEL_KIT.md §3), so
+     * Play Console's acquisition report can count the installs that came from people sharing Lucento. Play reads the
+     * tags from `referrer`; the app itself never reads them.
+     */
+    const val PLAY_STORE_SHARE = "$PLAY_STORE&referrer=utm_source%3Dapp_share%26utm_medium%3Dreferral%26utm_campaign%3Dshare_lucento"
+
+    /** The website's questions and answers (a section of the home page). */
+    const val FAQ = "https://www.lucentoapp.com/#faq"
+
+    /**
+     * Flip to true when the Google Play listing is public (production track live). Two things wait for it:
+     * - "Share Lucento" sends the Play link ([PLAY_STORE_SHARE]) instead of the website; until then the Play link would
+     *   show "item not found" to anyone outside testing.
+     * - Google Play's rating card may be asked for after a save ([com.lucento.app.domain.ReviewPromptPolicy]). Closed
+     *   testers are never asked (docs/marketing/launch/TRUTH_RULES.md T25); "Rate Lucento" in Settings works for them now.
      */
     const val PLAY_LISTING_PUBLIC = false
 
     /** Where "Share Lucento" points people. */
-    val shareLink: String get() = if (PLAY_LISTING_PUBLIC) PLAY_STORE else WEBSITE
+    val shareLink: String get() = if (PLAY_LISTING_PUBLIC) PLAY_STORE_SHARE else WEBSITE
 
     /** The message the share sheet starts with; the person can change it before sending. */
     fun shareMessage(link: String = shareLink): String =

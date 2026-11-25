@@ -78,9 +78,20 @@ class TesterRound3RulesTest {
     }
 
     @Test fun sharingPointsAtTheWebsiteUntilThePlayListingIsPublic() {
-        assertEquals(if (LucentoLinks.PLAY_LISTING_PUBLIC) LucentoLinks.PLAY_STORE else LucentoLinks.WEBSITE, LucentoLinks.shareLink)
+        assertEquals(if (LucentoLinks.PLAY_LISTING_PUBLIC) LucentoLinks.PLAY_STORE_SHARE else LucentoLinks.WEBSITE, LucentoLinks.shareLink)
         assertTrue(LucentoLinks.shareMessage().endsWith(LucentoLinks.shareLink))
         assertTrue(LucentoLinks.PLAY_STORE.endsWith("id=com.lucento.app"))
-        listOf(LucentoLinks.WEBSITE, LucentoLinks.COMMUNITY, LucentoLinks.PLAY_STORE).forEach { assertTrue(it.startsWith("https://")) }
+        listOf(LucentoLinks.WEBSITE, LucentoLinks.COMMUNITY, LucentoLinks.PLAY_STORE, LucentoLinks.PLAY_STORE_SHARE, LucentoLinks.FAQ)
+            .forEach { assertTrue(it.startsWith("https://")) }
+    }
+
+    /** Tester report 2026-11-25: the shared Play link carries the channel kit's tags, encoded inside `referrer`. */
+    @Test fun theSharedPlayLinkIsTaggedForPlayConsole() {
+        val link = LucentoLinks.PLAY_STORE_SHARE
+        assertTrue(link.startsWith(LucentoLinks.PLAY_STORE + "&referrer="))
+        val referrer = java.net.URLDecoder.decode(link.substringAfter("&referrer="), "UTF-8")
+        assertEquals("utm_source=app_share&utm_medium=referral&utm_campaign=share_lucento", referrer)
+        assertFalse("one query string: the tags stay encoded", link.substringAfter("&referrer=").contains('&'))
+        assertEquals("the released app's id, never the debug build's", "com.lucento.app", LucentoLinks.PLAY_PACKAGE)
     }
 }

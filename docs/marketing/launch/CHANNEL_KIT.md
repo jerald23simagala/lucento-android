@@ -90,11 +90,11 @@ https://play.google.com/store/apps/details?id=com.lucento.app&referrer=utm_sourc
 | Klaro email | `klaroph` | `klaro_email` |
 | Product Hunt, AlternativeTo | `producthunt`, `alternativeto` | `directory` |
 | Lucento Shared invite (in the app) | `shared_invite` | `referral` |
-| Share Lucento, "Tell a friend about Lucento" (profile menu) | `app_share` | `referral` |
+| Share Lucento, "Tell a friend about Lucento" (profile menu, Settings › Help & feedback) | `app_share` | `referral` |
 
-The last two are reserved: they need an app change. Today Share Lucento sends the plain website link (the plain Play
-link once `LucentoLinks.PLAY_LISTING_PUBLIC` is turned on in a build), and the Shared invite's message has no link
-(NEXT_TASKS LS-7).
+Share Lucento is built (0.5.20, docs/HELP_AND_FEEDBACK.md): it sends the plain website link until
+`LucentoLinks.PLAY_LISTING_PUBLIC` is turned on in a build, then the Play link tagged `app_share` / `referral` /
+`share_lucento`. The Shared invite's row is still reserved: its message has no link yet (NEXT_TASKS LS-7).
 
 Example, the TikTok bio before P-day:
 `https://www.lucentoapp.com/?utm_source=tiktok&utm_medium=bio&utm_campaign=warmup`

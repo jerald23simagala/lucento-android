@@ -250,6 +250,8 @@ dependencies {
     implementation(libs.androidx.biometric)
     // Lucento Pro: Google Play Billing (release builds; debug and tests use FakePurchaseSource).
     implementation(libs.play.billing)
+    // Google Play's rating card after a save, once the listing is public (domain/ReviewPromptPolicy).
+    implementation(libs.play.review)
     implementation(libs.androidx.fragment.ktx)
 
     // On-device receipt OCR (bundled model; works offline).

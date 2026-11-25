@@ -96,7 +96,10 @@ a better user-facing structure while preserving sound engineering boundaries.
     In release builds, Google Play's billing component sends Google its own diagnostics. When the person buys Pro,
     Lucento's server checks the purchase with Google (docs/MONETIZATION.md). After that, signed in or not, the app
     sends Play's signed purchase record to `/api/billing/check` every few hours while online, so a refund ends Pro
-    (owner decision 2026-11-13; SERVER_CONTRACT §3b). Mandatory sign-in was declined in its place.
+    (owner decision 2026-11-13; SERVER_CONTRACT §3b). Mandatory sign-in was declined in its place. Once the Play
+    listing is public, the app may ask Google Play to show its rating card after a save (a week of use, 20 records, at
+    most every 90 days; docs/HELP_AND_FEEDBACK.md): Play shows it and keeps any rating, and Lucento learns nothing.
+    Settings › Help & feedback only opens other apps (browser, Play, share sheet, email) on a tap.
   - Signing out, and switching to a different account, wipes this phone’s ledger and sync binding so the next account
     starts clean and one user’s data is never uploaded into another account; unsynced changes require confirmation
     before that wipe. The one exception (owner decision 2026-11-12): records no account or Shared Space ever claimed

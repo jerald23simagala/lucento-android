@@ -43,8 +43,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -198,6 +203,9 @@ private data class Tab(val item: DockItem, val route: Any)
 /** How tall the fade is where a tab's content meets the dock. */
 private val DockFade = 20.dp
 
+/** The pause between the "saved" confirmation leaving and Google Play's rating card being asked for, when it's due. */
+private const val RATING_CARD_PAUSE_MILLIS = 600L
+
 /**
  * The navigation dock: Home · Transactions · (+) · Budget · Wallets, with the transaction-entry button in the centre.
  * Budget leaves the dock when the user switches it off (its data is kept). Insights, goals, scheduled transactions
@@ -317,6 +325,9 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var transferNote by remember { mutableStateOf<String?>(null) }
     // Set only from a save callback that reported success, i.e. after the database write committed.
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
+    // Counts the composer's committed saves in this session; each one checks whether Google Play's rating card is due
+    // (the effect beside the plan notice below).
+    var ratingCheck by remember { mutableIntStateOf(0) }
 
     var showProfile by rememberSaveable { mutableStateOf(false) }
     // Follow Lucento, opened from the profile menu once it has closed.
@@ -881,6 +892,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         // Land on the history, where the batch that was just saved is now listed.
                                         selectedTab = "transactions"
                                         navigateTo(TransactionsRoute)
+                                        ratingCheck++
                                     },
                                     onAddWallet = { navigateTo(WalletsRoute) },
                                     voiceEnabled = features.isEnabled(Feature.VOICE_ENTRY),
@@ -1017,6 +1029,19 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             },
             onDismiss = appViewModel::dismissPlanNotice,
         )
+    }
+
+    // Tester report 2026-11-25 (docs/HELP_AND_FEEDBACK.md): a moment after the composer saved, Google Play's rating card
+    // when ReviewPromptPolicy says it's due, never before the listing is public. It waits for the "saved" confirmation to
+    // go, and doesn't come over the Pro welcome, a plan notice or the app lock; a later save checks again.
+    val obscuredNow by rememberUpdatedState(LocalAppObscured.current)
+    val ratingContext = LocalContext.current
+    LaunchedEffect(ratingCheck) {
+        if (ratingCheck == 0) return@LaunchedEffect
+        snapshotFlow { confirmation }.first { it == null }
+        delay(RATING_CARD_PAUSE_MILLIS)
+        if (welcomeRun != null || planNotice != null || obscuredNow) return@LaunchedEffect
+        if (appViewModel.claimRatingCard()) com.lucento.app.feature.help.showPlayRatingCard(ratingContext)
     }
 
     transferDraft?.let { draft ->
