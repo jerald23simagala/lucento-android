@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -84,7 +85,15 @@ class AppViewModelThemeTest {
         )
     }
 
-    private suspend fun themeBecomes(theme: ThemeId) = withTimeout(10_000) { preferences.preferences.first { it.themeId == theme } }
+    /**
+     * Waits until [theme] is stored, with a fresh read each time. A single long `first { }` could wait forever: in
+     * DataStore 1.1.1, a reader that starts while a write is landing can miss that write (it stays stored; the next fresh
+     * read sees it). The tap launches its write, so the two race: CI hung here on 2026-11-23 and 2026-11-25, and a local
+     * probe repeating this case hung within 31 and 148 repeats (KNOWN_ISSUES DS-K1).
+     */
+    private suspend fun themeBecomes(theme: ThemeId) = withTimeout(10_000) {
+        while (preferences.preferences.first().themeId != theme) delay(20)
+    }
 
     @Test
     fun `a Pro theme is picked while the plan holds`() = runBlocking {
