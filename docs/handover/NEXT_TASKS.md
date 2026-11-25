@@ -62,10 +62,30 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Tester round 2026-11-24 — follow-ups (`feature/tester-round-2026-11-24`)
+
+Owner's choices (2026-11-24): the Budget tab leads with Spent; "Into" is a field that opens the wallet picker; card
+payments get "Skip this statement" (hidden and not set aside, Undo); every composer row shows its wallet.
+
+- **TR4-1 Phone check** after the release that carries this branch: the Budget tab and Home read the same headline;
+  skip a card statement from the bell and from Scheduled, check Safe to spend rises by its amount, then Undo; a message
+  with rows for two wallets saves each row into its own wallet.
+- **TR4-2 Skips are per phone** (KNOWN_ISSUES TR4-K1): a person with two phones, or a Shared Space partner, sees the
+  reminder on the other phone. Syncing them would mean a `user_settings` column (a Supabase migration for the owner).
+- **TR4-3 Backup encryption (asked, not built).** The JSON backup is plain JSON; Settings already warns "This file isn't
+  encrypted…". Proposal: an optional password when exporting (AES-256-GCM, key from the password with a slow KDF), asked
+  again on restore, with a clear "forget it and the file can't be opened" warning; CSV export stays plain.
+- **TR4-4 Google Drive for offline users (asked, not built).** Export already uses Android's save screen, where Google
+  Drive is one of the places to save, so a manual Drive copy works today. Quick win: one hint line under Export. An
+  automatic Drive backup would be a new opt-in network path (Google authorisation for Drive's app-only files, a
+  Privacy Policy and Data safety update, ideally with TR4-3's encryption): medium-sized, free to run.
+
 ## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
 
 - **AS-1 Launch film on 0.5.19 (next; owner: after this review).** It still shows 0.5.14 screens ("Net Wallet Balance",
-  no Milestones). Re-capture with `capture_marketing.sh` runs `tour-php` and `showcase-php` (the same demo year), then
+  no Milestones). Owner (2026-11-24): narrate the 30 s, 15 s and vertical cuts with ElevenLabs from VOICEOVER.md, keep
+  the 93 s film music-led and the original score; needs a paid ElevenLabs plan (commercial use); every line passes
+  TRUTH_RULES; turn on TikTok's and Meta's AI-content label for the voice. Re-capture with `capture_marketing.sh` runs `tour-php` and `showcase-php` (the same demo year), then
   lucento-studio `video/tools/capture/live_capture.py` in the showcase state, `prepare_screens.py`, `remap_boxes.py
   <old> <new>`, fix the moved crop boxes and render all five versions with the emulator shut down
   (docs/marketing/launch-film/ASSET_INVENTORY.md). Update ASSET_INVENTORY's source line and the "Net worth" wording.

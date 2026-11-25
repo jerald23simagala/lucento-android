@@ -107,12 +107,14 @@ object CashflowCalculator {
         budgets: List<Budget>,
         schedules: List<RecurringSchedule>,
         categories: List<Category> = emptyList(),
+        /** Card statements the person skipped ([SkippedStatement]): nothing is set aside for them. */
+        skippedCards: Set<SkippedStatement> = emptySet(),
     ): SafeToSpend? {
         val month = YearMonth.from(today)
         val monthEnd = month.atEndOfMonth()
         val daysLeft = (ChronoUnit.DAYS.between(today, monthEnd) + 1).toInt()
         val plan = BudgetPlanner.plan(categories, budgets, transactions, currencyCode, month)
-        val money = MoneyOnHandCalculator.compute(currencyCode, today, wallets, transactions, schedules)
+        val money = MoneyOnHandCalculator.compute(currencyCode, today, wallets, transactions, schedules, skippedCards)
 
         val spent: Money
         val committed: Money

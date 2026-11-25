@@ -15,6 +15,12 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Tester round (2026-11-24, `feature/tester-round-2026-11-24`)
+
+- **TR4-K1 Card statement skips are kept on this phone.** "Skip this statement" is stored in this phone's
+  preferences (not synced, not in the backup), so another phone on the same account, or a Shared Space partner,
+  still sees the reminder and sets the amount aside. Follow-up TR4-2 in NEXT_TASKS.
+
 ## Milestones and the budget year (2026-11-23, `feature/milestones-budget-year`)
 
 | ID | Issue | Evidence | Next |

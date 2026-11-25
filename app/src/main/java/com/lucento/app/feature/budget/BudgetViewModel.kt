@@ -43,6 +43,8 @@ data class BudgetUiState(
     val wallets: List<Wallet> = emptyList(),
     /** Recurring schedules, empty when Recurring is switched off (a switched-off module never influences figures). */
     val schedules: List<RecurringSchedule> = emptyList(),
+    /** Card statements the person skipped: Safe to spend sets nothing aside for them. */
+    val skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
 ) {
     val expenseCategories: List<Category> get() = categories.filter { it.kind == CategoryKind.EXPENSE }
     val activeExpense: List<Category> get() = expenseCategories.filterNot { it.archived }
@@ -78,6 +80,7 @@ class BudgetViewModel(
             acknowledgedBudgetMonth = p.acknowledgedBudgetMonth,
             wallets = w,
             schedules = if (p.features.isEnabled(Feature.RECURRING)) s else emptyList(),
+            skippedCards = p.skippedCardStatements,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BudgetUiState())
 

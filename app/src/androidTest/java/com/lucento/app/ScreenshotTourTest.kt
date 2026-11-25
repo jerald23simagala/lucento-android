@@ -357,9 +357,13 @@ class ScreenshotTourTest {
         compose.onNode(hasContentDescription("Upcoming payments", substring = true)).performClick()
         waitForText("See all scheduled")
         shot("06b-home-bell")
-        // A card's payment in the bell opens the transfer that pays it, filled in: from the everyday account with the
-        // most money (the card has never been paid), to the card, for the amount due (owner, round 8).
+        // A card's payment in the bell opens its sheet (tester round 2026-11-24): Pay, or Skip this statement. Pay opens
+        // the transfer that pays it, filled in: from the everyday account with the most money (the card has never been
+        // paid), to the card, for the amount due (owner, round 8).
         compose.onNode(hasText("Visa card payment") and hasAnyAncestor(isPopup())).performClick()
+        waitForText("Skip this statement")
+        shot("06c0-card-payment-sheet")
+        click("Pay ", substring = true) // "Pay ₱6,400.00": the sheet's only text with "Pay " (its notes say "Paying")
         waitForText("Amount due by")
         waitForText("Change the amount for a partial payment")
         shot("06c-bell-pays-card")
@@ -516,8 +520,8 @@ class ScreenshotTourTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.waitForIdle()
         openBudgets()
-        // This month the hero's figure is the limits' "unspent" part (owner, 2026-11-18): "Unspent of your $… budget".
-        waitForText("Unspent of your $total")
+        // The hero leads with what's spent, as Home's card does (tester round 2026-11-24); unspent is the line under it.
+        waitForText("spent of your $total budget")
         shot("15-budget")
         compose.onNodeWithContentDescription("Manage categories").performClick()
         compose.waitForIdle()

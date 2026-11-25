@@ -132,6 +132,7 @@ class HomeViewModel(
             checkInAllowed = prefs.onboardingComplete && prefs.guideStep == null,
             checkInPlanned = prefs.budgetMonthPlanned,
             checkInRecapSeen = prefs.recapMonthSeen,
+            skippedCards = prefs.skippedCardStatements,
         ).let { built ->
             // Awards an update added wait until what they already earn is recorded quietly (no ceremony for the past).
             val newHere = if (prefs.achievementsSeen == null) emptySet()
@@ -204,6 +205,15 @@ class HomeViewModel(
     }
 
     /** Awards an update added: what they already earn ([earned] among them) is recorded silently, like the first run. */
+    /** "Skip this statement" on a card's payment (tester round 2026-11-24); [unskipCardStatement] is its Undo. */
+    fun skipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        viewModelScope.launch { preferences.skipCardStatement(statement) }
+    }
+
+    fun unskipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        viewModelScope.launch { preferences.unskipCardStatement(statement) }
+    }
+
     fun recordNewAwardsQuietly(earned: Set<com.lucento.app.domain.Achievement>) {
         viewModelScope.launch { preferences.recordAwardsQuietly(earned) }
     }

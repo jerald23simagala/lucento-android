@@ -174,6 +174,28 @@ class DebtProgressTest {
         assertNull(CreditCardMath.payingWallet(visa, listOf(visa, account(5, WalletType.BANK, 1, "EUR")), emptyList()))
     }
 
+    @Test fun aSkippedStatementIsNotDueUntilTheCardsNextStatement() {
+        // Tester round 2026-11-24: "Skip this statement" leaves that statement out; the next statement shows again.
+        val visa = card(owed = 50_000, statementDay = 15, dueDay = 5, id = 1) // statement Oct 15, due Nov 5
+        val until = LocalDate.parse("2026-11-25")
+        val statement = CreditCardMath.dues(listOf(visa), emptyList(), today, until).single().let(SkippedStatement::of)
+        assertEquals(SkippedStatement(1, LocalDate.parse("2026-10-15")), statement)
+        assertTrue(CreditCardMath.dues(listOf(visa), emptyList(), today, until, setOf(statement)).isEmpty())
+        // Another card's skip, or another statement of this one, changes nothing.
+        assertEquals(1, CreditCardMath.dues(listOf(visa), emptyList(), today, until, setOf(SkippedStatement(2, LocalDate.parse("2026-10-15")))).size)
+        assertEquals(1, CreditCardMath.dues(listOf(visa), emptyList(), today, until, setOf(SkippedStatement(1, LocalDate.parse("2026-09-15")))).size)
+        // After the next statement closes (Nov 15), its payment (due Dec 5) is reminded again despite the old skip.
+        val december = CreditCardMath.dues(listOf(visa), emptyList(), LocalDate.parse("2026-11-20"), LocalDate.parse("2026-12-10"), setOf(statement)).single()
+        assertEquals(LocalDate.parse("2026-11-15"), december.cycle.statementDate)
+    }
+
+    @Test fun skippedStatementKeysRoundTripAndRejectGarbage() {
+        val statement = SkippedStatement(42, LocalDate.parse("2026-10-15"))
+        assertEquals("42@2026-10-15", statement.key)
+        assertEquals(statement, SkippedStatement.parse(statement.key))
+        listOf("", "@2026-10-15", "x@2026-10-15", "42@", "42@2026-13-40", "42-2026-10-15").forEach { assertNull(it, SkippedStatement.parse(it)) }
+    }
+
     @Test fun cardDuesCarryTheSuggestedPayingAccount() {
         val visa = card(owed = 100_000)
         val bank = account(2, WalletType.BANK, 900_000)

@@ -50,6 +50,8 @@ data class PlanUiState(
     val contributions: List<GoalContribution> = emptyList(),
     val schedules: List<RecurringSchedule> = emptyList(),
     val acknowledgedBudgetMonth: java.time.YearMonth? = null,
+    /** Card statements the person skipped ([com.lucento.app.domain.SkippedStatement]): not listed as due. */
+    val skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
 ) {
     val walletsById: Map<Long, Wallet> = wallets.associateBy { it.id }
     val categoriesById: Map<Long, Category> = categories.associateBy { it.id }
@@ -138,6 +140,7 @@ class PlanViewModel(
             contributions = plans.contributions,
             schedules = plans.schedules,
             acknowledgedBudgetMonth = prefs.acknowledgedBudgetMonth,
+            skippedCards = prefs.skippedCardStatements,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlanUiState())
 
@@ -238,6 +241,15 @@ class PlanViewModel(
         write({ recurring.markPaid(id, amount, date, interest) }, onResult)
 
     fun skip(id: Long) = write({ recurring.skip(id) }) {}
+
+    /** "Skip this statement" on a card's payment (tester round 2026-11-24); [unskipCardStatement] is its Undo. */
+    fun skipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        viewModelScope.launch { preferences.skipCardStatement(statement) }
+    }
+
+    fun unskipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        viewModelScope.launch { preferences.unskipCardStatement(statement) }
+    }
 
     fun setPaused(id: Long, paused: Boolean) = write({ recurring.setPaused(id, paused) }) {}
 

@@ -205,6 +205,28 @@ fun RecurringScreen(
     var customTo by rememberSaveable { mutableStateOf<LocalDate?>(null) }
     var flowFilter by rememberSaveable { mutableStateOf<ScheduledFlow?>(null) }
     var walletFilter by rememberSaveable { mutableStateOf<Long?>(null) }
+    // A card's payment opens its sheet first: Pay, or Skip this statement (tester round 2026-11-24).
+    var payingCard by remember { mutableStateOf<com.lucento.app.domain.CardDue?>(null) }
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    payingCard?.let { due ->
+        com.lucento.app.core.designsystem.component.CardPaymentSheet(
+            due = due,
+            today = state.today,
+            onPay = {
+                payingCard = null
+                onPayCard(due)
+            },
+            onSkip = {
+                payingCard = null
+                val statement = com.lucento.app.domain.SkippedStatement.of(due)
+                viewModel.skipCardStatement(statement)
+                messageHosts?.app?.show("${due.wallet.name}’s statement skipped", actionLabel = "Undo") {
+                    viewModel.unskipCardStatement(statement)
+                }
+            },
+            onDismiss = { payingCard = null },
+        )
+    }
     var categoryFilter by rememberSaveable { mutableStateOf<Long?>(null) }
     var actingOn by rememberSaveable { mutableStateOf(openScheduleId) }
     var confirmation by remember { mutableStateOf<Confirmation?>(null) }
@@ -228,8 +250,8 @@ fun RecurringScreen(
     val active = remember(state.schedules) { state.schedules.filter { !it.paused && !it.isFinished } }
     val (from, to) = scheduledRange(range, today, customFrom, customTo)
     // Each card's payment for its current statement (later statements aren't known yet), when due by the range's end.
-    val cardDues = remember(state.wallets, state.transactions, today, to) {
-        CreditCardMath.dues(state.wallets, state.transactions, today, maxOf(to, YearMonth.from(today).atEndOfMonth()))
+    val cardDues = remember(state.wallets, state.transactions, today, to, state.skippedCards) {
+        CreditCardMath.dues(state.wallets, state.transactions, today, maxOf(to, YearMonth.from(today).atEndOfMonth()), state.skippedCards)
     }
     val agenda = remember(active, cardDues, today, from, to, filter) {
         ScheduleOutlook.items(active, cardDues, today, from, to).filter(filter::matches)
@@ -442,7 +464,7 @@ fun RecurringScreen(
                         onOpen = { item ->
                             when (item) {
                                 is ScheduledItem.Occurrence -> actingOn = item.schedule.id
-                                is ScheduledItem.CardPayment -> onPayCard(item.due)
+                                is ScheduledItem.CardPayment -> payingCard = item.due
                             }
                         },
                     )

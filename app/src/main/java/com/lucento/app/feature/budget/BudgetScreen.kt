@@ -13,7 +13,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.ShoppingBag
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
@@ -307,8 +308,8 @@ fun BudgetScreen(
                 }
             } else item(key = "summary") {
                 val burn = remember(plan, state.today) { BudgetPlanner.burn(plan, state.today) }
-                val safe = remember(plan, ledger, state.budgets, state.schedules, state.categories, state.today) {
-                    budgetSafeToSpend(plan, state.today, ledger, state.budgets, state.schedules, state.categories)
+                val safe = remember(plan, ledger, state.budgets, state.schedules, state.categories, state.today, state.skippedCards) {
+                    budgetSafeToSpend(plan, state.today, ledger, state.budgets, state.schedules, state.categories, state.skippedCards)
                 }
                 // A finished month's daily average for the hero; this month's per-day figure is under Safe to spend.
                 val average = remember(plan, burn, state.today) { dailyFigure(plan, burn, state.today, null) as? DailyFigure.DailyAverage }
@@ -585,15 +586,11 @@ private fun BudgetSummaryCard(
             )
         }
         Spacer(Modifier.height(6.dp))
-        // Signed: a negative remaining is the amount over budget.
-        MoneyText(money = plan.remaining, style = AmountStyles.headline, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
+        // Spent leads, as on Home's budget card (tester round 2026-11-24: the two screens led with opposite figures, so
+        // people couldn't match them); what's unspent, or over, is the line under the bar.
+        MoneyText(money = plan.spent, style = AmountStyles.headline, color = ext.onHero, fractionScale = 1f, minScale = 0.5f)
         Text(
-            when {
-                over -> "Over your $total budget"
-                // The limits below take the upcoming expenses off this figure: it is their "unspent" part (QA M2).
-                limitsBelow -> "Unspent of your $total budget"
-                else -> "Remaining of $total budget"
-            },
+            "spent of your $total budget",
             style = MaterialTheme.typography.bodyMedium,
             color = ext.onHeroMuted,
         )
@@ -626,14 +623,22 @@ private fun BudgetSummaryCard(
             val verdict = paceVerdict(plan, burn.pace, isCurrentMonth)
             StatusPill(verdict.label, verdictTone(verdict), Modifier.align(Alignment.CenterVertically))
         }
+        // What's left of the budget (or how far over it went), then how Spent splits so the figures add up (D1 / P2-3).
+        val left = if (over) -plan.remaining else plan.remaining
+        val leftWords = if (over) "over budget" else "unspent"
         if (limitsBelow) {
-            // Spent is every expense, so say how it splits and the figure adds up (D1 / P2-3), as Home's card does.
             Spacer(Modifier.height(Spacing.md))
             Text(
                 buildAnnotatedString {
-                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Spent ${fmt.format(plan.spent)}") }
-                    append(" = ${fmt.format(plan.budgetedSpending)} budgeted + ${fmt.format(plan.unbudgetedSpending)} unbudgeted")
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("${fmt.format(left)} $leftWords") }
                 },
+                style = MaterialTheme.typography.bodyMedium,
+                color = ext.onHero,
+                modifier = Modifier.semantics { contentDescription = "${fmt.spoken(left)} $leftWords" },
+            )
+            Spacer(Modifier.height(Spacing.xxs))
+            Text(
+                "Spent = ${fmt.format(plan.budgetedSpending)} budgeted + ${fmt.format(plan.unbudgetedSpending)} unbudgeted",
                 // Balanced lines, so "unbudgeted" never sits alone on the last one.
                 style = MaterialTheme.typography.bodySmall.copy(lineBreak = androidx.compose.ui.text.style.LineBreak.Heading),
                 color = ext.onHero,
@@ -646,14 +651,15 @@ private fun BudgetSummaryCard(
             return@HeroCard
         }
         Spacer(Modifier.height(14.dp))
+        // A finished month: Spent is the headline, so this tile says what was left (or how far over it went).
         val spentTile: @Composable (Modifier) -> Unit = { m ->
             HeroStatTile(
-                "Spent",
-                Icons.Outlined.ShoppingBag,
-                description = "Spent ${fmt.spoken(plan.spent)}",
+                if (over) "Over budget" else "Unspent",
+                if (over) Icons.Outlined.ErrorOutline else Icons.Outlined.Savings,
+                description = "${fmt.spoken(left)} $leftWords",
                 modifier = m,
             ) {
-                MoneyText(money = plan.spent, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
+                MoneyText(money = left, style = HeroFigureStyle, color = ext.onHero, fractionScale = 1f)
             }
         }
         if (LocalDensity.current.fontScale >= 1.3f) {

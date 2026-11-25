@@ -260,7 +260,7 @@ object AskSnapshotBuilder {
 
         // What's still scheduled this month (overdue included); transfers apart.
         val active = inputs.schedules.filter { !it.paused }
-        val dues = CreditCardMath.dues(inputs.wallets, inputs.transactions, today, current.atEndOfMonth())
+        val dues = CreditCardMath.dues(inputs.wallets, inputs.transactions, today, current.atEndOfMonth(), inputs.skippedCards)
         val items = ScheduleOutlook.items(active, dues, today, today, current.atEndOfMonth())
         val totals = ScheduleOutlook.totals(items, currency)
         if (!totals.isEmpty) {
@@ -287,7 +287,7 @@ object AskSnapshotBuilder {
         money("proj_out", "Projected spending for all of ${monthName(current)} at this pace (estimate)", burn.projectedMonthSpend)
         count("days_gone", "Days of ${monthName(current)} so far, today included", today.dayOfMonth.toLong())
         count("days_left", "Days left in ${monthName(current)}, today included", (current.lengthOfMonth() - today.dayOfMonth + 1).toLong())
-        CashflowCalculator.safeToSpend(currency, today, inputs.transactions, inputs.wallets, inputs.budgets, inputs.schedules, inputs.categories)?.let { safe ->
+        CashflowCalculator.safeToSpend(currency, today, inputs.transactions, inputs.wallets, inputs.budgets, inputs.schedules, inputs.categories, inputs.skippedCards)?.let { safe ->
             money("safe", "Safe to spend for the rest of ${monthName(current)} (as on Home)", safe.amount)
             safe.perDay?.let { money("safe_day", "Safe to spend a day for the rest of ${monthName(current)}", it) }
             // Tester round (2026-11-17): the two figures behind it, so an answer can say which one set it.

@@ -125,6 +125,12 @@ class MoneyOnHandTest {
         val withSchedule = compute(listOf(bank, gcash, visa), listOf(scheduled))!!
         assertTrue(withSchedule.deductions.none { it.kind == MoneyOnHand.Kind.CARD_PAYMENT })
         assertEquals(php(1_250_00), withSchedule.deductions.single { it.kind == MoneyOnHand.Kind.DEBT_PAYMENT }.amount)
+
+        // "Skip this statement" (tester round 2026-11-24): that statement's payment isn't set aside any more.
+        val skipped = setOf(SkippedStatement(visa.id, LocalDate.parse("2026-10-05")))
+        val withSkip = MoneyOnHandCalculator.compute("PHP", today, listOf(bank, gcash, visa), emptyList(), emptyList(), skipped)!!
+        assertTrue(withSkip.deductions.none { it.kind == MoneyOnHand.Kind.CARD_PAYMENT })
+        assertEquals(money.deducted - php(1_250_00), withSkip.deducted)
     }
 
     @Test fun `other currencies are never mixed in`() {

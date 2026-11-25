@@ -31,6 +31,28 @@ data class CardDue(
     val payFromWalletId: Long? = null,
 )
 
+/**
+ * A card statement the person chose to skip ("Skip this statement", tester round 2026-11-24): its payment is neither
+ * reminded nor set aside from Safe to spend until the card's next statement, which has its own date and so shows again.
+ * Kept on this phone as `<walletId>@<statement date>` ([com.lucento.app.data.preferences.UserPreferences.skippedCardStatements]).
+ */
+data class SkippedStatement(val walletId: Long, val statementDate: LocalDate) {
+    val key: String get() = "$walletId@$statementDate"
+
+    companion object {
+        fun of(due: CardDue) = SkippedStatement(due.wallet.id, due.cycle.statementDate)
+
+        /** A stored key back to a statement; null for anything malformed. */
+        fun parse(key: String): SkippedStatement? {
+            val at = key.indexOf('@')
+            if (at <= 0) return null
+            val id = key.substring(0, at).toLongOrNull() ?: return null
+            val date = runCatching { LocalDate.parse(key.substring(at + 1)) }.getOrNull() ?: return null
+            return SkippedStatement(id, date)
+        }
+    }
+}
+
 object CreditCardMath {
 
     /** [day] of [month], or the month's last day when the month is shorter (31 in February is the 28th or 29th). */
@@ -80,11 +102,21 @@ object CreditCardMath {
         wallet.debt?.creditLimit?.takeIf { wallet.type == WalletType.CREDIT_CARD && it.currencyCode == wallet.currencyCode }
             ?.let { it - wallet.balance }
 
-    /** Cards with something to pay that is due by [until] (overdue ones included), soonest first. */
-    fun dues(wallets: List<Wallet>, transactions: List<Transaction>, today: LocalDate, until: LocalDate): List<CardDue> =
+    /**
+     * Cards with something to pay that is due by [until] (overdue ones included), soonest first. A statement in [skipped]
+     * is left out: the person chose to skip it, and its card's next statement shows again.
+     */
+    fun dues(
+        wallets: List<Wallet>,
+        transactions: List<Transaction>,
+        today: LocalDate,
+        until: LocalDate,
+        skipped: Set<SkippedStatement> = emptySet(),
+    ): List<CardDue> =
         wallets.mapNotNull { wallet ->
             cycle(wallet, transactions, today)
                 ?.takeIf { it.amountDue.amountMinor > 0L && !it.dueDate.isAfter(until) }
+                ?.takeIf { SkippedStatement(wallet.id, it.statementDate) !in skipped }
                 ?.let { CardDue(wallet, it, overdue = it.isOverdue(today), payFromWalletId = payingWallet(wallet, wallets, transactions)?.id) }
         }.sortedBy { it.cycle.dueDate }
 

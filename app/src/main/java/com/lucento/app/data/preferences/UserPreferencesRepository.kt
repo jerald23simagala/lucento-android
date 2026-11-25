@@ -175,6 +175,11 @@ data class UserPreferences(
     val achievementsKnown: Set<String>? = null,
     /** The user has opened Insights at least once (the Financial Explorer milestone). Local only. */
     val insightsVisited: Boolean = false,
+    /**
+     * Card statements the person skipped ("Skip this statement", tester round 2026-11-24): no reminder and nothing set
+     * aside until the card's next statement ([com.lucento.app.domain.SkippedStatement]). Local only, like the notices.
+     */
+    val skippedCardStatements: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
     /** App lock has been turned on at some point (the Secured award). Local only; never cleared by turning lock off. */
     val appLockUsed: Boolean = false,
     /** The one-time "+" spotlight after setup was shown and dismissed (or + was used). A device choice. */
@@ -341,6 +346,7 @@ class UserPreferencesRepository internal constructor(
         val spendTypes = stringSetPreferencesKey("spend_types")
         val achievementsSeen = stringSetPreferencesKey("achievements_seen")
         val achievementsKnown = stringSetPreferencesKey("achievements_known")
+        val skippedCardStatements = stringSetPreferencesKey("skipped_card_statements")
         val insightsVisited = booleanPreferencesKey("insights_visited")
         val appLockUsed = booleanPreferencesKey("app_lock_used")
         val addSpotlightSeen = booleanPreferencesKey("add_spotlight_seen")
@@ -417,6 +423,8 @@ class UserPreferencesRepository internal constructor(
                 spendTypes = com.lucento.app.domain.SpendType.fromKeys(p[Keys.spendTypes].orEmpty()),
                 achievementsSeen = p[Keys.achievementsSeen]?.mapNotNull(com.lucento.app.domain.Achievement::fromKey)?.toSet(),
                 achievementsKnown = p[Keys.achievementsKnown],
+                skippedCardStatements = p[Keys.skippedCardStatements].orEmpty()
+                    .mapNotNull(com.lucento.app.domain.SkippedStatement::parse).toSet(),
                 insightsVisited = p[Keys.insightsVisited] ?: false,
                 // Installs that turned lock on before this flag existed count too.
                 appLockUsed = p[Keys.appLockUsed] ?: (p[Keys.appLock] ?: false),
@@ -780,6 +788,25 @@ class UserPreferencesRepository internal constructor(
             it[Keys.achievementsSeen] = it[Keys.achievementsSeen].orEmpty() + earned.map { a -> a.key }
             it[Keys.achievementsKnown] = it[Keys.achievementsKnown].orEmpty() + com.lucento.app.domain.Achievement.entries.map { a -> a.key }
         }
+    }
+
+    /**
+     * "Skip this statement": [statement]'s payment is no longer reminded or set aside. Statements older than a year are
+     * dropped from the set as it's written, since a card's next statement has its own date anyway.
+     */
+    suspend fun skipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        val oldest = java.time.LocalDate.now().minusYears(1)
+        trackedEdit {
+            val kept = it[Keys.skippedCardStatements].orEmpty().filter { key ->
+                com.lucento.app.domain.SkippedStatement.parse(key)?.statementDate?.isBefore(oldest) == false
+            }
+            it[Keys.skippedCardStatements] = (kept + statement.key).toSet()
+        }
+    }
+
+    /** Undo of [skipCardStatement]. */
+    suspend fun unskipCardStatement(statement: com.lucento.app.domain.SkippedStatement) {
+        trackedEdit { it[Keys.skippedCardStatements] = it[Keys.skippedCardStatements].orEmpty() - statement.key }
     }
 
     suspend fun setInsightsVisited() {
