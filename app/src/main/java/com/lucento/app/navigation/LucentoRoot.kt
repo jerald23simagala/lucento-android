@@ -170,8 +170,12 @@ import androidx.compose.ui.focus.focusProperties
  * invitation id, from Home's card) opens straight on that invitation's review; empty = the page.
  */
 @Serializable data class SharedSpaceRoute(val reviewInvite: String = "")
-/** Lucento Pro: the plan, what each plan includes, restore (docs/MONETIZATION.md §5.5). [from] names the lock that led here. */
-@Serializable data class ProRoute(val from: String = "")
+/**
+ * Lucento Pro: the plan, what each plan includes, restore (docs/MONETIZATION.md §5.5). [from] names the lock that led here.
+ * [via] names a door that isn't a lock (Settings, the profile menu, the plan-ended sheet), for the opt-in usage count
+ * `plan_page_viewed` only (docs/growth/CRO_PLAN.md); empty through a lock note or the Pro dialog.
+ */
+@Serializable data class ProRoute(val from: String = "", val via: String = "")
 /** Full-page editor for the transaction held in LucentoRoot's editor draft (opened from Edit on a row). */
 @Serializable data object TransactionEditRoute
 /** Read-only View Transaction page; Edit there opens [TransactionEditRoute] (or the transfer sheet). */
@@ -802,7 +806,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                         when {
                                             page == SettingsPage.FEATURES -> push(FeaturesRoute)
                                             page == SettingsPage.SHARED -> push(SharedSpaceRoute())
-                                            page == SettingsPage.PRO -> push(ProRoute())
+                                            page == SettingsPage.PRO -> push(ProRoute(via = com.lucento.app.domain.ConversionCounts.FROM_SETTINGS))
                                             // Not push(): launchSingleTop would replace the hub (same route type), so Back would skip
                                             // it. A repeated tap on the same row is ignored instead.
                                             navController.currentBackStackEntry?.arguments?.getString("page") != page.key ->
@@ -824,10 +828,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 )
                             }
                             pushed<ProRoute>(reducedMotion) { entry ->
-                                val from = entry.toRoute<ProRoute>().from
+                                val route = entry.toRoute<ProRoute>()
                                 com.lucento.app.feature.pro.ProScreen(
                                     onBack = back,
-                                    from = com.lucento.app.domain.entitlement.ProFeature.entries.firstOrNull { it.name == from },
+                                    from = com.lucento.app.domain.entitlement.ProFeature.entries.firstOrNull { it.name == route.from },
+                                    via = route.via,
                                     onReplayTour = appViewModel::replayProTour,
                                 )
                             }
@@ -1003,7 +1008,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                         ProfileDestination.SETTINGS -> push(SettingsRoute())
                         ProfileDestination.FEATURES -> push(FeaturesRoute)
                         ProfileDestination.SHARED -> push(SharedSpaceRoute())
-                        ProfileDestination.PRO -> push(ProRoute())
+                        ProfileDestination.PRO -> push(ProRoute(via = com.lucento.app.domain.ConversionCounts.FROM_PROFILE))
                         ProfileDestination.SWITCH_ACCOUNT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, switchAccount = true))
                         ProfileDestination.SIGN_OUT -> push(SettingsRoute(SettingsPage.ACCOUNT.key, signOut = true))
                         ProfileDestination.FOLLOW -> showFollow = true
@@ -1025,7 +1030,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             notice = notice,
             onSeePro = {
                 appViewModel.dismissPlanNotice()
-                push(ProRoute())
+                push(ProRoute(via = com.lucento.app.domain.ConversionCounts.FROM_PLAN_ENDED))
             },
             onDismiss = appViewModel::dismissPlanNotice,
         )

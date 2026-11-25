@@ -292,6 +292,17 @@ begin
   select public.record_usage_event(gen_random_uuid(), 'first_entry_saved', '{}'::jsonb, '1.0') into v_b;
   execute 'reset role';
   r := r || (case when v_b then 'ok  U7 a signed-in phone records counts too' else 'FAIL U7' end);
+  -- Conversion counts (20261125090000, CRO-1): the four new names with their props.
+  set role anon;
+  v_n := 0;
+  if public.record_usage_event(gen_random_uuid(), 'pro_dialog_shown', '{"feature":"money_wallets"}'::jsonb, '1.0') then v_n := v_n + 1; end if;
+  if public.record_usage_event(gen_random_uuid(), 'plan_page_viewed', '{"from":"wall","feature":"money_wallets"}'::jsonb, '1.0') then v_n := v_n + 1; end if;
+  if public.record_usage_event(gen_random_uuid(), 'purchase_started', '{"plan":"annual_trial"}'::jsonb, '1.0') then v_n := v_n + 1; end if;
+  if public.record_usage_event(gen_random_uuid(), 'purchase_completed', '{"plan":"annual_trial"}'::jsonb, '1.0') then v_n := v_n + 1; end if;
+  v_s := pg_temp.attempt('select public.record_usage_event(gen_random_uuid(), ''purchase_refunded'')');
+  execute 'reset role';
+  r := r || (case when v_n = 4 then 'ok  U8 the four conversion counts are accepted with their props' else 'FAIL U8 stored ' || v_n end);
+  r := r || (case when v_s = '23514' then 'ok  U9 a name outside the twelve is still refused' else 'FAIL U9 ' || v_s end);
 
   -- ======================================================================== F-02 refunds are permanent (probe X1)
   set role service_role;

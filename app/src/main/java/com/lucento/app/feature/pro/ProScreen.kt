@@ -38,6 +38,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -92,10 +93,14 @@ fun ProScreen(
     onBack: () -> Unit,
     /** The feature whose lock led here; its sentence is shown first. */
     from: ProFeature? = null,
+    /** The door that opened the page when it wasn't a lock ([com.lucento.app.domain.ConversionCounts]); counts only. */
+    via: String? = null,
     /** "See your Pro cards": the welcome's cards and collection again, without the medal (shown while Pro is active). */
     onReplayTour: (() -> Unit)? = null,
     viewModel: ProViewModel = viewModel(factory = ProViewModel.Factory),
 ) {
+    // The opt-in count plan_page_viewed; the ViewModel sends it once per visit (Back from a deeper page isn't a new one).
+    LaunchedEffect(viewModel) { viewModel.noteOpened(from, via) }
     val state by viewModel.state.collectAsStateWithLifecycle()
     val now = System.currentTimeMillis()
     val status = ProCopy.planStatus(state.entitlements, now)

@@ -616,7 +616,11 @@ internal fun RestoreFlow(
                 .background(MaterialTheme.colorScheme.background)
                 .safeDrawingPadding(),
         ) {
-            com.lucento.app.feature.pro.ProScreen(onBack = closePlan, from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_RESTORE)
+            com.lucento.app.feature.pro.ProScreen(
+                onBack = closePlan,
+                from = com.lucento.app.domain.entitlement.ProFeature.CLOUD_RESTORE,
+                via = com.lucento.app.domain.ConversionCounts.FROM_ONBOARDING,
+            )
         }
         return
     }

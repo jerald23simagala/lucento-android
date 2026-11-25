@@ -3,8 +3,9 @@ package com.lucento.app.domain
 import java.util.concurrent.TimeUnit
 
 /**
- * Anonymous usage counts. The eight names are the whole allowlist. Props are only [PROP_KEYS].
- * Nothing here reads the server table back. Opting out drops the queue and the install id.
+ * Anonymous usage counts. The twelve names are the whole allowlist, the same twelve as the server table's own check
+ * (`usage_events_event_allowlist`). Props are only [PROP_KEYS]. Nothing here reads the server table back. Opting out
+ * drops the queue and the install id.
  */
 object UsageCounts {
     const val ONBOARDING_STARTED = "onboarding_started"
@@ -16,6 +17,12 @@ object UsageCounts {
     const val BUDGET_SUGGESTION_SHOWN = "budget_suggestion_shown"
     const val BUDGET_SUGGESTION_ACCEPTED = "budget_suggestion_accepted"
 
+    // The way to Lucento Pro (docs/growth/CRO_PLAN.md, CRO-2). Server side since 20261125090000.
+    const val PRO_DIALOG_SHOWN = "pro_dialog_shown"
+    const val PLAN_PAGE_VIEWED = "plan_page_viewed"
+    const val PURCHASE_STARTED = "purchase_started"
+    const val PURCHASE_COMPLETED = "purchase_completed"
+
     val EVENTS: List<String> = listOf(
         ONBOARDING_STARTED,
         ONBOARDING_STEP_VIEWED,
@@ -25,9 +32,14 @@ object UsageCounts {
         FIRST_WEEK_CARD_STEP_DONE,
         BUDGET_SUGGESTION_SHOWN,
         BUDGET_SUGGESTION_ACCEPTED,
+        PRO_DIALOG_SHOWN,
+        PLAN_PAGE_VIEWED,
+        PURCHASE_STARTED,
+        PURCHASE_COMPLETED,
     )
 
-    val PROP_KEYS: Set<String> = setOf("step", "ms", "day_index", "count")
+    /** `feature`, `from` and `plan` carry only the fixed values [ConversionCounts] makes, never text the person typed. */
+    val PROP_KEYS: Set<String> = setOf("step", "ms", "day_index", "count", "feature", "from", "plan")
 
     const val MAX_QUEUE = 40
     const val MAX_PROP_LENGTH = 32
@@ -40,6 +52,74 @@ object UsageCounts {
         raw.filterKeys { it in PROP_KEYS }
             .mapValues { (_, value) -> value.trim().take(MAX_PROP_LENGTH) }
             .filterValues { it.isNotEmpty() }
+
+    /**
+     * Whether the server's answer [sqlState] means it will never take this count: a data exception (class 22, such as
+     * the reserved install id) or a constraint it breaks (class 23, such as a name outside the allowlist). Anything
+     * else (no network, a timeout, a server that's down) is worth trying again later.
+     */
+    fun isRefusal(sqlState: String?): Boolean =
+        sqlState != null && sqlState.length == 5 && (sqlState.startsWith("22") || sqlState.startsWith("23"))
+}
+
+/**
+ * The props of the conversion counts (docs/growth/CRO_PLAN.md, CRO-2). Every value is one of a fixed few, so a count
+ * says which door was used and which plan was chosen, and nothing about the person's money.
+ */
+object ConversionCounts {
+    /** Where the plan page was opened from, when it wasn't through a Pro wall. */
+    const val FROM_SETTINGS = "settings"
+    const val FROM_PROFILE = "profile"
+    const val FROM_PLAN_ENDED = "plan_ended"
+    const val FROM_ONBOARDING = "onboarding"
+    /** Through a Pro wall: its dialog, the short message's Unlock, or a lock note naming a feature. */
+    const val FROM_WALL = "wall"
+    const val FROM_OTHER = "other"
+
+    private val NAMED_DOORS = setOf(FROM_SETTINGS, FROM_PROFILE, FROM_PLAN_ENDED, FROM_ONBOARDING)
+
+    /** [door] is what the route says opened the page; [featureKey] the feature that led there, if any. */
+    fun from(door: String?, featureKey: String?): String = when {
+        door in NAMED_DOORS -> door!!
+        !featureKey.isNullOrBlank() -> FROM_WALL
+        else -> FROM_OTHER
+    }
+
+    /** A feature as a count names it: the enum's name in lower case ("money_wallets"). */
+    fun feature(enumName: String): String = enumName.lowercase()
+
+    /** The props of [UsageCounts.PLAN_PAGE_VIEWED]. */
+    fun planPageProps(door: String?, featureEnumName: String?): Map<String, String> = buildMap {
+        put("from", from(door, featureEnumName))
+        if (!featureEnumName.isNullOrBlank()) put("feature", feature(featureEnumName))
+    }
+
+    const val PLAN_MONTHLY = "monthly"
+    const val PLAN_ANNUAL = "annual"
+    const val PLAN_ANNUAL_TRIAL = "annual_trial"
+    const val PLAN_LIFETIME = "lifetime"
+    const val PLAN_CLOUD_MONTHLY = "cloud_monthly"
+    const val PLAN_CLOUD_ANNUAL = "cloud_annual"
+    const val PLAN_OTHER = "other"
+
+    /**
+     * The plan a purchase is for, from Google Play's product and base plan: [billingPeriodIso] P1M or P1Y for a
+     * subscription, null for Lifetime; [withTrial] when the offer starts with a free trial.
+     */
+    fun plan(productId: String, billingPeriodIso: String?, withTrial: Boolean): String = when (productId) {
+        com.lucento.app.domain.entitlement.PlayProducts.PRO_LIFETIME -> PLAN_LIFETIME
+        com.lucento.app.domain.entitlement.PlayProducts.PRO_SUBSCRIPTION -> when (billingPeriodIso) {
+            "P1M" -> PLAN_MONTHLY
+            "P1Y" -> if (withTrial) PLAN_ANNUAL_TRIAL else PLAN_ANNUAL
+            else -> PLAN_OTHER
+        }
+        com.lucento.app.domain.entitlement.PlayProducts.CLOUD_ADDON -> when (billingPeriodIso) {
+            "P1M" -> PLAN_CLOUD_MONTHLY
+            "P1Y" -> PLAN_CLOUD_ANNUAL
+            else -> PLAN_OTHER
+        }
+        else -> PLAN_OTHER
+    }
 }
 
 data class UsageEvent(val name: String, val props: Map<String, String> = emptyMap())
