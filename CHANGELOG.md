@@ -5,6 +5,17 @@
 > merged between 2026-11-01 and the first Google Play build, 0.5.0 (version code 5), such as Lucento Pro, Lucento
 > Shared, wallets in other currencies, themes and Awards, is not itemised here; `CURRENT_STATUS.md` records it.
 
+## Unreleased — tester round 2026-11-24
+
+- **The Budget tab leads with what's spent**, as Home's budget card does: "₱22,979.90 spent of your ₱25,900.00
+  budget", then the bar and "₱2,920.10 unspent" (or "over budget"). Testers couldn't match the two screens when one led
+  with spent and the other with unspent.
+- **Card payments can be skipped.** Tapping a card's payment reminder (the bell, Upcoming, Scheduled) opens its sheet:
+  **Pay** opens the payment as before; **Skip this statement** stops the reminder and stops setting the amount aside in
+  Safe to spend until the card's next statement, with Undo right after. Skips are kept on this phone.
+- **Add transactions:** "Into" is one field that opens the wallet picker (grouped, with balances) instead of a row of
+  chips, and every row shows its wallet, so rows from different wallets in one message can be set before saving.
+
 ## 0.5.19 (version code 24) — 2026-11-23
 
 - **Progress is now Milestones.** It opens with the Awards card, which shows three small medals: the latest one

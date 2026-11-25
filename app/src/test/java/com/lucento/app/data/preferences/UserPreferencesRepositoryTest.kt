@@ -72,6 +72,21 @@ class UserPreferencesRepositoryTest {
     }
 
     @Test
+    fun `a skipped card statement stays on this phone, is pruned after a year and can be undone`() = runBlocking {
+        val old = com.lucento.app.domain.SkippedStatement(1, java.time.LocalDate.now().minusYears(2))
+        val recent = com.lucento.app.domain.SkippedStatement(2, java.time.LocalDate.now().minusMonths(1))
+        val changes = repository.accountSettingChanges.first()
+        repository.skipCardStatement(old)
+        repository.skipCardStatement(recent)
+        // A statement over a year old is dropped as the next skip is written.
+        assertEquals(setOf(recent), repository.preferences.first().skippedCardStatements)
+        // Kept on this phone: a skip is never marked for sync.
+        assertEquals(changes, repository.accountSettingChanges.first())
+        repository.unskipCardStatement(recent)
+        assertTrue(repository.preferences.first().skippedCardStatements.isEmpty())
+    }
+
+    @Test
     fun `consents, AI answers and this phone's lock are never marked`() = runBlocking {
         repository.setSmartReading(true)
         repository.setOnlineVoice(true)

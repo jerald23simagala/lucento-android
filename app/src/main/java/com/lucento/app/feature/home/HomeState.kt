@@ -499,6 +499,8 @@ object HomeStateBuilder {
         /** The latest month planned or dismissed, and the latest recap seen ([UserPreferences.budgetMonthPlanned]). */
         checkInPlanned: YearMonth? = null,
         checkInRecapSeen: YearMonth? = null,
+        /** Card statements the person skipped: no reminder and nothing set aside ([com.lucento.app.domain.SkippedStatement]). */
+        skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
     ): HomeUiState {
         // Multicurrency (docs/CALCULATIONS.md "Exchange rates"): every figure below is in the main currency — wallets in
         // other currencies at their carrying value, their movements at their own value. Lists of what was recorded
@@ -583,7 +585,7 @@ object HomeStateBuilder {
             safeToSpend = if (plan?.hasBudget == true && shown == current) {
                 // Schedules from a valued foreign wallet at that wallet's rate, as its balance is (tester round, 2026-11-17).
                 val valuedSchedules = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, activeSchedules)
-                CashflowCalculator.safeToSpend(focus, today, recorded, valued, budgets, valuedSchedules, categories)
+                CashflowCalculator.safeToSpend(focus, today, recorded, valued, budgets, valuedSchedules, categories, skippedCards)
                     ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
             } else {
                 null
@@ -598,8 +600,8 @@ object HomeStateBuilder {
             recentInMonth = recentInMonth,
             checkIn = checkIn,
             checkInBudget = checkInBudget,
-            cardDues = if (shown != current) emptyList() else com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, shown.atEndOfMonth()),
-            cardDuesSoon = com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, today.plusDays(RecurringMath.DUE_SOON_DAYS)),
+            cardDues = if (shown != current) emptyList() else com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, shown.atEndOfMonth(), skippedCards),
+            cardDuesSoon = com.lucento.app.domain.CreditCardMath.dues(wallets, all, today, today.plusDays(RecurringMath.DUE_SOON_DAYS), skippedCards),
             recentTransfers = (recentActivity(all, limit = RECENT_LIMIT) + recentInMonth).mapNotNull { it.transferGroup }.toSet().let { groups ->
                 if (groups.isEmpty()) emptyMap() else com.lucento.app.domain.Transfer.pair(all.filter { it.transferGroup in groups })
             },

@@ -304,14 +304,38 @@ private fun HomeDashboard(
     val planWallets = if (state.loading) null else state.wallets
     val walletScope = rememberCoroutineScope()
     var editingWallet by remember { mutableStateOf<WalletDraft?>(null) }
+    // A card's payment reminder (bell, Upcoming) opens its sheet first: Pay, or Skip this statement (tester round 2026-11-24).
+    var payingCard by remember { mutableStateOf<CardDue?>(null) }
     // A card from the budget card opens with its real Default switch, so a default card stays the default.
     val dashboardActions = remember(actions) {
-        actions.copy(onEditWallet = { wallet -> walletScope.launch { editingWallet = walletsViewModel.draftFor(wallet) } })
+        actions.copy(
+            onEditWallet = { wallet -> walletScope.launch { editingWallet = walletsViewModel.draftFor(wallet) } },
+            onPayCard = { due -> payingCard = due },
+        )
     }
     // Add wallet: the editor on Cash, the type sheet when money wallets are full, or the Pro dialog (owner, 2026-11-18).
     val addWallet = com.lucento.app.feature.wallets.rememberAddWallet(planWallets, state.primaryCurrency) { editingWallet = it }
     var showSync by remember { mutableStateOf(false) }
     val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
+    payingCard?.let { due ->
+        com.lucento.app.core.designsystem.component.CardPaymentSheet(
+            due = due,
+            today = state.today,
+            onPay = {
+                payingCard = null
+                actions.onPayCard(due)
+            },
+            onSkip = {
+                payingCard = null
+                val statement = com.lucento.app.domain.SkippedStatement.of(due)
+                viewModel.skipCardStatement(statement)
+                messageHosts?.app?.show("${due.wallet.name}’s statement skipped", actionLabel = "Undo") {
+                    viewModel.unskipCardStatement(statement)
+                }
+            },
+            onDismiss = { payingCard = null },
+        )
+    }
     // The award being presented. Saved, so a ceremony isn't lost to rotation after its award was acknowledged.
     var ceremony by rememberSaveable { mutableStateOf<com.lucento.app.domain.Achievement?>(null) }
     var ceremonyAlso by rememberSaveable { mutableStateOf<List<com.lucento.app.domain.Achievement>>(emptyList()) }
@@ -361,7 +385,7 @@ private fun HomeDashboard(
             syncDetails = state.syncDetails,
             onOpenSyncSettings = { showSync = true },
             bell = if (state.features.isEnabled(Feature.RECURRING) || state.cardDuesSoon.isNotEmpty()) {
-                { PaymentsBell(state, actions.onOpenRecurring, actions.onPayCard) }
+                { PaymentsBell(state, actions.onOpenRecurring, dashboardActions.onPayCard) }
             } else {
                 null
             },

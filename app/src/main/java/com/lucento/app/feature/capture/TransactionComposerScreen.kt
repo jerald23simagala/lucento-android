@@ -14,6 +14,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.filled.Star
+import com.lucento.app.core.designsystem.component.AccountPickerSheet
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.lucento.app.core.designsystem.component.icon
@@ -531,9 +534,10 @@ fun TransactionComposerScreen(
 }
 
 /**
- * The wallet everything flows into, pinned under the banner: "Into", then one chip per account with its own icon (its
- * bank's mark or its type's), the active one filled, the default starred. Tapping another moves the unsaved rows that
- * were following it. A trailing chip starts a transfer from the active wallet.
+ * The wallet everything flows into, pinned under the banner: "Into" and one field showing the active account (its own
+ * icon, a star when it's the default) that opens the shared account picker, grouped by kind with balances (tester round
+ * 2026-11-24: a row of chips got hard to scroll as wallets grew). Choosing another moves the unsaved rows that were
+ * following it. The chip beside it starts a transfer from the active wallet.
  */
 @Composable
 private fun WalletBar(
@@ -547,37 +551,60 @@ private fun WalletBar(
     onTransfer: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
+    val ext = LucentoTheme.extendedColors
+    var picking by rememberSaveable { mutableStateOf(false) }
+    val active = wallets.firstOrNull { it.id == activeWalletId }
     Column(Modifier.fillMaxWidth().padding(bottom = Spacing.xs)) {
-        Text(
-            if (activeWalletId == null) "Choose a wallet" else "Into",
-            style = MaterialTheme.typography.labelLarge,
-            color = if (activeWalletId == null) LucentoTheme.extendedColors.negative else colors.onSurfaceVariant,
-            modifier = Modifier
-                .padding(horizontal = Spacing.gutter)
-                .then(if (activeWalletId == null) Modifier.clickable(onClick = onChooseMissing) else Modifier),
-        )
         Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = Spacing.gutter)
-                .selectableGroup(),
+            Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter),
             horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // The default wallet leads; the rest keep their usual order.
-            wallets.sortedByDescending { it.id == defaultWalletId }.forEach { wallet ->
-                val selected = wallet.id == activeWalletId
-                val isDefault = wallet.id == defaultWalletId
-                val name = if (isDefault) "${wallet.name}, default wallet" else wallet.name
-                WalletChip(
-                    label = wallet.name,
-                    selected = selected,
-                    starred = isDefault,
-                    description = if (selected) "$name, active" else "Use $name",
-                    role = Role.RadioButton,
-                    onClick = { if (enabled && !selected) onChoose(wallet.id) },
-                ) { WalletIdentityTile(wallet, size = 26.dp) }
+            Text(
+                if (active == null) "Choose a wallet" else "Into",
+                style = MaterialTheme.typography.labelLarge,
+                color = if (active == null) ext.negative else colors.onSurfaceVariant,
+            )
+            val isDefault = active != null && active.id == defaultWalletId
+            val name = active?.let { if (isDefault) "${it.name}, default wallet" else it.name }
+            Surface(
+                onClick = {
+                    if (!enabled) return@Surface
+                    if (active == null) onChooseMissing() else picking = true
+                },
+                shape = RoundedCornerShape(50),
+                color = if (LucentoTheme.isDark) colors.surfaceContainerHigh else colors.surfaceContainerLowest,
+                contentColor = colors.onSurface,
+                border = BorderStroke(1.dp, if (active == null) ext.negative else ext.borderDefault),
+                modifier = Modifier
+                    .weight(1f)
+                    .minimumInteractiveComponentSize()
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = if (name == null) "Choose a wallet" else "Into $name. Change wallet"
+                        role = Role.Button
+                    },
+            ) {
+                Row(Modifier.padding(start = 6.dp, end = Spacing.sm, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (active != null) {
+                        WalletIdentityTile(active, size = 26.dp)
+                        Spacer(Modifier.width(Spacing.sm))
+                    }
+                    // The name and its star together; the arrow at the field's end.
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            active?.name ?: "Choose",
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        if (isDefault) {
+                            Spacer(Modifier.width(Spacing.xs))
+                            Icon(Icons.Filled.Star, contentDescription = null, tint = ext.accent, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(24.dp))
+                }
             }
             if (transfersAllowed) {
                 WalletChip(
@@ -592,6 +619,19 @@ private fun WalletBar(
                 }
             }
         }
+    }
+    if (picking) {
+        AccountPickerSheet(
+            title = "Into which account?",
+            subtitle = "New rows go here unless you pick another on a row.",
+            wallets = wallets,
+            selectedId = activeWalletId,
+            onPick = {
+                picking = false
+                if (it.id != activeWalletId) onChoose(it.id)
+            },
+            onDismiss = { picking = false },
+        )
     }
 }
 

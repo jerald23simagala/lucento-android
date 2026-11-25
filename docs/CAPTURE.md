@@ -65,13 +65,17 @@ type / speak / scan ──► TransactionInterpreter ──► ReviewRow[] ─�
   the active wallet is that default and the person hasn't picked it, income, transfers and a new transfer's "from" go to
   the first cash, bank or e-wallet (`InterpretationContext.moneyWalletId` / `walletFor`). A card picked in the wallet bar,
   or the wallet the composer was opened from, takes every type.
-- The active wallet is, in order: the pill the user tapped, the wallet the composer was opened from, the default, or the
+- The active wallet is, in order: the account the user picked in the wallet field, the wallet the composer was opened from, the default, or the
   only account. With several accounts and none of these, the composer asks "Select wallet to use" (with "Remember as
   my default"), and a message sent before answering waits for the answer.
-- With two or more accounts a pinned **wallet bar** sits under the banner: one pill per account, the active one filled.
-  Tapping another moves the unsaved rows that were only following it (`BatchReview.retarget`); rows whose words named an
-  account, or whose account the user picked, stay. A trailing **Transfer** pill adds a transfer row from the active
-  wallet. A row shows its own account chip only when it differs from the active wallet; transfer rows read "A → B".
+- With two or more accounts a pinned **wallet bar** sits under the banner: "Into" and one field showing the active
+  account (its icon, a star when it's the default) that opens the shared account picker, grouped by kind with balances
+  (tester round 2026-11-24: a row of pills got hard to scroll as wallets grew). Choosing another moves the unsaved rows
+  that were only following it (`BatchReview.retarget`); rows whose words named an account, or whose account the user
+  picked, stay. A **Transfer** chip beside it adds a transfer row from the active wallet. Every row shows its own
+  account chip whenever there are two or more accounts (tester round 2026-11-24: rows from several wallets in one
+  message were saved into the default and fixed afterwards), so each can be changed before saving; transfer rows read
+  "A → B".
 
 ## Review and save
 

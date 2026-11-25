@@ -189,7 +189,10 @@ internal fun ReviewRowItem(
                         small = true,
                         onClick = onPickDate,
                     )
-                    val showAccount = wallets.size > 1 && row.walletId != activeWalletId
+                    // Every row shows its wallet when there's more than one (tester round 2026-11-24: rows from several
+                    // wallets in one message were saved into the default and edited afterwards). A row still follows
+                    // "Into" until its words name an account or the person picks one here.
+                    val showAccount = wallets.size > 1
                     if (!row.type.isTransfer && (showAccount || attention(RowField.WALLET))) {
                         Spacer(Modifier.width(6.dp))
                         AccountChip(

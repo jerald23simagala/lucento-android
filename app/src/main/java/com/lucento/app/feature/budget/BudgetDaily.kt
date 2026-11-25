@@ -53,7 +53,8 @@ fun budgetDailyFigure(
     budgets: List<Budget>,
     schedules: List<RecurringSchedule>,
     categories: List<Category>,
-): DailyFigure? = dailyFigure(plan, burn, today, budgetSafeToSpend(plan, today, ledger, budgets, schedules, categories))
+    skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
+): DailyFigure? = dailyFigure(plan, burn, today, budgetSafeToSpend(plan, today, ledger, budgets, schedules, categories, skippedCards))
 
 /**
  * Safe to spend for [plan]'s month on the Budget tab, the same calculation and inputs as Home's: the translated
@@ -68,10 +69,12 @@ fun budgetSafeToSpend(
     budgets: List<Budget>,
     schedules: List<RecurringSchedule>,
     categories: List<Category>,
+    /** Card statements the person skipped ([com.lucento.app.domain.SkippedStatement]), as on Home. */
+    skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
 ): SafeToSpend? {
     if (plan.month != YearMonth.from(today)) return null
     val valued = com.lucento.app.domain.fx.FxTranslation.valueSchedules(ledger, schedules)
-    return CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, valued, categories)
+    return CashflowCalculator.safeToSpend(plan.currencyCode, today, ledger.transactions, ledger.wallets, budgets, valued, categories, skippedCards)
         ?.takeIf { it.basis == SafeToSpend.Basis.BUDGET }
 }
 

@@ -101,6 +101,8 @@ data class ReportInputs(
     /** Active savings goals and their contributions (for Ask Lucento's AI; the reports don't use them). */
     val goals: List<com.lucento.app.domain.Goal> = emptyList(),
     val contributions: List<com.lucento.app.domain.GoalContribution> = emptyList(),
+    /** Card statements the person skipped: left out of what's due and of Safe to spend, as on Home. */
+    val skippedCards: Set<com.lucento.app.domain.SkippedStatement> = emptySet(),
 )
 
 /**

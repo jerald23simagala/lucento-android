@@ -74,6 +74,8 @@ object MoneyOnHandCalculator {
         wallets: List<Wallet>,
         transactions: List<Transaction>,
         schedules: List<RecurringSchedule>,
+        /** Card statements the person skipped: their payments aren't set aside ([CreditCardMath.dues]). */
+        skippedCards: Set<SkippedStatement> = emptySet(),
     ): MoneyOnHand? {
         val monthEnd = YearMonth.from(today).atEndOfMonth()
         val spending = wallets.filter { it.currencyCode == currencyCode && it.isSpendingMoney }
@@ -121,7 +123,7 @@ object MoneyOnHandCalculator {
             }
         }
         // A card's payment from its billing days, paid from spending money — unless a schedule due this month stands for it.
-        CreditCardMath.dues(wallets.filter { it.currencyCode == currencyCode }, transactions, today, monthEnd)
+        CreditCardMath.dues(wallets.filter { it.currencyCode == currencyCode }, transactions, today, monthEnd, skippedCards)
             .filter { it.wallet.id !in scheduledToCard && it.payFromWalletId in ids }
             .forEach { d ->
                 deductions += MoneyOnHand.Deduction(MoneyOnHand.Kind.CARD_PAYMENT, "${d.wallet.name} payment", d.cycle.dueDate, d.cycle.amountDue)

@@ -152,8 +152,8 @@ class AskLucentoViewModel(
         ) { t, w, c, b, s -> ReportInputs(w, t, c, b, s, LocalDate.now()) },
         goals?.observeGoals() ?: flowOf(emptyList()),
         goals?.observeContributions() ?: flowOf(emptyList()),
-        preferences.preferences.map { it.primaryCurrency }.distinctUntilChanged(),
-    ) { base, g, contributions, main ->
+        preferences.preferences.map { it.primaryCurrency to it.skippedCardStatements }.distinctUntilChanged(),
+    ) { base, g, contributions, (main, skipped) ->
         // Multicurrency: reports and AI answers read every figure in the main currency, FX results included.
         val ledger = com.lucento.app.domain.fx.FxTranslation.translate(main, base.wallets, base.transactions)
         base.copy(
@@ -164,6 +164,7 @@ class AskLucentoViewModel(
             categories = ledger.withFxCategories(base.categories),
             goals = g,
             contributions = contributions,
+            skippedCards = skipped,
         )
     }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
