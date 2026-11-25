@@ -82,13 +82,13 @@ payments get "Skip this statement" (hidden and not set aside, Undo); every compo
 
 ## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
 
-- **AS-1 Launch film on 0.5.19 (next; owner: after this review).** It still shows 0.5.14 screens ("Net Wallet Balance",
-  no Milestones). Owner (2026-11-24): narrate the 30 s, 15 s and vertical cuts with ElevenLabs from VOICEOVER.md, keep
-  the 93 s film music-led and the original score; needs a paid ElevenLabs plan (commercial use); every line passes
-  TRUTH_RULES; turn on TikTok's and Meta's AI-content label for the voice. Re-capture with `capture_marketing.sh` runs `tour-php` and `showcase-php` (the same demo year), then
-  lucento-studio `video/tools/capture/live_capture.py` in the showcase state, `prepare_screens.py`, `remap_boxes.py
-  <old> <new>`, fix the moved crop boxes and render all five versions with the emulator shut down
-  (docs/marketing/launch-film/ASSET_INVENTORY.md). Update ASSET_INVENTORY's source line and the "Net worth" wording.
+- ~~AS-1 Launch film on 0.5.19~~ **Built 2026-11-24 (branch `marketing/launch-film-0.5.19`), owner review next.** All
+  screens re-captured from main `a866390` (0.5.19 + the tester round), crop boxes remapped, the bulk message's brand
+  name replaced by "taxi" (T21). Narrated with ElevenLabs, voice Rianne (owner's pick over Laurel), "Lucento" said
+  loo-SEN-toh (owner): the 30 s and 15 s cuts, and the 93 s film twice, narrated and music-led (owner: "a voiced over
+  version too"); scripts in `docs/marketing/launch-film/VOICEOVER.md`. Eight films in `Downloads/lucento-launch-film/`.
+  **AS-1a (owner):** watch them; when posting a narrated one, turn on the AI label (TikTok "AI-generated content",
+  Instagram/Facebook "Label as made with AI").
 - **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
   graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
 - **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).

@@ -10,7 +10,7 @@ monthly AI allowance) read `README.md`, `docs/SCAN.md`, `docs/ASK.md` and the re
 `docs/handover/CURRENT_STATUS.md`.
 
 **Checked against Lucento 0.5.19 (version code 24) on 2026-11-24.** IDs never change: a new rule takes the next number
-and sits in the section it belongs to (T34–T40 were added on 2026-11-24).
+and sits in the section it belongs to (T34–T41 were added on 2026-11-24).
 
 On a Launch Board card, cite failures by ID (for example "T4, T11").
 
@@ -74,6 +74,7 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 | T27 | Creators who get free Pro disclose it ("gifted", or TikTok's branded-content toggle) and are free to say what they really think. We never script praise |
 | T28 | No unsolicited bulk messages. Every pitch is personal, sent by the owner from lucentoapp@gmail.com, one at a time, and a "no" or no reply after one follow-up ends it |
 | T29 | No real person's money, names or faces without written permission. The owner's own screenshots use Hide amounts or the demo data |
+| T41 | A narrated video uses an AI voice (ElevenLabs, since 2026-11-24): turn on the platform's AI label when posting it (TikTok "AI-generated content", Instagram and Facebook "Label as made with AI"), and never present the narrator as a real person, a user or the owner. The music-led 93 s film needs no label (`launch-film/VOICEOVER.md`) |
 
 ## KlaroPH bridge (owner decisions 2026-11-14)
 

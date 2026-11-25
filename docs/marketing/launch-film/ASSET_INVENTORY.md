@@ -5,10 +5,11 @@ unless stated otherwise.
 
 ## App screens (53 + 1 stitched)
 
-**Source:** Lucento 0.5.14 debug build (version code 19), `main` at `c4458d9`. It ran on the API 35 shots emulator
-(`Lucento_Shots_API35`, 1080 × 2400, 420 dpi) on 2026-11-19, with the clock set to 2026-11-08 10:00 to match the demo
-month used on the website and Play listing. (The first cut, 2026-11-14, used 0.5.8; the discovery report's section 7
-lists what changed on screen.)
+**Source:** Lucento 0.5.19 debug build (version code 24), `main` at `a866390` (0.5.19 plus the 2026-11-24 tester
+round, which ships in the next release). It ran on the API 35 shots emulator (`Lucento_Shots_API35`, 1080 × 2400,
+420 dpi) on 2026-11-24, with the clock set to 2026-11-08 10:00 to match the demo month used on the website and Play
+listing. Earlier cuts used 0.5.8 (2026-11-14) and 0.5.14 (2026-11-19); the discovery report's section 7 lists what
+changed on screen up to 0.5.14.
 
 **Processing:** `tools/prepare_screens.py` crops the emulator status bar (top 68 px) and the 3-button navigation bar
 with the debug build's TEST badge (bottom 126 px). That's the same crop the website uses. It then saves WebP quality 92
@@ -23,9 +24,9 @@ background ANR). After an app update, `tools/remap_boxes.py` finds where each cr
 
 | Run | How | Screens |
 |---|---|---|
-| `tour-dark` | `ScreenshotTourTest -e demoCurrency PHP -e demoDark true` (the existing CI tour, pesos ×10, dark) | onboarding presets and review, bell, Transactions, Visa card, car loan, new wallet, Insights top, Ask Lucento (question, answer, report), Budget, Categories, Goals, Scheduled, profile menu, Awards |
-| `showcase-2` | `WebsiteShowcaseTest -e websiteShowcase true -e showcaseCurrency PHP` (the demo month plus wallets in USD, AED and JPY at fixed rates, on the test build's simulated Pro plan) | Wallets (cards, rows, net worth), Dollar savings, multicurrency Dashboard, the Wallets screen in all five themes |
-| `live` | The showcase state, driven by adb (`tools/capture/`) | canonical Dashboard (₱258,108.10) and its two scroll positions, Hide amounts, Insights charts, composer states (empty, listening, typed, bulk, saved), partner entry, Transactions after each save |
+| `tour-dark` | lucento-android `tools/screenshots/capture_marketing.sh <dir> tour-php`: `ScreenshotTourTest -e demoCurrency PHP -e demoDark true -e demoHistory true` (the existing CI tour, pesos ×10, dark, with the demo year's history) | onboarding presets and review, bell, Transactions, Visa card, car loan, new wallet, Insights top, Ask Lucento (question, answer, report), Budget, Categories, Goals, Scheduled, profile menu, Awards |
+| `showcase-2` | `capture_marketing.sh <dir> showcase-php`: `WebsiteShowcaseTest -e websiteShowcase true -e showcaseCurrency PHP -e demoHistory true` (the demo month plus wallets in USD, AED and JPY at fixed rates, on the test build's simulated Pro plan) | Wallets (cards, rows, net worth), Dollar savings, multicurrency Dashboard, the Wallets screen in all five themes |
+| `live` | The showcase state, driven by adb (`tools/capture/`) | canonical Dashboard (net worth ₱413,338.10 with the demo year's history) and its two scroll positions, Hide amounts, Insights charts, composer states (empty, listening, typed, bulk, saved), partner entry, Transactions after each save |
 
 **Fictional data:** everything comes from `DemoMonth.seed` (androidTest), the same world the website and Play listing
 show:
@@ -39,22 +40,27 @@ The film adds only what was entered on screen during the capture:
 
 - Lunch 500 (not saved)
 - Groceries 850 (not saved)
-- Coffee 180, lunch 250, Grab 240, load 300 (saved, into Everyday bank: the default wallet)
+- Coffee 180, lunch 250, taxi 240, load 300 (saved, into Everyday bank: the default wallet). Until 0.5.14 the
+  message named a ride-hailing brand, which TRUTH_RULES T21 doesn't allow
 - Family dinner 1,280 (saved, into Everyday bank)
 
 **Staging disclosures:**
 
-- **Voice (S04):** the Listening sheet is a real capture in the app's default offline mode ("Your words are turned into
-  text on this phone"). The emulator can't hear speech, so the phrase was then entered as text. The row card it produces is identical to the spoken result. The spoken words
+- **Voice (S04):** the Listening sheet is a real capture. The emulator has no offline speech pack, so online voice was
+  allowed on this test install and the sheet carries its line ("Online voice is on: your phone's speech service may
+  send your words to Google…"); a phone with an offline pack shows the on-phone line instead. The sheet closes after
+  about 1.5 s without a reachable speech service, so the still is taken as it opens. The emulator can't hear speech, so
+  the phrase was then entered as text. The row card it produces is identical to the spoken result. The spoken words
   are a caption beside the phone, not text drawn into the app. In the app, a spoken message also carries a small
-  "Spoken" label, which this capture doesn't show.
+  "Spoken" label, which this capture doesn't show. Behind the sheet the film draws the app's own scrim (black at 32 %,
+  measured from the capture, within one level) over the real composer, so the sheet can slide away cleanly.
 - **Typing (S04, S07):** each still already contains the real typed text. Covers in the field's own colour (#18233F)
   shrink left to right, so the words appear in the order typed.
 - **Motion:** live screen recordings ran at about 18 fps on this machine, too choppy for the film. All motion is
   therefore camera work on full-resolution stills: pans, push-ins, cross-fades, slide-ups and reveals of the screens'
   own pixels. The bar and donut "draw" reveals use the real chart pixels. The mic ring pulse mirrors the app's own
   voice-level animation.
-- **Dashboard scroll (S02):** three real captures stitched at offsets 995 px and 1,766 px (template match above 0.98),
+- **Dashboard scroll (S02):** three real captures stitched at offsets 998 px and 1,796 px (template match above 0.98),
   each seam halfway through the overlap. The header and dock are pinned, as they are in the app, and the app's 48 px
   fade into the dock (measured from the captures) is drawn at the dock edge.
 - **Shared (S07):** both phones show real screens of the same ledger, staged like the Play listing's Shared graphic. A
@@ -91,6 +97,16 @@ The random seed is fixed, so it regenerates exactly.
 To swap in a licensed track, replace `score.wav` (93.3 s, or trim it in `Soundtrack.tsx`). The edit points sit on a
 90 BPM grid.
 
+**Voiceover** (since 2026-11-24): generated with ElevenLabs (`eleven_v4`) on the owner's paid Creator plan, whose terms
+allow commercial use, in the library voice Rianne ("Warm & Friendly Filipino Creator"). It is an AI voice, so narrated
+posts carry each platform's AI label (`VOICEOVER.md`).
+
+| File | What |
+|---|---|
+| `voiceover/takes/*.mp3` | The ElevenLabs takes as downloaded (used: `30-rianne-c`, `15-rianne-a`, `93-rianne-b`; the rest are alternates and the voice samples) |
+| `public/launch-film/audio/vo/<cut>-rianne/NN.wav` | Each line, cut from its take by `tools/voiceover.py`: levelled to −16 LUFS, limited at −3 dBFS, 48 kHz mono |
+| `src/launch-film/audio/Voiceover.tsx` | Where each line starts (`VO_AT`) and the score dip under it |
+
 ## Other
 
 | Asset | Source |
@@ -102,5 +118,5 @@ To swap in a licensed track, replace `score.wav` (93.3 s, or trim it in `Soundtr
 
 | File | Where |
 |---|---|
-| Films | `lucento-studio/video/out/` (git-ignored), copied to `Downloads/lucento-launch-film/`: `lucento-launch-film.mp4` (93.3 s), `-30s`, `-15s`, and each with `-vertical` (1080 × 1920) |
+| Films | `lucento-studio/video/out/` (git-ignored), copied to `Downloads/lucento-launch-film/`: `lucento-launch-film.mp4` (93.3 s, music-led), `lucento-launch-film-narrated.mp4` (93.3 s), `-30s`, `-15s` (narrated), and each with `-vertical` (1080 × 1920). The 0.5.14 renders are kept in `previous-0.5.14/` |
 | Review frames | `lucento-studio/video/out/` (git-ignored) |

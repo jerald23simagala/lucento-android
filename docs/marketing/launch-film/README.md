@@ -1,18 +1,19 @@
 # Lucento launch film
 
 Lucento's first official product film: **93.3 seconds, 1920 × 1080, 30 fps**, plus a **vertical 1080 × 1920**
-version. It is built in Remotion from real captures of Lucento 0.5.14 (refreshed 2026-11-19; the first cut used 0.5.8) and
-carries an original synthesized score. In the vertical version every caption is centred.
-30-second and 15-second cuts, in both shapes, come from the same source.
+version. It is built in Remotion from real captures of Lucento 0.5.19 (refreshed 2026-11-24; earlier cuts used 0.5.8
+and 0.5.14) and carries an original synthesized score. In the vertical version every caption is centred.
+30-second and 15-second cuts, in both shapes, come from the same source. Since 2026-11-24 every version is narrated
+(ElevenLabs, voice Rianne), and the 93-second film also stays available music-led for muted feeds.
 
 | Deliverable | Where |
 |---|---|
-| Remotion project | `lucento-studio/video/` · film source `src/launch-film/` · compositions `LaunchFilm`, `LaunchFilm30`, `LaunchFilm15`, the vertical `LaunchFilmVertical`, `LaunchFilm30Vertical`, `LaunchFilm15Vertical`, plus each scene under `LaunchFilm-Scenes` |
+| Remotion project | `lucento-studio/video/` · film source `src/launch-film/` · compositions `LaunchFilm` (music-led), `LaunchFilmNarrated`, `LaunchFilm30`, `LaunchFilm15`, the vertical `LaunchFilmVertical`, `LaunchFilmNarratedVertical`, `LaunchFilm30Vertical`, `LaunchFilm15Vertical`, plus each scene under `LaunchFilm-Scenes` |
 | Rendered films | `lucento-studio/video/out/` (git-ignored); copies in `Downloads/lucento-launch-film/` |
 | Feature discovery report | [`../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`](../LAUNCH_VIDEO_FEATURE_DISCOVERY.md) |
 | Feature-to-visual mapping (tiers 1–4) | [`FEATURE_VISUAL_MAP.md`](FEATURE_VISUAL_MAP.md) |
 | Final storyboard | [`STORYBOARD.md`](STORYBOARD.md) |
-| Voiceover script (timed) | [`VOICEOVER.md`](VOICEOVER.md) |
+| Voiceover: scripts, timings, voice and the AI labels for posting | [`VOICEOVER.md`](VOICEOVER.md) |
 | Asset inventory, sources, rights, staging disclosures | [`ASSET_INVENTORY.md`](ASSET_INVENTORY.md) |
 | 30 s and 15 s cuts; vertical versions | [`CUTDOWNS.md`](CUTDOWNS.md) |
 | Future feature videos | [`FUTURE_VIDEOS.md`](FUTURE_VIDEOS.md) |
@@ -23,8 +24,8 @@ carries an original synthesized score. In the vertical version every caption is 
 cd lucento-studio/video
 npm ci                                   # first time only
 npm run studio                           # opens Remotion Studio; pick LaunchFilm
-npm run render:film                      # → out/lucento-launch-film.mp4 (also render:film30, render:film15)
-npm run render:vertical                  # → out/lucento-launch-film-vertical.mp4 (also render:vertical30, render:vertical15)
+npm run render:film                      # → out/lucento-launch-film.mp4, music-led (also render:film-vo, render:film30, render:film15)
+npm run render:vertical                  # → out/lucento-launch-film-vertical.mp4 (also render:vertical-vo, render:vertical30, render:vertical15)
 npm run score                            # regenerate the music (needs Python with numpy and scipy)
 ```
 
