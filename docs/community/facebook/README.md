@@ -68,7 +68,7 @@ the extension can't use. When it asks, choose the file yourself from
 `C:\Users\Jerald\Desktop\Personal\lucento-android\docs\community\facebook\`.
 
 > Set up Lucento on Facebook using the kit at docs/community/facebook/README.md (I'll paste the texts as you need
-> them). 1) Create a Page named "Lucento", category App Page, with the Page bio, About text, website
+> them). 1) Create a Page named "Lucento", category App Page, with the Page bio, website
 > https://www.lucentoapp.com and email lucentoapp@gmail.com. Pause so I can upload profile-720x720.png and
 > page-cover-1640x624.png. 2) Switch to the Page and create a group named "Lucento Community", privacy Private,
 > visibility Visible. Pause so I can upload group-cover-1640x856.png. 3) Add the Group description, the five rules
@@ -78,15 +78,14 @@ the extension can't use. When it asks, choose the file yourself from
 
 ## Texts
 
-### Page bio (101 characters max)
-> Everything about your money, in one clear view. A personal finance app for Android.
+### Page bio (255 characters max, this one is 246)
+The Page has one **Bio** box under **About**. It takes 255 characters at most (the owner checked on 26 Nov 2026),
+so there's no separate long description. The website and email go in the Page's **Contact info**.
+> Personal finance app for Android: wallets, budgets, bills, debts and goals in one clear view. Type a purchase like a
+> text. Works offline with records on your phone. Cloud sync is optional (Lucento Pro). Privacy:
+> https://www.lucentoapp.com/privacy
 
-### Page "About" / long description
-> Lucento is a personal finance app for Android: wallets, budgets, bills, debts, goals and insights in one clear view.
-> Type a purchase the way you'd text a friend and Lucento turns it into a transaction. Your records are stored on
-> your phone and every core feature works offline; online extras such as cloud sync (Lucento Pro) are optional.
-> Join the Lucento Community group to suggest ideas, ask questions and report problems.
-> Website: https://www.lucentoapp.com · Privacy: https://www.lucentoapp.com/privacy · Email: lucentoapp@gmail.com
+Paste it as one line. The quote's line breaks are only there to keep this file readable.
 
 ### Group description
 > The official community for Lucento, the personal finance app for Android.
