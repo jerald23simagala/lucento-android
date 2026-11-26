@@ -307,7 +307,10 @@ fun BudgetScreen(
                     }
                 }
             } else item(key = "summary") {
-                val burn = remember(plan, state.today) { BudgetPlanner.burn(plan, state.today) }
+                // Pace counts the month's scheduled bills on their due dates, the same as Home (CALCULATIONS "Budget pace").
+                val burn = remember(plan, state.today, state.schedules) {
+                    BudgetPlanner.burn(plan, state.today, com.lucento.app.domain.BudgetPace.bills(state.schedules, plan.month, state.today))
+                }
                 val safe = remember(plan, ledger, state.budgets, state.schedules, state.categories, state.today, state.skippedCards) {
                     budgetSafeToSpend(plan, state.today, ledger, state.budgets, state.schedules, state.categories, state.skippedCards)
                 }

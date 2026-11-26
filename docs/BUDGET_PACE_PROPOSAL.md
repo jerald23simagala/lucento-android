@@ -1,10 +1,17 @@
-# Budget pace with bills on their due dates (proposal, 26 Nov 2026)
+# Budget pace with bills on their due dates (26 Nov 2026)
 
-**Owner's choice (26 Nov):** pace bills by their due dates, and show the before and after first. This page is that
-before and after.
+**Owner's choices (26 Nov):**
+1. Pace bills by their due dates, and show the before and after first. This page is that before and after.
+2. After the owner asked "what if the payment was delayed from last month": count every bill **on its due date, paid or
+   not**. A bill already due and still owed counts as spent for pace, whichever month it belongs to.
+3. Only the chip's word changes. The bar and its "days elapsed" tick stay as they are.
 
-- **Built so far:** the rule, `domain/BudgetPace.kt`, with `BudgetPaceTest` (8 tests, all pass).
-- **Not built yet:** nothing on Home or the Budget page uses it.
+**Built:**
+- `domain/BudgetPace.kt`, read by `BudgetPlanner.burn` (Home, the Budget page, widgets, the wellness tier);
+- the definition in docs/CALCULATIONS.md "Budget pace";
+- `BudgetPaceTest` (15 tests, all pass), including the late-payment cases below.
+
+The "What changes on screen" and "Open question" sections below are superseded by choice 3: there's no new label.
 
 ## The problem
 
@@ -49,11 +56,20 @@ test in `BudgetPaceTest`.
 | 8 | 80 % | **Ahead of pace** (the plan is at 69 %) |
 | 12 | 92 % | **Ahead of pace** (74 %) |
 
+**Late and unpaid payments** (choice 2), on day 8:
+
+| Case | Used for pace | Proposed |
+|---|---|---|
+| This month's rent due on the 2nd, not paid yet | 69 % (it counts as spent) | On track (not "Under budget") |
+| Last month's rent paid late on the 5th; this month's not paid yet | 127 % | **Ahead of pace** |
+| Last month's rent paid late, and this month's paid too | 127 % (the card also says Over budget) | **Ahead of pace** |
+| Last month's rent and this month's both still unpaid | 127 % | **Ahead of pace** |
+
 **Other cases:**
 - **Rent typed by hand, with no schedule:** the plan can't know about it, so the chip reads as today ("Ahead of pace" on
   day 8). The rule only follows bills it knows about.
-- **Rent scheduled but not yet paid by day 8:** 11 % spent against a plan of 69 % reads "Under budget". Home's bell
-  already flags the overdue bill.
+- **A skipped bill:** skips aren't recorded apart from payments, so it still counts as planned for its day. That errs
+  toward "On track", never toward a false warning.
 
 ## What changes on screen, once you say yes
 
