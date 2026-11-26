@@ -62,6 +62,14 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Wide windows — follow-ups (2026-11-26, `feature/foldable-split`)
+
+1. Owner: look at the preview and say yes before the PR merges (layout change; owner rule).
+2. WW-1: keep the transaction editor's and transfer sheet's drafts across a fold or rotation.
+3. Mark the open wallet in the card grid; consider `paneTitle` on the detail pane (WW-3).
+4. An instrumented test on a wide window (forced size or a tablet AVD) for the split's navigation; CI's tour is a phone.
+5. Try it on a real foldable and a tablet, including half-open posture (WW-5).
+
 ## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
 
 The closed test's report (Testers Community, 25 Nov) found no bugs and asked for a rating option, sharing and help in

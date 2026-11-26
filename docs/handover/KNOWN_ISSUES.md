@@ -15,6 +15,23 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Wide windows: rail and two panes (2026-11-26, `feature/foldable-split`)
+
+- **WW-1 (Code-only, older than this work).** Folding, unfolding, rotating or resizing recreates the activity (the
+  manifest handles no configuration changes). The full-page transaction editor's draft (`editorDraft`) and the transfer
+  sheet's (`transferDraft`) are plain `remember` in `LucentoRoot`, so an open editor closes itself and unsaved edits are
+  lost. The composer keeps its rows (they are in its ViewModel). Fix: hold both drafts in the activity-scoped
+  `TransactionEditorViewModel`, and keep the editor's fields in saved state.
+- **WW-2 (Verified on the emulator).** At 200 % text in a ~383dp pane, some titles and tiles end in "…" (Add
+  transactions, a wallet's name, Wallet view's Transfer tile), as on a narrow phone. Nothing overlaps; every control works.
+- **WW-3 (Code-only).** The wallets card grid doesn't mark the wallet open beside it (the rows view does). The detail
+  pane has no `paneTitle`, so TalkBack doesn't announce that the right pane changed (each page's heading is read when
+  reached).
+- **WW-4 (Inferred).** Picking Insights on Home (or Scheduled on Budget) while it is already the default pane opens a
+  second copy with a back arrow; Back returns to the default. Harmless.
+- **WW-5 (Not checked).** Half-open (tabletop/book) posture: Lucento doesn't read the hinge, so the split line ignores
+  it. Not run on a real foldable or a tablet yet.
+
 ## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
 
 - **DS-K1 (Verified, local probe and CI).**

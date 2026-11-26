@@ -120,7 +120,26 @@ import kotlin.reflect.KClass
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.runtime.key
+import androidx.compose.runtime.saveable.SaveableStateHolder
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.navigation.NavBackStackEntry
+import com.lucento.app.feature.transactions.TransactionsViewModel
+import com.lucento.app.feature.wallets.WalletsViewModel
 
 // Primary destinations: the five tabs of the navigation dock.
 @Serializable data object HomeRoute
@@ -240,11 +259,56 @@ private val FocusedRoutes: List<KClass<out Any>> = listOf(
     AskRoute::class,
 )
 
+/**
+ * On wide windows (rail and two panes, owner 2026-11-26) the focused workflows above open in the right-hand pane beside
+ * the list, except these, which still take the whole window: setup, settings and the Lucento Plan page.
+ */
+private val FullScreenRoutes: List<KClass<out Any>> = listOf(
+    GuideRoute::class,
+    CategorySetupRoute::class,
+    SettingsRoute::class,
+    FeaturesRoute::class,
+    SharedSpaceRoute::class,
+    ProRoute::class,
+)
+
 private fun NavDestination?.primaryKey(): String? =
     this?.hierarchy?.firstNotNullOfOrNull { d -> PrimaryRoutes.firstOrNull { d.hasRoute(it.second) }?.first }
 
 private fun NavDestination?.isFocused(): Boolean =
     this?.hierarchy?.any { d -> FocusedRoutes.any { d.hasRoute(it) } } == true
+
+private fun NavDestination?.isFullScreen(): Boolean =
+    this?.hierarchy?.any { d -> FullScreenRoutes.any { d.hasRoute(it) } } == true
+
+/** Where something is being written that a stray tap beside it must not throw away (see HeldWhileEditing). */
+private val EditorRoutes: List<KClass<out Any>> = listOf(
+    ComposerRoute::class,
+    TransactionEditRoute::class,
+    RecurringEditRoute::class,
+    MonthPlanRoute::class,
+)
+
+private fun NavDestination?.isEditor(): Boolean =
+    this?.hierarchy?.any { d -> EditorRoutes.any { d.hasRoute(it) } } == true
+
+/** A tab's root route, for the list pane and for clearing the detail pane back to it. */
+private fun tabRoot(key: String): Any = when (key) {
+    "transactions" -> TransactionsRoute
+    "budget" -> BudgetRoute
+    "wallets" -> WalletsRoute
+    else -> HomeRoute
+}
+
+/** The back stack entry of a tab's root, whose ViewModels the list pane shares; null when it isn't on the stack. */
+private fun NavHostController.tabRootEntry(key: String): NavBackStackEntry? = runCatching {
+    when (key) {
+        "transactions" -> getBackStackEntry<TransactionsRoute>()
+        "budget" -> getBackStackEntry<BudgetRoute>()
+        "wallets" -> getBackStackEntry<WalletsRoute>()
+        else -> getBackStackEntry<HomeRoute>()
+    }
+}.getOrNull()
 
 /** Switches between first-run onboarding and the main app once preferences are known. */
 @Composable
@@ -298,6 +362,10 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     val haptics = rememberHaptics()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    // Wide windows get the side rail, and two panes when there's room (owner, 2026-11-26); phones keep the dock.
+    val windowConfiguration = LocalConfiguration.current
+    val navLayout = navLayoutFor(windowConfiguration.screenWidthDp, windowConfiguration.screenHeightDp)
+    val layoutState = rememberUpdatedState(navLayout)
     // Short messages (a Pro wall met again, owner 2026-11-19) show in the app's snackbar unless a sheet is open.
     val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
     androidx.compose.runtime.DisposableEffect(messageHosts, snackbarHostState, scope) {
@@ -370,6 +438,21 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
         navController.navigate(route) { launchSingleTop = true }
     }
 
+    // Something picked in a tab's own screen. With two panes it replaces what the right-hand pane shows (Back then
+    // returns to the tab's default there) instead of stacking up; elsewhere it's an ordinary push.
+    fun open(route: Any) {
+        if (layoutState.value == NavLayout.SPLIT) {
+            // The tab the list pane shows: the root on top, else the tab the top screen was opened from.
+            val tab = navController.currentDestination.primaryKey() ?: selectedTab
+            navController.navigate(route) {
+                popUpTo(tabRoot(tab))
+                launchSingleTop = true
+            }
+        } else {
+            push(route)
+        }
+    }
+
     // A card or loan saved with a payment reminder opens a prefilled recurring payment (when that module is on).
     val planDebtPayment: ((Long, java.time.LocalDate) -> Unit)? = if (features.isEnabled(Feature.RECURRING)) {
         { walletId, firstDue -> push(RecurringEditRoute(debtWalletId = walletId, firstDueEpochDay = firstDue.toEpochDay())) }
@@ -421,7 +504,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             if (due.payFromWalletId == null) "Choose the account you’re paying from, then save." else "Change the amount for a partial payment, or the account it comes from."
     }
 
-    fun edit(transaction: Transaction) {
+    /** [fromList]: from the history's own rows, which on wide windows open beside the list (see [open]). */
+    fun edit(transaction: Transaction, fromList: Boolean = false) {
         val group = transaction.transferGroup
         if (group != null) {
             val transfer = editorState.transfers[group] ?: return
@@ -429,11 +513,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             transferDraft = transfer.toDraft()
         } else {
             editorDraft = transaction.toDraft()
-            push(TransactionEditRoute)
+            if (fromList) open(TransactionEditRoute) else push(TransactionEditRoute)
         }
     }
 
-    fun view(transaction: Transaction) = push(TransactionViewRoute(transaction.id))
+    fun view(transaction: Transaction, fromList: Boolean = false) =
+        if (fromList) open(TransactionViewRoute(transaction.id)) else push(TransactionViewRoute(transaction.id))
 
     /** The one way to add transactions: the composer (typed, spoken or scanned, reviewed as a batch). */
     fun openComposer(start: ComposerStart = ComposerStart.TYPE, walletId: Long? = null, typeHint: TransactionType? = null) {
@@ -487,6 +572,171 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
     var dockHidden by remember { mutableStateOf(false) }
     val hideDock: (Boolean) -> Unit = remember { { hidden -> dockHidden = hidden } }
 
+    // The four tabs' own screens. Phones show them through the NavHost; with two panes they stay in the left-hand pane
+    // and what they open shows on the right (owner, 2026-11-26), so their detail links go through open().
+    val homeTab: @Composable () -> Unit = {
+        val spacePrompt by appViewModel.spacePrompt.collectAsStateWithLifecycle()
+        HomeScreen(
+            scrollToTop = homeToTop,
+            actions = HomeActions(
+                spacePrompt = spacePrompt,
+                onOpenSpacePrompt = {
+                    val invite = (spacePrompt as? com.lucento.app.data.sharedspace.SpacePrompt.Invitation)?.invitation?.id
+                    push(SharedSpaceRoute(reviewInvite = invite.orEmpty()))
+                },
+                onDismissSpacePrompt = { spacePrompt?.let { appViewModel.dismissSpacePrompt(it.key) } },
+                onOpenBudget = { navigateTo(BudgetRoute) },
+                onChooseCategories = { push(CategorySetupRoute) },
+                onOpenInsights = { open(InsightsRoute) },
+                onOpenGoals = { open(GoalsRoute) },
+                onOpenRecurring = { id -> open(RecurringRoute(id ?: NO_SCHEDULE)) },
+                onOpenWallets = { navigateTo(WalletsRoute) },
+                onOpenWallet = { open(WalletDetailRoute(it)) },
+                onPayCard = { if (features.isEnabled(Feature.MULTIPLE_WALLETS)) openCardPayment(it) else open(WalletDetailRoute(it.wallet.id)) },
+                onOpenDebts = { open(DebtsRoute) },
+                onOpenSettings = { push(SettingsRoute()) },
+                onOpenAccountSettings = { push(SettingsRoute(SettingsPage.ACCOUNT.key)) },
+                onOpenTransactions = { navigateTo(TransactionsRoute) },
+                onViewTransaction = { view(it, fromList = true) },
+                onAddTransaction = { type -> openComposer(typeHint = type) },
+                onTransfer = { openTransfer() },
+                onScanReceipt = { openComposer(ComposerStart.SCAN) },
+                onOpenCategory = { id, month -> open(CategoryTransactionsRoute(id, month.toString())) },
+                onOpenMilestones = { open(ProgressRoute) },
+                onOpenMonthRecap = { month -> open(MonthRecapRoute(month.toString())) },
+                onOpenAwards = { open(AwardsRoute) },
+                onPlanMonth = { month -> open(MonthPlanRoute(month.toString())) },
+            ),
+        )
+    }
+    val transactionsTab: @Composable () -> Unit = {
+        TransactionsScreen(
+            onAddTransaction = { openComposer() },
+            onViewTransaction = { view(it, fromList = true) },
+            onEditTransaction = { edit(it, fromList = true) },
+            onDeleteTransaction = { t ->
+                editorViewModel.delete(t.id) { notify(if (t.isTransfer) "Transfer deleted" else "Transaction deleted") }
+            },
+            onAddWallet = { navigateTo(WalletsRoute) },
+            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
+            onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
+        )
+    }
+    val walletsTab: @Composable () -> Unit = {
+        WalletsScreen(
+            onBack = null,
+            onOpenWallet = { open(WalletDetailRoute(it)) },
+            allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
+            onPlanDebtPayment = planDebtPayment,
+            onOpenDebts = if (features.isEnabled(Feature.DEBTS_LOANS)) ({ open(DebtsRoute) }) else null,
+            onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
+        )
+    }
+    val budgetTab: @Composable () -> Unit = {
+        Gated(Feature.BUDGETS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) {
+            BudgetScreen(
+                onBack = null,
+                onChooseCategories = { push(CategorySetupRoute) },
+                onManageCategories = { open(CategoriesRoute) },
+                onOpenScheduled = { open(RecurringRoute()) },
+                onPlanMonth = { month -> open(MonthPlanRoute(month.toString())) },
+            )
+        }
+    }
+    val walletPane: @Composable (Long, (() -> Unit)?) -> Unit = { walletId, onBack ->
+        WalletDetailScreen(
+            walletId = walletId,
+            onBack = onBack,
+            onAddTransaction = { type, id -> openComposer(walletId = id, typeHint = type) },
+            onTransfer = { from, to -> openTransfer(from, to) },
+            onEditTransaction = { view(it) },
+            transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
+            onAdjusted = { notify("Balance adjusted") },
+            onOutsideRecorded = { notify("${it.label} recorded") },
+            onPlanDebtPayment = planDebtPayment,
+            onPayCard = { openCardPayment(it) },
+        )
+    }
+    val scheduledPane: @Composable () -> Unit = {
+        RecurringScreen(
+            onBack = null,
+            onAddSchedule = { push(RecurringEditRoute()) },
+            onEditSchedule = { id -> push(RecurringEditRoute(scheduleId = id)) },
+            onOpenWallet = { id -> push(WalletDetailRoute(id)) },
+            onPayCard = { if (features.isEnabled(Feature.MULTIPLE_WALLETS)) openCardPayment(it) else push(WalletDetailRoute(it.wallet.id)) },
+        )
+    }
+    // What a tab's default pane is showing, so the list beside it can mark that row (set by the pane itself).
+    var paneDefault by remember { mutableStateOf(com.lucento.app.core.designsystem.component.PaneSelection()) }
+    // With two panes, what the right-hand one shows while nothing has been opened from the tab, so it is never empty
+    // (owner, 2026-11-26: Insights beside Home; defaultPaneFor). It runs in the tab root's entry, so it reads the list's
+    // ViewModels; the page it shows gets ViewModels of its own that end when it leaves the screen (PaneViewModels).
+    val tabDefaultPane: @Composable (String) -> Unit = { tabKey ->
+        val insightsPane: @Composable () -> Unit = {
+            PaneViewModels {
+                // Seeing Insights beside Home is not opening it: no Financial Explorer milestone for that.
+                InsightsScreen(onBack = null, onAsk = { push(AskRoute) }, viewModel = viewModel(factory = com.lucento.app.feature.insights.InsightsViewModel.PaneFactory))
+            }
+        }
+        when (defaultPaneFor(tabKey, insightsOn = features.isEnabled(Feature.INSIGHTS), scheduledOn = features.isEnabled(Feature.RECURRING))) {
+            DefaultPane.INSIGHTS -> insightsPane()
+            DefaultPane.SCHEDULED -> PaneViewModels { scheduledPane() }
+            DefaultPane.NEWEST_TRANSACTION -> {
+                val list: TransactionsViewModel = viewModel(factory = TransactionsViewModel.Factory)
+                val listState by list.uiState.collectAsStateWithLifecycle()
+                // The newest of what the list shows (its filters applied).
+                val newest = listState.sections.firstOrNull()?.group?.items?.firstOrNull()
+                androidx.compose.runtime.SideEffect {
+                    paneDefault = com.lucento.app.core.designsystem.component.PaneSelection(transactionId = newest?.id)
+                }
+                when {
+                    newest != null -> key(newest.id) {
+                        PaneViewModels { TransactionDetailScreen(transactionId = newest.id, onBack = null, onEdit = { edit(it) }) }
+                    }
+                    listState.loading -> Unit
+                    listState.totalCount > 0 -> PanePlaceholder(
+                        title = "Nothing matches",
+                        body = "No transactions fit the filters on the left. Change them and the newest one opens here.",
+                    )
+                    else -> PanePlaceholder(
+                        title = "No transactions yet",
+                        body = "Add one with the + button. Whatever you pick from the list opens here.",
+                    )
+                }
+            }
+            DefaultPane.DEFAULT_WALLET -> {
+                val list: WalletsViewModel = viewModel(factory = WalletsViewModel.Factory)
+                val listState by list.uiState.collectAsStateWithLifecycle()
+                // The wallet new transactions go into, else the first one listed.
+                val walletId = listState.defaultWalletId?.takeIf { id -> listState.wallets.any { it.id == id } }
+                    ?: listState.shown.firstOrNull()?.id
+                    ?: listState.wallets.firstOrNull()?.id
+                androidx.compose.runtime.SideEffect {
+                    paneDefault = com.lucento.app.core.designsystem.component.PaneSelection(walletId = walletId)
+                }
+                when {
+                    walletId != null -> key(walletId) { PaneViewModels { walletPane(walletId, null) } }
+                    !listState.loading -> PanePlaceholder(
+                        title = "No wallets yet",
+                        body = "Add your cash, bank or card on the left and it opens here.",
+                    )
+                }
+            }
+            DefaultPane.NOTHING_OPEN -> PanePlaceholder(title = "Nothing open", body = "Pick something on the left and it opens here.")
+        }
+    }
+    // The list pane's remembered state (scroll position, search) per tab-root entry: a tab reopened after a switch starts
+    // afresh, as on a phone, and its ViewModels with it (the entries it was kept for are let go below).
+    val listPaneStates = rememberSaveableStateHolder()
+    val listPaneEntries = remember { mutableMapOf<String, NavBackStackEntry>() }
+    LaunchedEffect(backStackEntry) {
+        val gone = listPaneEntries.filterValues { it.lifecycle.currentState == androidx.lifecycle.Lifecycle.State.DESTROYED }.keys.toList()
+        gone.forEach { stateKey ->
+            listPaneStates.removeState(stateKey)
+            listPaneEntries.remove(stateKey)
+        }
+    }
+
     CompositionLocalProvider(
         com.lucento.app.core.designsystem.component.LocalSpotlight provides spotlight,
         com.lucento.app.core.designsystem.component.LocalHideDock provides hideDock,
@@ -508,7 +758,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                 },
                 bottomBar = {
                     AnimatedVisibility(
-                        visible = !focused && !dockHidden,
+                        // Wide windows use the side rail instead.
+                        visible = navLayout == NavLayout.DOCK && !focused && !dockHidden,
                         enter = slideInVertically { it } + fadeIn(),
                         exit = slideOutVertically { it } + fadeOut(),
                     ) {
@@ -561,6 +812,94 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                     // The padding is consumed as insets too, so a screen's imePadding() adds only the keyboard above the navigation
                     // bar the Scaffold already cleared, not the bar a second time (a gap above the keyboard in the composer).
                     Box(Modifier.fillMaxSize().padding(innerPadding).consumeWindowInsets(innerPadding)) {
+                      BoxWithConstraints(Modifier.fillMaxSize()) {
+                        // Wide windows (owner, 2026-11-26): the rail down the leading edge and, with two panes, the
+                        // current tab's own screen on the left and what was opened from it on the right. Setup,
+                        // settings and the Lucento Plan page still take the whole window. The NavHost keeps one place
+                        // in the tree whatever shows beside it, so nothing in it restarts when the panes change.
+                        val fullScreen = currentDestination.isFullScreen()
+                        val showRail = navLayout != NavLayout.DOCK && !fullScreen
+                        val showList = navLayout == NavLayout.SPLIT && !fullScreen
+                        // While something is being written on the right (the composer, an editor), the rail and the
+                        // list wait behind a veil, as the dock steps aside on a phone: a tap there is Back, so unsaved
+                        // work goes through the editor's own "discard?" instead of vanishing.
+                        val editing = currentDestination.isEditor()
+                        val backDispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+                        val leaveEditor: () -> Unit = { backDispatcher?.onBackPressed() }
+                        val besideRail = maxWidth - (if (showRail) RailWidth else 0.dp)
+                        val listWidth = if (showList) listPaneWidthDp(besideRail.value.toInt()).dp else 0.dp
+                        val detailWidth = besideRail - listWidth - (if (showList) PaneDividerWidth else 0.dp)
+                        Row(Modifier.fillMaxSize()) {
+                            if (showRail) {
+                              HeldWhileEditing(held = editing, onTapWhileHeld = leaveEditor, modifier = Modifier.fillMaxHeight()) {
+                                NavigationRailDock(
+                                    items = tabs.map { it.item },
+                                    selectedKey = selectedTab,
+                                    onSelect = { item ->
+                                        val tab = tabs.first { it.item.key == item.key }
+                                        selectedTab = item.key
+                                        if (item.key == "home") homeToTop++
+                                        navigateTo(tab.route)
+                                    },
+                                    onAdd = {
+                                        haptics.tick()
+                                        if (spotlightAdd) appViewModel.markAddSpotlightSeen()
+                                        openComposer()
+                                    },
+                                    highlightAdd = spotlightAdd && selectedTab == "home",
+                                    modifier = Modifier.fillMaxHeight(),
+                                )
+                              }
+                            }
+                            if (showList) {
+                                // On a tab's root, that tab at once (selectedTab follows a frame later); above it, the
+                                // tab it was opened from.
+                                val tabKey = currentDestination.primaryKey() ?: selectedTab
+                                // The tab root's entry, so the list shares the ViewModels it has on a phone (and the
+                                // default pane beside it). Its lifecycle stays the screen's: the list keeps updating
+                                // while something else is open on the right.
+                                val rootEntry = remember(backStackEntry, tabKey) { navController.tabRootEntry(tabKey) }
+                                // The row open on the right (a transaction or a wallet), marked in the list.
+                                val top = backStackEntry
+                                val paneSelection = when {
+                                    top == null -> null
+                                    top.destination.hasRoute<TransactionViewRoute>() ->
+                                        com.lucento.app.core.designsystem.component.PaneSelection(transactionId = top.toRoute<TransactionViewRoute>().transactionId)
+                                    top.destination.hasRoute<TransactionEditRoute>() ->
+                                        com.lucento.app.core.designsystem.component.PaneSelection(transactionId = editorDraft?.id)
+                                    top.destination.hasRoute<WalletDetailRoute>() ->
+                                        com.lucento.app.core.designsystem.component.PaneSelection(walletId = top.toRoute<WalletDetailRoute>().walletId)
+                                    top.destination.primaryKey() != null -> paneDefault
+                                    else -> null
+                                }
+                                PaneConfiguration(listWidth) {
+                                    HeldWhileEditing(held = editing, onTapWhileHeld = leaveEditor, modifier = Modifier.width(listWidth).fillMaxHeight()) {
+                                        // Only once the tab's entry is on the stack (not on the very first frame), and
+                                        // afresh for each entry: a tab reopened after a switch starts over, as on a phone.
+                                        if (rootEntry != null) {
+                                            val stateKey = "list-${rootEntry.id}"
+                                            androidx.compose.runtime.SideEffect { listPaneEntries[stateKey] = rootEntry }
+                                            key(tabKey, rootEntry.id) {
+                                                ListPaneOwners(rootEntry, stateKey, listPaneStates, paneSelection) {
+                                                    PaneFadeIn(reducedMotion) {
+                                                        when (tabKey) {
+                                                            "transactions" -> transactionsTab()
+                                                            "budget" -> budgetTab()
+                                                            "wallets" -> walletsTab()
+                                                            else -> homeTab()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                VerticalDivider(thickness = PaneDividerWidth, color = LucentoTheme.extendedColors.borderDefault)
+                            }
+                            PaneConfiguration(if (navLayout == NavLayout.DOCK) null else detailWidth) {
+                              // Beside the list pane, whose top bar already has the profile button, one is enough.
+                              CompositionLocalProvider(LocalProfileChrome provides LocalProfileChrome.current.takeUnless { showList }) {
+                              Box(Modifier.weight(1f).fillMaxHeight()) {
                         NavHost(
                             navController = navController,
                             startDestination = HomeRoute,
@@ -578,52 +917,11 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     },
                                 )
                             }
-                            composable<HomeRoute> {
-                                val spacePrompt by appViewModel.spacePrompt.collectAsStateWithLifecycle()
-                                HomeScreen(
-                                    scrollToTop = homeToTop,
-                                    actions = HomeActions(
-                                        spacePrompt = spacePrompt,
-                                        onOpenSpacePrompt = {
-                                            val invite = (spacePrompt as? com.lucento.app.data.sharedspace.SpacePrompt.Invitation)?.invitation?.id
-                                            push(SharedSpaceRoute(reviewInvite = invite.orEmpty()))
-                                        },
-                                        onDismissSpacePrompt = { spacePrompt?.let { appViewModel.dismissSpacePrompt(it.key) } },                                onOpenBudget = { navigateTo(BudgetRoute) },
-                                        onChooseCategories = { push(CategorySetupRoute) },
-                                        onOpenInsights = { push(InsightsRoute) },
-                                        onOpenGoals = { push(GoalsRoute) },
-                                        onOpenRecurring = { id -> push(RecurringRoute(id ?: NO_SCHEDULE)) },
-                                        onOpenWallets = { navigateTo(WalletsRoute) },
-                                        onOpenWallet = { push(WalletDetailRoute(it)) },
-                                        onPayCard = { if (features.isEnabled(Feature.MULTIPLE_WALLETS)) openCardPayment(it) else push(WalletDetailRoute(it.wallet.id)) },
-                                        onOpenDebts = { push(DebtsRoute) },
-                                        onOpenSettings = { push(SettingsRoute()) },
-                                        onOpenAccountSettings = { push(SettingsRoute(SettingsPage.ACCOUNT.key)) },
-                                        onOpenTransactions = { navigateTo(TransactionsRoute) },
-                                        onViewTransaction = { view(it) },
-                                        onAddTransaction = { type -> openComposer(typeHint = type) },
-                                        onTransfer = { openTransfer() },
-                                        onScanReceipt = { openComposer(ComposerStart.SCAN) },
-                                        onOpenCategory = { id, month -> push(CategoryTransactionsRoute(id, month.toString())) },
-                                        onOpenMilestones = { push(ProgressRoute) },
-                                        onOpenMonthRecap = { month -> push(MonthRecapRoute(month.toString())) },
-                                        onOpenAwards = { push(AwardsRoute) },
-                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
-                                    ),
-                                )
-                            }
+                            // A tab's root: its own screen, or with two panes (that screen sits on the left) the tab's
+                            // default right-hand pane.
+                            composable<HomeRoute> { if (layoutState.value == NavLayout.SPLIT) tabDefaultPane("home") else homeTab() }
                             composable<TransactionsRoute> {
-                                TransactionsScreen(
-                                    onAddTransaction = { openComposer() },
-                                    onViewTransaction = { view(it) },
-                                    onEditTransaction = { edit(it) },
-                                    onDeleteTransaction = { t ->
-                                        editorViewModel.delete(t.id) { notify(if (t.isTransfer) "Transfer deleted" else "Transaction deleted") }
-                                    },
-                                    onAddWallet = { navigateTo(WalletsRoute) },
-                                    onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
-                                    onSpeak = if (features.isEnabled(Feature.VOICE_ENTRY)) ({ openComposer(ComposerStart.SPEAK) }) else null,
-                                )
+                                if (layoutState.value == NavLayout.SPLIT) tabDefaultPane("transactions") else transactionsTab()
                             }
                             composable<CategoryTransactionsRoute> { entry ->
                                 val route = entry.toRoute<CategoryTransactionsRoute>()
@@ -640,27 +938,8 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     initialMonth = runCatching { java.time.YearMonth.parse(route.month) }.getOrNull(),
                                 )
                             }
-                            composable<WalletsRoute> {
-                                WalletsScreen(
-                                    onBack = null,
-                                    onOpenWallet = { push(WalletDetailRoute(it)) },
-                                    allowAdding = features.isEnabled(Feature.MULTIPLE_WALLETS),
-                                    onPlanDebtPayment = planDebtPayment,
-                                    onOpenDebts = if (features.isEnabled(Feature.DEBTS_LOANS)) ({ push(DebtsRoute) }) else null,
-                                    onScanReceipt = if (features.isEnabled(Feature.RECEIPT_SCANNING)) ({ openComposer(ComposerStart.SCAN) }) else null,
-                                )
-                            }
-                            composable<BudgetRoute> {
-                                Gated(Feature.BUDGETS, features, enableFeature, onBack = { navigateTo(HomeRoute) }) {
-                                    BudgetScreen(
-                                        onBack = null,
-                                        onChooseCategories = { push(CategorySetupRoute) },
-                                        onManageCategories = { push(CategoriesRoute) },
-                                        onOpenScheduled = { push(RecurringRoute()) },
-                                        onPlanMonth = { month -> push(MonthPlanRoute(month.toString())) },
-                                    )
-                                }
-                            }
+                            composable<WalletsRoute> { if (layoutState.value == NavLayout.SPLIT) tabDefaultPane("wallets") else walletsTab() }
+                            composable<BudgetRoute> { if (layoutState.value == NavLayout.SPLIT) tabDefaultPane("budget") else budgetTab() }
                             pushed<ProgressRoute>(reducedMotion) {
                                 com.lucento.app.feature.progress.ProgressScreen(
                                     onBack = back,
@@ -711,19 +990,7 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                             }
 
                             pushed<WalletDetailRoute>(reducedMotion) { entry ->
-                                val route = entry.toRoute<WalletDetailRoute>()
-                                WalletDetailScreen(
-                                    walletId = route.walletId,
-                                    onBack = back,
-                                    onAddTransaction = { type, walletId -> openComposer(walletId = walletId, typeHint = type) },
-                                    onTransfer = { from, to -> openTransfer(from, to) },
-                                    onEditTransaction = { view(it) },
-                                    transfersEnabled = features.isEnabled(Feature.MULTIPLE_WALLETS),
-                                    onAdjusted = { notify("Balance adjusted") },
-                                    onOutsideRecorded = { notify("${it.label} recorded") },
-                                    onPlanDebtPayment = planDebtPayment,
-                                    onPayCard = { openCardPayment(it) },
-                                )
+                                walletPane(entry.toRoute<WalletDetailRoute>().walletId, back)
                             }
                             pushed<GoalsRoute>(reducedMotion) {
                                 Gated(Feature.SAVINGS_GOALS, features, enableFeature, back) { GoalsScreen(onBack = back) }
@@ -889,9 +1156,15 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                     onBack = back,
                                     onSaved = { message ->
                                         confirmation = Confirmation(message)
-                                        // Land on the history, where the batch that was just saved is now listed.
-                                        selectedTab = "transactions"
-                                        navigateTo(TransactionsRoute)
+                                        if (layoutState.value == NavLayout.SPLIT) {
+                                            // Two panes: the composer closes and the list beside it (the Dashboard, or the
+                                            // history) shows the batch at once (owner, 2026-11-26).
+                                            if (navController.currentBackStackEntry?.id == entry.id) navController.popBackStack()
+                                        } else {
+                                            // Land on the history, where the batch that was just saved is now listed.
+                                            selectedTab = "transactions"
+                                            navigateTo(TransactionsRoute)
+                                        }
                                         ratingCheck++
                                     },
                                     onAddWallet = { navigateTo(WalletsRoute) },
@@ -907,7 +1180,12 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
                                 )
                             }
                         }
-                        if (!focused) {
+                              }
+                              }
+                            }
+                        }
+                      }
+                        if (navLayout == NavLayout.DOCK && !focused) {
                             // Content dissolves into the background above the dock instead of being cut by a hard line at the
                             // top of its + button. Every tab's scrolling content ends with at least Spacing.xl of padding, so
                             // nothing readable is faded at rest.
@@ -1066,6 +1344,119 @@ private fun MainScaffold(preferences: UserPreferences, navController: NavHostCon
             },
             sourceNote = transferNote,
             recentTransfers = editorState.transfers.values,
+        )
+    }
+}
+
+/** The hairline between the list pane and the detail pane. */
+private val PaneDividerWidth = 1.dp
+
+/**
+ * Tells the screens inside a pane how wide the pane is: they size themselves from the window's width
+ * (`screenGutter()`, the compact layouts under 400dp), which beside the rail or another pane is not theirs. Null keeps
+ * the window's own (phones: unchanged).
+ */
+@Composable
+private fun PaneConfiguration(width: Dp?, content: @Composable () -> Unit) {
+    val window = LocalConfiguration.current
+    val pane = remember(window, width) {
+        width?.let { android.content.res.Configuration(window).apply { screenWidthDp = it.value.toInt().coerceAtLeast(0) } }
+    }
+    // Phones: nothing is provided (the same call either way, so what's inside keeps its place in the tree).
+    CompositionLocalProvider(values = if (pane == null) emptyArray() else arrayOf(LocalConfiguration provides pane), content = content)
+}
+
+/**
+ * ViewModels for a page shown as a tab's default pane, that end when it leaves the screen. Without this they would live
+ * in the tab root's entry for the whole session (Home's is never popped), still working after the window folds to one
+ * pane. The application rides along so containerFactory can reach the app's container.
+ */
+@Composable
+private fun PaneViewModels(content: @Composable () -> Unit) {
+    val application = LocalContext.current.applicationContext as android.app.Application
+    val owner = remember(application) { PaneViewModelOwner(application) }
+    androidx.compose.runtime.DisposableEffect(owner) { onDispose { owner.viewModelStore.clear() } }
+    CompositionLocalProvider(LocalViewModelStoreOwner provides owner, content = content)
+}
+
+private class PaneViewModelOwner(application: android.app.Application) :
+    androidx.lifecycle.ViewModelStoreOwner,
+    androidx.lifecycle.HasDefaultViewModelProviderFactory {
+    override val viewModelStore = androidx.lifecycle.ViewModelStore()
+    override val defaultViewModelProviderFactory: androidx.lifecycle.ViewModelProvider.Factory =
+        androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(application)
+    override val defaultViewModelCreationExtras: androidx.lifecycle.viewmodel.CreationExtras =
+        androidx.lifecycle.viewmodel.MutableCreationExtras().apply {
+            set(androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY, application)
+        }
+}
+
+/**
+ * The rail or the list pane while something is being written on the right: still visible (the Dashboard keeps
+ * updating) but veiled and out of reach, TalkBack included; a tap on the veil is Back ([onTapWhileHeld]), so the editor
+ * can ask before anything unsaved is lost.
+ */
+@Composable
+private fun HeldWhileEditing(held: Boolean, onTapWhileHeld: () -> Unit, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier) {
+        Box(if (held) Modifier.clearAndSetSemantics {}.focusProperties { canFocus = false } else Modifier) { content() }
+        if (held) {
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null,
+                        onClick = onTapWhileHeld,
+                    )
+                    .semantics {
+                        contentDescription = "Leave the editor"
+                        role = androidx.compose.ui.semantics.Role.Button
+                    },
+            )
+        }
+    }
+}
+
+/**
+ * The list pane's screen runs with its tab root's ViewModels ([entry], so it is the same screen as on a phone) and its
+ * own remembered state ([stateKey], one per entry). Its lifecycle stays the screen's, not the entry's (which is only
+ * CREATED under a detail): the list keeps updating while something is open beside it.
+ */
+@Composable
+private fun ListPaneOwners(
+    entry: NavBackStackEntry,
+    stateKey: String,
+    states: SaveableStateHolder,
+    selection: com.lucento.app.core.designsystem.component.PaneSelection?,
+    content: @Composable () -> Unit,
+) {
+    states.SaveableStateProvider(stateKey) {
+        CompositionLocalProvider(
+            LocalViewModelStoreOwner provides entry,
+            com.lucento.app.core.designsystem.component.LocalPaneSelection provides selection,
+            content = content,
+        )
+    }
+}
+
+/** A tab's screen arriving in the list pane fades in, as tabs do on a phone (at once when animations are off). */
+@Composable
+private fun PaneFadeIn(reducedMotion: Boolean, content: @Composable () -> Unit) {
+    val alpha = remember { androidx.compose.animation.core.Animatable(if (reducedMotion) 1f else 0f) }
+    LaunchedEffect(Unit) { alpha.animateTo(1f, tween(220)) }
+    Box(Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.value }) { content() }
+}
+
+/** The detail pane when there is nothing to show yet (no transactions, no wallets, those modules off). */
+@Composable
+private fun PanePlaceholder(title: String, body: String) {
+    Box(Modifier.fillMaxSize().padding(horizontal = Spacing.gutter), contentAlignment = Alignment.Center) {
+        EmptyState(
+            title = title,
+            body = body,
+            illustration = { MascotScene(mood = MascotMood.Curious, mascotSize = 96.dp) },
         )
     }
 }

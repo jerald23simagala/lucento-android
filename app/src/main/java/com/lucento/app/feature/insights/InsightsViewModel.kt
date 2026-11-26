@@ -50,10 +50,15 @@ class InsightsViewModel(
     preferences: UserPreferencesRepository,
     /** Lucento Pro: the plan this phone holds; null in tests (everything allowed). */
     entitlements: StateFlow<com.lucento.app.domain.entitlement.EntitlementState>? = null,
+    /**
+     * False when Insights is only shown as Home's default pane on a wide window (owner, 2026-11-26): seeing it there is
+     * not opening it, so it doesn't earn the milestone below.
+     */
+    countsAsVisit: Boolean = true,
 ) : ViewModel() {
     init {
         // Opening Insights earns the Financial Explorer milestone (a local flag; nothing is sent).
-        viewModelScope.launch { runCatching { preferences.setInsightsVisited() } }
+        if (countsAsVisit) viewModelScope.launch { runCatching { preferences.setInsightsVisited() } }
     }
 
     val data: StateFlow<InsightsData> = combine(
@@ -82,5 +87,10 @@ class InsightsViewModel(
 
     companion object {
         val Factory = containerFactory { InsightsViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.preferences, it.entitlements.state) }
+
+        /** Insights as Home's default pane on a wide window: the same page, without counting as a visit. */
+        val PaneFactory = containerFactory {
+            InsightsViewModel(it.transactions, it.wallets, it.categories, it.budgets, it.preferences, it.entitlements.state, countsAsVisit = false)
+        }
     }
 }

@@ -39,6 +39,7 @@ import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.selection.selectableGroup
 import com.lucento.app.core.designsystem.component.FlowStatTiles
+import com.lucento.app.core.designsystem.component.openInPane
 import com.lucento.app.core.money.MoneyFormatter
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
@@ -145,6 +146,8 @@ fun TransactionsScreen(
     // One row at a time shows its Edit / Delete actions.
     var revealedId by rememberSaveable { mutableStateOf<Long?>(null) }
     var confirmingDelete by remember { mutableStateOf<Transaction?>(null) }
+    // Wide windows (two panes): the transaction open beside the list.
+    val paneSelection = com.lucento.app.core.designsystem.component.LocalPaneSelection.current
     val listState = rememberLazyListState()
     val scrolled by remember { derivedStateOf { listState.canScrollBackward } }
     val clearFilters = {
@@ -346,7 +349,12 @@ fun TransactionsScreen(
                                             transaction.isAdjustment -> "View balance adjustment"
                                             else -> "View transaction"
                                         },
-                                        modifier = rowModifier,
+                                        // Wide windows: the transaction open beside the list is marked.
+                                        modifier = rowModifier.openInPane(
+                                            open = paneSelection?.transactionId == transaction.id,
+                                            tint = MaterialTheme.colorScheme.primaryContainer,
+                                            bar = MaterialTheme.colorScheme.primary,
+                                        ),
                                     )
                                 }
                                 // Inset to the row text (12dp padding + 36dp tile + 10dp gap), not under the tile.

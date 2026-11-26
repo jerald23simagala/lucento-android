@@ -85,7 +85,8 @@ import java.util.Locale
 @Composable
 fun TransactionDetailScreen(
     transactionId: Long,
-    onBack: () -> Unit,
+    /** Null when the page is a tab's default pane on a wide screen (nothing to go back to): no back arrow. */
+    onBack: (() -> Unit)?,
     onEdit: (Transaction) -> Unit,
     viewModel: TransactionDetailViewModel = viewModel(
         key = "transaction-$transactionId",
@@ -95,7 +96,7 @@ fun TransactionDetailScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val transaction = state.transaction
     LaunchedEffect(state.loading, transaction == null) {
-        if (!state.loading && transaction == null) onBack()
+        if (!state.loading && transaction == null) onBack?.invoke()
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {

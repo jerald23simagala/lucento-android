@@ -1,0 +1,79 @@
+package com.lucento.app.navigation
+
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+/** Which navigation a window gets (owner, 2026-11-26): phones keep the dock; wide windows get the rail and two panes. */
+class NavLayoutTest {
+
+    @Test
+    fun phonesKeepTheDockUpright() {
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 360, heightDp = 640))
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 411, heightDp = 914))
+        // Pixel 9 Pro Fold, folded (cover screen).
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 443, heightDp = 994))
+    }
+
+    @Test
+    fun aPhoneOnItsSideKeepsTheDock() {
+        // Wide enough to split, but too short: phones never change layout.
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 914, heightDp = 411))
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 640, heightDp = 360))
+    }
+
+    @Test
+    fun anUnfoldedFoldableSplits() {
+        // Pixel 9 Pro Fold, unfolded: upright and on its side.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 851, heightDp = 883))
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 883, heightDp = 851))
+        // A tablet on its side.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 1280, heightDp = 800))
+    }
+
+    @Test
+    fun mediumWidthGetsTheRailWithOnePane() {
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 600, heightDp = 960))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 800, heightDp = 1280))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 839, heightDp = 900))
+    }
+
+    @Test
+    fun breakpointsAreInclusiveAtTheirLowerEdge() {
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 599, heightDp = 900))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 600, heightDp = 480))
+        assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 900, heightDp = 479))
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 840, heightDp = 480))
+    }
+
+    @Test
+    fun theListPaneTakesHalfWithinItsBounds() {
+        // The unfolded Fold (851dp) beside the 84dp rail: two equal panes.
+        assertEquals(383, listPaneWidthDp(767))
+        // Just enough room: the list keeps a small phone's width and so does the detail pane.
+        assertEquals(LIST_PANE_MIN_DP, listPaneWidthDp(720))
+        // Not enough for two 360dp panes (side insets): equal halves, so the detail pane isn't the one squeezed.
+        assertEquals(350, listPaneWidthDp(700))
+        // Big tablets don't stretch the list past a readable column.
+        assertEquals(LIST_PANE_MAX_DP, listPaneWidthDp(1200))
+    }
+
+    @Test
+    fun everyTabHasADefaultPane() {
+        // Owner, 2026-11-26: Insights beside Home.
+        assertEquals(DefaultPane.INSIGHTS, defaultPaneFor("home", insightsOn = true, scheduledOn = true))
+        assertEquals(DefaultPane.NEWEST_TRANSACTION, defaultPaneFor("transactions", insightsOn = true, scheduledOn = true))
+        assertEquals(DefaultPane.DEFAULT_WALLET, defaultPaneFor("wallets", insightsOn = true, scheduledOn = true))
+        assertEquals(DefaultPane.SCHEDULED, defaultPaneFor("budget", insightsOn = true, scheduledOn = true))
+    }
+
+    @Test
+    fun aSwitchedOffModuleFallsBackRatherThanShowingATurnedOffPage() {
+        assertEquals(DefaultPane.SCHEDULED, defaultPaneFor("home", insightsOn = false, scheduledOn = true))
+        assertEquals(DefaultPane.INSIGHTS, defaultPaneFor("budget", insightsOn = true, scheduledOn = false))
+        assertEquals(DefaultPane.NOTHING_OPEN, defaultPaneFor("home", insightsOn = false, scheduledOn = false))
+        assertEquals(DefaultPane.NOTHING_OPEN, defaultPaneFor("budget", insightsOn = false, scheduledOn = false))
+        // Lists always have their own default (or say there's nothing in them yet).
+        assertEquals(DefaultPane.NEWEST_TRANSACTION, defaultPaneFor("transactions", insightsOn = false, scheduledOn = false))
+        assertEquals(DefaultPane.DEFAULT_WALLET, defaultPaneFor("wallets", insightsOn = false, scheduledOn = false))
+    }
+}
