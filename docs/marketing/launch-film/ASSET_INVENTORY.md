@@ -98,13 +98,14 @@ To swap in a licensed track, replace `score.wav` (93.3 s, or trim it in `Soundtr
 90 BPM grid.
 
 **Voiceover** (since 2026-11-24): generated with ElevenLabs (`eleven_v4`) on the owner's paid Creator plan, whose terms
-allow commercial use, in the library voice Rianne ("Warm & Friendly Filipino Creator"). It is an AI voice, so narrated
-posts carry each platform's AI label (`VOICEOVER.md`).
+allow commercial use, in the library voice Laurel ("Warm, Kind & Confident", American English; owner, 2026-11-25).
+Rianne ("Warm & Friendly Filipino Creator") narrated the 2026-11-24 renders. It is an AI voice, so narrated posts carry
+each platform's AI label (`VOICEOVER.md`).
 
 | File | What |
 |---|---|
-| `voiceover/takes/*.mp3` | The ElevenLabs takes as downloaded (used: `30-rianne-c`, `15-rianne-a`, `93-rianne-b`; the rest are alternates and the voice samples) |
-| `public/launch-film/audio/vo/<cut>-rianne/NN.wav` | Each line, cut from its take by `tools/voiceover.py`: levelled to −16 LUFS, limited at −3 dBFS, 48 kHz mono |
+| `voiceover/takes/*.mp3` | The ElevenLabs takes as downloaded (used: `30-laurel-a`, `15-laurel-a`, `93-laurel-a`; the rest are alternates, Rianne's takes and the 30 s voice samples of Justin, Marina and Charlotte) |
+| `public/launch-film/audio/vo/<cut>-<voice>/NN.wav` | Each line, cut from its take by `tools/voiceover.py`: levelled to −16 LUFS, limited at −3 dBFS, 48 kHz mono |
 | `src/launch-film/audio/Voiceover.tsx` | Where each line starts (`VO_AT`) and the score dip under it |
 
 ## Other
