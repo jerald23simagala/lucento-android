@@ -162,6 +162,22 @@ class AppContainer(application: Application) {
 
     val preferences: UserPreferencesRepository by lazy { UserPreferencesRepository(application) }
 
+    /**
+     * When Lucento was first installed on this phone (Android keeps it across updates), for the rating card's first week
+     * (domain/ReviewPromptPolicy). Null if Android won't say, and then Lucento never asks.
+     */
+    val installedAtMillis: Long? by lazy {
+        runCatching {
+            val pm = application.packageManager
+            val info = if (android.os.Build.VERSION.SDK_INT >= 33) {
+                pm.getPackageInfo(application.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION") pm.getPackageInfo(application.packageName, 0)
+            }
+            info.firstInstallTime.takeIf { it > 0L }
+        }.getOrNull()
+    }
+
     /** P2-10: whether this process has been unlocked. Process-wide, so rotation never re-locks and a cold start does. */
     val appLock: com.lucento.app.core.security.AppLockSession by lazy { com.lucento.app.core.security.AppLockSession() }
 

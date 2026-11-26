@@ -570,6 +570,22 @@ class ScreenshotTourTest {
         waitForText("Account and app")
         shot("19-profile-menu")
 
+        // ---------------------------------------------------------------- Settings › Help & feedback (2026-11-25)
+        // The closed test's report looked for rating, sharing and help in Settings (docs/HELP_AND_FEEDBACK.md).
+        click("Settings")
+        waitForText("Home-screen widgets")
+        // The profile sheet has Share and Rate rows of its own: wait until it has gone and only Settings' remain.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasText("Share Lucento")).fetchSemanticsNodes().size == 1 }
+        compose.onNode(hasText("Share Lucento")).performScrollTo()
+        waitForText("Help & feedback")
+        waitForText("Rate Lucento")
+        shot("19b-settings-help-feedback")
+        backUntilGone("Home-screen widgets")
+        waitForText("Monthly budget")
+        compose.onNodeWithContentDescription("Profile and settings", substring = true).performClick()
+        compose.waitForIdle()
+        waitForText("Account and app")
+
         // ---------------------------------------------------------------- dark theme
         click("Dark")
         backUntilGone("Account and app")

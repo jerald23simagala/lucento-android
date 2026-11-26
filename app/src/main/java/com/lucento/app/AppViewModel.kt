@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,7 +61,11 @@ class AppViewModel(
     private val planMemory: com.lucento.app.data.entitlement.PlanMemory? = null,
     /** Goals, for Lucento Pro's tour (null in tests). */
     goals: com.lucento.app.data.repository.GoalRepository? = null,
-    /** The time the theme gate reads ([lockedThemes], [setThemeId]); tests move it. */
+    /** When Lucento was first installed on this phone, for the rating card's first week ([claimRatingCard]); null: unknown. */
+    private val installedAtMillis: Long? = null,
+    /** Incomes and expenses recorded, counted as the awards count them, for [claimRatingCard] (none without a repository). */
+    private val recordedCount: Flow<Int> = transactions?.observeCashFlowCount() ?: flowOf(0),
+    /** The time the theme gate and the rating card read ([lockedThemes], [setThemeId], [claimRatingCard]); tests move it. */
     private val clock: () -> Long = System::currentTimeMillis,
 ) : ViewModel() {
     /** Lucento Pro: the one-time "your plan has ended" notice (docs/MONETIZATION.md §6.3 rule 7); null when there is none. */
@@ -331,6 +336,24 @@ class AppViewModel(
         viewModelScope.launch { preferences.setAddSpotlightSeen() }
     }
 
+    /**
+     * Right after a save: whether to ask Google Play for its rating card now ([com.lucento.app.domain.ReviewPromptPolicy]).
+     * A due ask is recorded before the card is requested, so a failure, or Play's own limit showing nothing, never makes
+     * Lucento ask again sooner than the policy allows.
+     */
+    suspend fun claimRatingCard(listingPublic: Boolean = com.lucento.app.core.LucentoLinks.PLAY_LISTING_PUBLIC): Boolean {
+        val now = clock()
+        val due = com.lucento.app.domain.ReviewPromptPolicy.isDue(
+            nowMillis = now,
+            installedAtMillis = installedAtMillis,
+            recorded = recordedCount.first(),
+            lastAskedAtMillis = preferences.preferences.first().ratingCardAskedAt,
+            listingPublic = listingPublic,
+        )
+        if (due) preferences.setRatingCardAsked(now)
+        return due
+    }
+
     fun setFeatureEnabled(feature: Feature, enabled: Boolean) {
         viewModelScope.launch { preferences.setFeatureEnabled(feature, enabled) }
     }
@@ -358,7 +381,7 @@ class AppViewModel(
         const val SPACE_FRESH_MILLIS = 60_000L
 
         val Factory = containerFactory {
-            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state, it.entitlements.ready, it.planMemory, it.goals)
+            AppViewModel(it.preferences, it.auth.observeSignedInEmail(), it.profilePhotos, it.auth.observeAccountPhotoUrl(), it.sharedSpace, it.wallets, it.transactions, it.entitlements.state, it.entitlements.ready, it.planMemory, it.goals, it.installedAtMillis)
         }
     }
 }

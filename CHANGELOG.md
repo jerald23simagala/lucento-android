@@ -1,20 +1,29 @@
 # Changelog
 
-> Current through 0.5.19 (version code 24, 2026-11-23). Each release lists what changed for people using the app, with
+> Current through 0.5.20 (version code 25, 2026-11-26). Each release lists what changed for people using the app, with
 > its pull request numbers; the tests and CI runs behind each change stay in `docs/handover/CURRENT_STATUS.md`. Work
 > merged between 2026-11-01 and the first Google Play build, 0.5.0 (version code 5), such as Lucento Pro, Lucento
 > Shared, wallets in other currencies, themes and Awards, is not itemised here; `CURRENT_STATUS.md` records it.
 
-## Unreleased — tester round 2026-11-24
+## 0.5.20 (version code 25) — 2026-11-26
 
+- **Settings › Help & feedback:** Questions and answers (the website's FAQ), Contact support (an email to us from your
+  own email app, with the app and Android version below your message), Lucento Community, **Rate Lucento** (Google
+  Play) and Share Lucento. Testers looked for these in Settings; the profile menu keeps its Community group and gains
+  Rate Lucento (#150).
+- **Google Play's rating card**, once Lucento is public on Google Play: after a save, for someone who has used Lucento
+  for a week and recorded 20 incomes and expenses, at most once every 90 days. Google Play shows it and keeps any
+  rating; Lucento never learns it (#150).
+- After launch, Share Lucento's Google Play link is tagged so Play Console can count visits that came from sharing (#150).
+- The Privacy Policy (26 November 2026) says what the rating card and these rows do (#150).
 - **The Budget tab leads with what's spent**, as Home's budget card does: "₱22,979.90 spent of your ₱25,900.00
   budget", then the bar and "₱2,920.10 unspent" (or "over budget"). Testers couldn't match the two screens when one led
-  with spent and the other with unspent.
+  with spent and the other with unspent (#148).
 - **Card payments can be skipped.** Tapping a card's payment reminder (the bell, Upcoming, Scheduled) opens its sheet:
   **Pay** opens the payment as before; **Skip this statement** stops the reminder and stops setting the amount aside in
-  Safe to spend until the card's next statement, with Undo right after. Skips are kept on this phone.
+  Safe to spend until the card's next statement, with Undo right after. Skips are kept on this phone (#148).
 - **Add transactions:** "Into" is one field that opens the wallet picker (grouped, with balances) instead of a row of
-  chips, and every row shows its wallet, so rows from different wallets in one message can be set before saving.
+  chips, and every row shows its wallet, so rows from different wallets in one message can be set before saving (#148).
 
 ## 0.5.19 (version code 24) — 2026-11-23
 

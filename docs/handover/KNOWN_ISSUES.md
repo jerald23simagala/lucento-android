@@ -15,6 +15,32 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
+
+- **DS-K1 (Verified, local probe and CI).**
+  - **Symptom:** `AppViewModelThemeTest` hung on CI on 2026-11-23 (`chore/settings-sync-followups`) and in 2 of 3 runs
+    on 2026-11-25 (#150).
+  - **Cause:** with DataStore 1.1.1, a reader of `preferences` that starts while a write is landing can miss that write.
+    The value is stored, and a fresh read shows it, but that reader waits for the next change.
+  - **Evidence:** a local probe repeating the test's case hung within 148 and then 31 repeats. With fresh reads it ran
+    300 of 300.
+  - **Test fix:** the test now waits with fresh reads (`themeBecomes`). No other test waits that way.
+  - **In the app:** a screen that starts reading preferences in the same instant as a write could show the previous
+    value until the next change. Nothing is lost.
+  - **Follow-up:** when DataStore is upgraded (it waits for the compileSdk 37 work), check its release notes for this
+    race.
+
+## Help & feedback and the rating card (2026-11-25, `feature/help-and-feedback`)
+
+- **HF-K1 The rating card can't be seen before launch.** It waits for `LucentoLinks.PLAY_LISTING_PUBLIC`, debug builds
+  aren't on Play, and Google Play never says whether the card showed. Only the rule and the record are tested (JVM).
+  First real check after launch: NEXT_TASKS HF-5.
+- **HF-K2 Contact support's details depend on the email app.** The subject and the version lines go as Android's
+  standard email extras; an email app that ignores them opens a blank email to the right address. Nothing is lost: the
+  person writes as usual.
+- **HF-K3 Two "Help" places until PR #77 is rebased.** The draft Contact support form adds its own "Help" section to
+  Settings; rebasing it onto this one is NEXT_TASKS HF-4.
+
 ## Tester round (2026-11-24, `feature/tester-round-2026-11-24`)
 
 - **TR4-K1 Card statement skips are kept on this phone.** "Skip this statement" is stored in this phone's

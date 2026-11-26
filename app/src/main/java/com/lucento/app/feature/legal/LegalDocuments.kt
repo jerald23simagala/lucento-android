@@ -9,8 +9,8 @@ package com.lucento.app.feature.legal
  */
 object LegalDocuments {
     /** Recorded with each new email account (`terms_version` in the account's metadata). */
-    const val VERSION = "2026-11-23"
-    const val UPDATED = "23 November 2026"
+    const val VERSION = "2026-11-26"
+    const val UPDATED = "26 November 2026"
 
     /**
      * What Google may do with AI content while Lucento uses Gemini’s free tier (owner decision 2026-11-10; security audit
@@ -280,6 +280,19 @@ object LegalDocuments {
                     "Usage counts send event names and timings (such as which setup screen was opened), with a random " +
                         "number for this install and the app version — never amounts or what you type. They’re kept for " +
                         "90 days, and turning them off deletes what was sent.",
+                ),
+            ),
+            Section(
+                "Rating, sharing and contacting us",
+                listOf(
+                    "Once Lucento is public on Google Play, it may ask Google Play to show its rating card after you " +
+                        "save — only after a week of use, and at most once every 90 days. Google Play decides whether " +
+                        "the card appears. A rating or review you give goes to Google Play under your Google account; " +
+                        "Lucento never learns whether or how you rated it.",
+                    "Rate Lucento, Share Lucento, Contact support and Lucento’s pages open Google Play, your share " +
+                        "sheet, your email app or your browser, only when you tap them; Lucento itself sends nothing. A " +
+                        "support email starts with the app version, Android version and phone model below your " +
+                        "message, and you can delete them before sending.",
                 ),
             ),
             Section(
