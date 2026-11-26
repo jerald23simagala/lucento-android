@@ -105,6 +105,25 @@ Then: the website's screens are cropped with lucento-studio `qa/crop-screen.mjs`
 `lab/play-graphics/render.mjs` into `docs/play/graphics/{global,ph}`; the launch film follows
 docs/marketing/launch-film/ASSET_INVENTORY.md. Never edit a screenshot by hand.
 
+### Tablet screenshots (Google Play's tablet slots)
+
+The tablet set shows the wide-window split (rail, list on the left, what it opened on the right; `NavLayout`, split
+from 840 dp). The emulator is AVD `Lucento_Tablet_API35`: `avdmanager create avd -d pixel_tablet` on the same API 35
+`google_apis_playstore` image, `hw.gpu.mode=host`, `hw.keyboard=yes`; 2560 × 1600 at 320 dpi, so 1280 × 800 dp in
+landscape (split) and 800 × 1280 dp in portrait (one pane beside the rail). Boot it, run
+`setup_marketing_emulator.sh`, then `tools/screenshots/capture_tablet.sh <out dir>`. For each currency it makes the
+screen phone-sized (`wm size 1080x2400`, `wm density 420`) so the tour seeds exactly the phone shots' demo data, goes
+back to tablet size with gesture navigation (no taskbar), sets the debug plan simulator to Pro Monthly (the tour ends
+on the free plan), deletes the tour's last-step "Celebration dinner" (the phone set's screens are taken before it), and
+captures `t01`…`t08` in landscape (Insights on the free three months; Home scrolled differently beside Goals and
+Milestones; Market open beside Transactions) and `p01`…`p03` in portrait into `<out dir>/tablet-usd/` and
+`tablet-php/`, with `clock.txt` (the tablet's time after the last shot, for the generated status bar). The demo month
+must be the phone set's: until PR #154 (on-pace month, rent due on the 10th) merges, build the androidTest APK with its
+`DemoMonth.kt`. lucento-studio `render.mjs --tablet-global <out>/tablet-usd --tablet-ph <out>/tablet-php --out <dir>`
+crops the status bar (48 px) and gesture bar (64 px, where the debug build's TEST badge sits) and draws the seven
+2560 × 1440 screenshots. `wm size 1920x1200` with `wm density 320` gives a 7-inch tablet (960 × 600 dp) on the same
+AVD for a quick check; reset both afterwards.
+
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
   (AllowBackup, HardcodedDebugMode, SecureRandom, TrustAllX509TrustManager, ExportedContentProvider,
