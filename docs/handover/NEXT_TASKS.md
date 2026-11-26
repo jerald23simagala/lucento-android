@@ -64,11 +64,19 @@
 
 ## Wide windows — follow-ups (2026-11-26, `feature/foldable-split`)
 
-1. Owner: look at the preview and say yes before the PR merges (layout change; owner rule).
+1. Done: the owner merged PR #158 (2026-11-26). Owner, with the first release built after #158 (not before: 0.5.20
+   and older show the phone layout on tablets): upload the tablet screenshots, `docs/play/graphics/global/tablet-*` to
+   the main listing's 7-inch and 10-inch tablet slots and `ph/tablet-*` to the Philippine custom listing's.
 2. WW-1: keep the transaction editor's and transfer sheet's drafts across a fold or rotation.
 3. Mark the open wallet in the card grid; consider `paneTitle` on the detail pane (WW-3).
 4. An instrumented test on a wide window (forced size or a tablet AVD) for the split's navigation; CI's tour is a phone.
-5. Try it on a real foldable and a tablet, including half-open posture (WW-5).
+5. Try it on a real foldable and a tablet, including half-open posture (WW-5); the emulators are done.
+6. Safe to spend's reason wraps to "…for 23 / days" in a split's narrower panes (Budget beside Scheduled); the phone
+   fits it on one line. Tighten or reflow it (seen in the tablet screenshots, 2026-11-26).
+7. Tablet screenshots follow the phone set's demo month: they were captured with PR #154's `DemoMonth.kt`. When #154
+   merges, `capture_tablet.sh` on main needs nothing else; if #154 changes the month again, recapture both sets. Its demo
+   note "Uncategorised" sits beside the app's "Uncategorized" category in Transactions (`DemoMonth.kt`): rename the note
+   (for example "Corner shop") on #154, then recapture.
 
 ## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
 

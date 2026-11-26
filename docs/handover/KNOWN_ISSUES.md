@@ -29,8 +29,9 @@ resolved items are kept at the bottom for traceability.
   reached).
 - **WW-4 (Inferred).** Picking Insights on Home (or Scheduled on Budget) while it is already the default pane opens a
   second copy with a back arrow; Back returns to the default. Harmless.
-- **WW-5 (Not checked).** Half-open (tabletop/book) posture: Lucento doesn't read the hinge, so the split line ignores
-  it. Not run on a real foldable or a tablet yet.
+- **WW-5 (Partly checked).** Half-open (tabletop/book) posture: Lucento doesn't read the hinge, so the split line
+  ignores it. Checked on emulators only: Pixel 9 Pro Fold and Pixel Tablet (both orientations, and a 7-inch size,
+  2026-11-26); not on a real foldable or tablet yet.
 
 ## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
 
