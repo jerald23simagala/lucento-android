@@ -18,7 +18,7 @@ For YouTube pre-roll, Facebook and Instagram feed, and the Play listing's promo 
 | F | 2600–2800 | 6.7 s | Sunrise, the logo, "See your money clearly.", CTA, Pro note |
 
 The crest lands on bar 1 and the final logo on bar 9. Story: one view → effortless entry → together → clarity.
-Voiceover, if used: the 0:06, 0:30.4 and 0:54 lines (first sentence) and the closing line from `VOICEOVER.md`.
+Narrated since 2026-11-24 (owner): eight lines between the captions, script and timings in `VOICEOVER.md`.
 
 ## 15-second cut: `LaunchFilm15` (14.7 s, 440 frames)
 
@@ -32,6 +32,7 @@ For TikTok, Reels and Stories (pair it with the vertical layout below), and bump
 
 One idea only: "four transactions in one message" is the most surprising, demonstrable promise. The final logo lands
 on bar 4.
+Narrated since 2026-11-24 (owner): three lines, in `VOICEOVER.md`.
 
 ## Vertical versions (9:16, 1080 × 1920): rendered
 
