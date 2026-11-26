@@ -72,7 +72,8 @@
 4. An instrumented test on a wide window (forced size or a tablet AVD) for the split's navigation; CI's tour is a phone.
 5. Try it on a real foldable and a tablet, including half-open posture (WW-5); the emulators are done.
 6. Safe to spend's reason wraps to "…for 23 / days" in a split's narrower panes (Budget beside Scheduled); the phone
-   fits it on one line. Tighten or reflow it (seen in the tablet screenshots, 2026-11-26).
+   fits it on one line. Tighten or reflow it (seen in the tablet screenshots, 2026-11-26), then recapture: it sits in
+   tablet slot 3's lifted card.
 7. Tablet screenshots follow the phone set's demo month: they were captured with PR #154's `DemoMonth.kt`. When #154
    merges, `capture_tablet.sh` on main needs nothing else; if #154 changes the month again, recapture both sets. Its demo
    note "Uncategorised" sits beside the app's "Uncategorized" category in Transactions (`DemoMonth.kt`): rename the note
