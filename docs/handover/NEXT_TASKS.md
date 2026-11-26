@@ -106,7 +106,9 @@ payments get "Skip this statement" (hidden and not set aside, Undo); every compo
   Instagram/Facebook "Label as made with AI").
 - **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
   graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
-- **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).
+- **AS-3 Owner pastes the Facebook Page's new Bio** from `docs/community/facebook/README.md` (Mission Control OT-65).
+  On 26 Nov the long text was too big for Facebook's 255-character Bio, so it's now 246 characters and the website and
+  email sit in Contact info.
 - **AS-4 Claude pages:** the "Lucento" design-system page dates from 2026-10-23, before the five themes; bring its tokens
   and themes up to `core/designsystem/theme/`. ~~"Lucento Price Check" showed AI answers as Free 10 a month · Pro 50 a
   day~~ fixed 2026-11-24 (its features.csv re-uploaded; the repo source was fixed in this branch).
