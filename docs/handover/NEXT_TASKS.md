@@ -77,7 +77,8 @@ The plan is in docs/growth/CRO_PLAN.md. Owner's choices:
 | CRO-4 | Review both listings (first three screenshots, icon at search size, PH title call) → ranked fixes, asked as multiple choice | P1 before P-day | Evidence: the live listing and Play search for the `ASO_KEYWORDS.md` terms |
 | CRO-5 | Review setup → first entry (taps and seconds) and the plan page (trial visible, which plan is selected first, Lifetime framing) → ranked fixes | P1 | No walkthroughs (owner, 2026-11-25) |
 | CRO-6 | Funnel log in lucento-studio (private) and read-only `usage_events` queries | P1 before week 1 | No install or purchase numbers in this public repo |
-| CRO-7 | E1: screenshots, one variant, on the listing most visitors see; starts at P-day + 8 and runs at least 14 days | P1 | The owner uploads it from a Mission Control task |
+| CRO-4a | **Recapture the listing graphics (owner, 26 Nov).** Both listings: screenshots 1 and 3 and the feature graphic on an on-pace demo month, with a positive Safe to spend; the feature graphic leads with "The budget tracker you type like a text." Philippine set: the composer reading "jeep 13, load 100, sweldo 25000", captions with gastos, ipon and utang, and a debts screen. Then an owner upload task | P0 before P-day | `docs/growth/LISTING_REVIEW_2026-11-26.md` L1–L3; capture pipeline `tools/screenshots/capture_marketing.sh`, lucento-studio `lab/play-graphics` |
+| CRO-7 | E1: an icon variant on a solid brand colour, one variant, on the listing most visitors see; starts at P-day + 8 and runs at least 14 days | P1 | The owner uploads it from a Mission Control task; the approved artwork is untouched |
 
 ## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
 

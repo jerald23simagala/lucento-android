@@ -148,11 +148,16 @@ The output is a ranked fix list, asked as multiple choice. It won't include walk
 
 ### CRO-7: first experiment (E1)
 
-- **What it tests:** the screenshots on the listing most visitors see. Marketing is Philippine-first, so this is
-  probably the Philippine custom listing; the baseline week's country split decides.
-- **Variant B:** built with the capture pipeline and the Play graphics generator (lucento-studio `lab/play-graphics`).
-  Its first three screenshots carry type it like a text, Safe to spend and offline, with short captions.
-- **One variant only** against the current listing, because traffic is low.
+**Changed 26 Nov.** The listing review (`LISTING_REVIEW_2026-11-26.md`) led the owner to fix the screenshots before
+launch instead of testing them:
+- an on-pace recapture for both listings;
+- a Philippine set that speaks gastos, ipon and utang.
+
+E1 therefore tests something else:
+- **What it tests:** the icon, on the listing most visitors see; the baseline week's country split decides which. The
+  variant puts the Rising Crest on a solid brand colour (finding L5). It's a new asset, and the approved artwork stays
+  untouched.
+- **One variant only** against the current icon, because traffic is low.
 - **Upload:** the owner uploads it in Play Console, from a click-by-click Mission Control task created when it's due.
 
 ## 3. Phase 1: launch weeks 1–4
@@ -173,7 +178,7 @@ The output is a ranked fix list, asked as multiple choice. It won't include walk
 - **Next tests:**
   - E2 tests the short description. It's a localized experiment, and the alternatives are already in
     `ASO_KEYWORDS.md`.
-  - E3 tests the icon.
+  - E3 tests the screenshot order or captions, once the new sets have a baseline of their own.
 - **Search terms:** a search term that Play shows and we lose on feeds the next description edit.
 
 ## 4. Phase 2: month 2 on (setup, then Pro)
@@ -215,7 +220,6 @@ The output is a ranked fix list, asked as multiple choice. It won't include walk
 
 ## 7. Open owner calls
 
-- **Philippine listing title:** keep "Lucento: Budget Tracker" or use "Lucento: Budget & Ipon Tracker"
-  (`ASO_KEYWORDS.md`).
+- **Philippine listing title:** decided 26 Nov: keep "Lucento: Budget Tracker".
 - **E1's listing:** Philippine custom or main. Decided after the baseline week.
 - **Data safety:** add Analytics as a purpose of Purchase history (CRO-2).
