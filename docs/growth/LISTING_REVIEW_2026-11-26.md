@@ -26,12 +26,10 @@ The search capture is kept outside this public repo, in lucento-studio `qa/out/m
   - Screenshots 1 and 3 and the feature graphic are rebuilt on an on-pace demo month, for both listings.
   - The feature graphic leads with "The budget tracker you type like a text."
   - The owner re-uploads them from a Mission Control task.
-- **L3: replace the Philippine set before launch, without a test.** The Philippine set gets:
-  - the composer reading "jeep 13, load 100, sweldo 25000" (only if the app reads it right on capture);
-  - captions with gastos, ipon and utang;
-  - a debts screen.
-
-  E1 therefore needs another subject, and the icon variant (L5) moves up.
+- **L3: withdrawn the same day.** A gastos/ipon/utang set was drawn (the composer reading "jeep 13, load 100, sweldo
+  25000", an utang page, ipon goals). The owner then said: "Honestly i cringe with the pinoy slangs." The pictures are
+  now plain English: the main listing's eight pages, in pesos. The Philippine **text** keeps gastos, ipon and utang as
+  search words (the owner chose "Keep the words in the text only").
 - **L4: keep "Lucento: Budget Tracker"** as the Philippine title.
 - L5 and L6 are as above.
 

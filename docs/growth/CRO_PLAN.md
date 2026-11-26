@@ -150,8 +150,9 @@ The output is a ranked fix list, asked as multiple choice. It won't include walk
 
 **Changed 26 Nov.** The listing review (`LISTING_REVIEW_2026-11-26.md`) led the owner to fix the screenshots before
 launch instead of testing them:
-- an on-pace recapture for both listings;
-- a Philippine set that speaks gastos, ipon and utang.
+- an on-pace recapture for both listings, with a keyword-led feature graphic;
+- plain English pictures in both listings: no Filipino slang (owner, 26 Nov; a gastos/ipon/utang set was withdrawn the
+  same day). The Philippine text keeps those words as search keywords.
 
 E1 therefore tests something else:
 - **What it tests:** the icon, on the listing most visitors see; the baseline week's country split decides which. The
