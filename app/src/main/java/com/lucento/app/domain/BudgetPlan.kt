@@ -140,23 +140,22 @@ data class BudgetBurn(
     val dailyAllowance: Money?,
     /** Month-end budgeted spending if the current pace continues (labelled as a projection). */
     val projected: Money,
+    /**
+     * Pace's own measures ([BudgetPace], docs/CALCULATIONS.md "Budget pace"): what the plan expects spent by today, with
+     * the month's scheduled bills on their due dates, and what's spent counting bills already due and still owed. Without
+     * bills they are [elapsedPercent] and [consumedPercent]. Only the pace chip reads them; the bar keeps those two.
+     */
+    val paceExpectedPercent: Int = elapsedPercent,
+    val paceConsumedPercent: Int? = consumedPercent,
 ) {
-    /** Spending is running ahead of the calendar by more than [BudgetPlanner.PACE_MARGIN_PERCENT] points. */
-    val aheadOfPace: Boolean get() = consumedPercent != null && consumedPercent > elapsedPercent + BudgetPlanner.PACE_MARGIN_PERCENT
+    /** Spending is running ahead of the plan by more than [BudgetPlanner.PACE_MARGIN_PERCENT] points. */
+    val aheadOfPace: Boolean get() = pace == PacePosition.AHEAD
 
     /**
-     * Where spending stands against the calendar: budget used vs month elapsed, with the same
+     * Where spending stands against the plan for today: [paceConsumedPercent] vs [paceExpectedPercent], with the same
      * [BudgetPlanner.PACE_MARGIN_PERCENT] tolerance either side. Null without a budget.
      */
-    val pace: PacePosition?
-        get() {
-            val consumed = consumedPercent ?: return null
-            return when {
-                consumed > elapsedPercent + BudgetPlanner.PACE_MARGIN_PERCENT -> PacePosition.AHEAD
-                consumed < elapsedPercent - BudgetPlanner.PACE_MARGIN_PERCENT -> PacePosition.BEHIND
-                else -> PacePosition.ALIGNED
-            }
-        }
+    val pace: PacePosition? get() = BudgetPace.position(paceConsumedPercent, paceExpectedPercent)
 }
 
 object BudgetPlanner {
@@ -271,7 +270,11 @@ object BudgetPlanner {
         )
     }
 
-    fun burn(plan: BudgetPlan, today: LocalDate): BudgetBurn {
+    /**
+     * [bills] are the month's scheduled bills for pace ([BudgetPace.bills]); they only count for the current month,
+     * since a finished month's pace is its result and a future one has none yet.
+     */
+    fun burn(plan: BudgetPlan, today: LocalDate, bills: List<BudgetPace.Bill> = emptyList()): BudgetBurn {
         val month = plan.month
         val current = YearMonth.from(today)
         val length = month.lengthOfMonth()
@@ -299,6 +302,8 @@ object BudgetPlanner {
         } else {
             null
         }
+        val elapsedPercent = (elapsed * 100) / length
+        val withBills = month == current && plan.hasBudget && bills.isNotEmpty()
         return BudgetBurn(
             month = month,
             level = BurnLevel.of(plan.health),
@@ -310,10 +315,12 @@ object BudgetPlanner {
             daysElapsed = elapsed,
             daysInMonth = length,
             daysLeft = daysLeft,
-            elapsedPercent = (elapsed * 100) / length,
+            elapsedPercent = elapsedPercent,
             dailyAverage = daily,
             dailyAllowance = allowance,
             projected = projected,
+            paceExpectedPercent = if (withBills) BudgetPace.expectedPercent(plan.total, bills, month, elapsed) else elapsedPercent,
+            paceConsumedPercent = if (withBills) BudgetPace.consumedPercent(plan.spent, plan.total, bills, today) else plan.percentUsed,
         )
     }
 }

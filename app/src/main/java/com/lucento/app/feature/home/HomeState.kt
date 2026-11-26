@@ -6,6 +6,7 @@ import com.lucento.app.domain.Budget
 import com.lucento.app.domain.BudgetBurn
 import com.lucento.app.domain.BudgetHealth
 import com.lucento.app.domain.BudgetPlan
+import com.lucento.app.domain.BudgetPace
 import com.lucento.app.domain.BudgetPlanner
 import com.lucento.app.domain.CashflowCalculator
 import com.lucento.app.domain.Category
@@ -563,7 +564,8 @@ object HomeStateBuilder {
             monthTotals = monthTotals.firstOrNull { it.currencyCode == focus },
             otherMonthTotals = monthTotals.filter { it.currencyCode != focus },
             budget = plan,
-            burn = plan?.let { BudgetPlanner.burn(it, today) },
+            // Pace counts the month's scheduled bills on their due dates (docs/CALCULATIONS.md "Budget pace").
+            burn = plan?.let { BudgetPlanner.burn(it, today, BudgetPace.bills(activeSchedules, it.month, today)) },
             expenseCategoryCount = categories.count { it.kind == CategoryKind.EXPENSE && !it.archived },
             otherBudgetCurrencies = if (budgetsOn) BudgetPlanner.currencies(budgets, categories, focus, shown).drop(1) else emptyList(),
             netFlow = if (wallets.isEmpty()) null else CashflowCalculator.netFlow(focus, shown, recorded),
