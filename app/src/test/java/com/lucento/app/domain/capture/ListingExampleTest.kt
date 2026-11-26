@@ -12,9 +12,9 @@ import org.junit.Test
 import java.time.LocalDate
 
 /**
- * The Google Play listings promise what the composer does with their example sentences (docs/play/PLAY_STORE_SUBMISSION.md
- * §4; the Philippine screenshot set from CRO-4a). These read them on the phone, with the preset categories a new person
- * picks, so a listing never shows something the app doesn't do.
+ * The Google Play listings' descriptions promise what the composer does with their example sentences
+ * (docs/play/PLAY_STORE_SUBMISSION.md §4). These read them on the phone, with the preset categories a new person picks, so
+ * a listing never promises something the app doesn't do.
  */
 class ListingExampleTest {
     private val today = LocalDate.parse("2026-11-26")
@@ -34,13 +34,6 @@ class ListingExampleTest {
         assertEquals(listOf("13", "100", "2450", "25000"), rows.map { it.amount?.toPlainString() })
         assertEquals(listOf(EXPENSE, EXPENSE, EXPENSE, INCOME), rows.map { it.type })
         assertEquals(listOf(10L, 11L, 12L, 20L), rows.map { it.categoryId })
-    }
-
-    @Test fun thePhilippineScreenshotsSentence() {
-        val rows = BatchEntryParser.parse("jeep 13, load 100, sweldo 25000", context)
-        assertEquals(listOf("13", "100", "25000"), rows.map { it.amount?.toPlainString() })
-        assertEquals(listOf(EXPENSE, EXPENSE, INCOME), rows.map { it.type })
-        assertEquals(listOf(10L, 11L, 20L), rows.map { it.categoryId })
     }
 
     @Test fun theGlobalListingsSentence() {

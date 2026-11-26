@@ -431,23 +431,6 @@ class ScreenshotTourTest {
         click("Discard")
         compose.waitForIdle()
         waitForDescription("Add transaction")
-        // The Philippine listing's own example (docs/growth/LISTING_REVIEW_2026-11-26.md L3), in the peso marketing run
-        // only: read on the phone, three complete rows (ListingExampleTest checks the same sentence on the JVM).
-        if (demoCurrency == "PHP" && demoHistory) {
-            compose.onNodeWithContentDescription("Add transaction").performClick()
-            waitForText("Tell me about your transaction")
-            compose.onNode(hasSetTextAction()).performTextInput("Jeep 13, load 100, sweldo 25000")
-            compose.onNodeWithContentDescription("Send").performClick()
-            closeKeyboard()
-            waitForText("Save 3 transactions")
-            waitForToastsGone()
-            shot("09c-composer-ph")
-            compose.onNodeWithContentDescription("Back").performClick()
-            waitForText("Discard 3 unsaved transactions?")
-            click("Discard")
-            compose.waitForIdle()
-            waitForDescription("Add transaction")
-        }
 
         // ---------------------------------------------------------------- tabs
         tab("Transactions")
