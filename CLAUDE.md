@@ -31,7 +31,9 @@ app/src/main/java/com/lucento/app/
                        monthly check-in card opens the plan page), profile menu (Settings and Follow
                        Lucento live there); a new user's
                        guided setup (feature/guide) follows onboarding; Lucento Pro's welcome (feature/pro/welcome:
-                       a tour over the real screens via Modifier.spotlightTarget) plays after a confirmed plan
+                       a tour over the real screens via Modifier.spotlightTarget) plays after a confirmed plan;
+                       wide windows (NavLayout): a side rail from 600dp, and from 840dp two panes (the tab on the
+                       left, what it opened on the right; docs/DESIGN.md "Wide windows")
 ```
 This tree and the navigation notes above describe the current implementation. They are
 not mandatory UX or information-architecture constraints. Claude may propose and implement
