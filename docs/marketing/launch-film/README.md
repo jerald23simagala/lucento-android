@@ -4,7 +4,8 @@ Lucento's first official product film: **93.3 seconds, 1920 × 1080, 30 fps**, p
 version. It is built in Remotion from real captures of Lucento 0.5.19 (refreshed 2026-11-24; earlier cuts used 0.5.8
 and 0.5.14) and carries an original synthesized score. In the vertical version every caption is centred.
 30-second and 15-second cuts, in both shapes, come from the same source. Since 2026-11-24 every version is narrated
-(ElevenLabs, voice Rianne), and the 93-second film also stays available music-led for muted feeds.
+(ElevenLabs; voice Laurel, American English, since 2026-11-25, after Rianne on the first renders), and the 93-second
+film also stays available music-led for muted feeds.
 
 | Deliverable | Where |
 |---|---|

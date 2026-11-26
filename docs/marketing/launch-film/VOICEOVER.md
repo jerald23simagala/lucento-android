@@ -7,12 +7,15 @@ for autoplaying, muted feeds and anywhere an AI label isn't wanted). The origina
 
 ## Narration
 
-**Voice:** Rianne ("Warm & Friendly Filipino Creator"), a young Filipino woman's voice from the ElevenLabs library, on
-the owner's paid Creator plan, which allows commercial use. The owner chose her over Laurel (American) from two 30 s
-samples. **"Lucento" is said loo-SEN-toh** (owner): the takes spell it `/luˈsɛntoʊ/` for the model. Model `eleven_v4`,
-one take per version that speaks every line in order; the takes are on the ElevenLabs flow "Lucento launch film —
-voiceover (AS-1)" and in lucento-studio `video/voiceover/takes/` (used: `30-rianne-c`, `15-rianne-a`, `93-rianne-b`;
-the others are alternates and the earlier samples).
+**Voice:** Laurel ("Warm, Kind & Confident"), a native English (American) woman's voice from the ElevenLabs library,
+made for brand films and product launches, on the owner's paid Creator plan, which allows commercial use. The owner
+chose her on 2026-11-25 for a native English narrator, from 30 s samples of Laurel, Justin Case (American man), Marina
+(American woman) and Charlotte (British woman). Rianne ("Warm & Friendly Filipino Creator") narrated the first renders
+on 2026-11-24; her takes are kept and still render with `--props='{"voice":"rianne"}'`. **"Lucento" is said
+loo-SEN-toh** (owner): the takes spell it `/luˈsɛntoʊ/` for the model. Model `eleven_v4`, one take per version that
+speaks every line in order; the takes are on the ElevenLabs flow "Lucento launch film — voiceover (AS-1)" and in
+lucento-studio `video/voiceover/takes/` (used: `30-laurel-a`, `15-laurel-a`, `93-laurel-a`; the others are
+alternates, Rianne's takes and the voice samples).
 
 **How it's built** (lucento-studio `video/`):
 
@@ -24,7 +27,9 @@ the others are alternates and the earlier samples).
    −7.5 dB) under it, 6 frames before a line and 12 after. The sound effects stay as they are.
 3. `VOICE` picks the narrator. `--props='{"voice":"none"}'` renders a cut without narration, and another narrator
    renders with its own name. Under a line the sound effects dip about 3 dB too, and each line is held at −3 dBFS by
-   a gentle limiter, so the mix keeps its headroom (the 30 s cut measures about −16 LUFS, peaks −1.4 dBFS).
+   a gentle limiter, so the mix keeps its headroom. With Laurel (ffmpeg ebur128): the 30 s cut −14.3 LUFS, peak
+   −1.3 dBFS; the 15 s −15.3 LUFS, peak −0.7 dBFS (the closing line on the final hit); the narrated 93 s −15.0 LUFS,
+   peak −1.0 dBFS. The verticals measure the same.
 
 A new line or a retake needs only a take, the script and a render. Lines sit between the on-screen captions and off
 the score's hits; times are in the cut's own seconds (frames at 30 fps).

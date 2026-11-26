@@ -97,11 +97,13 @@ payments get "Skip this statement" (hidden and not set aside, Undo); every compo
 
 ## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
 
-- ~~AS-1 Launch film on 0.5.19~~ **Built 2026-11-24 (branch `marketing/launch-film-0.5.19`), owner review next.** All
-  screens re-captured from main `a866390` (0.5.19 + the tester round), crop boxes remapped, the bulk message's brand
-  name replaced by "taxi" (T21). Narrated with ElevenLabs, voice Rianne (owner's pick over Laurel), "Lucento" said
-  loo-SEN-toh (owner): the 30 s and 15 s cuts, and the 93 s film twice, narrated and music-led (owner: "a voiced over
-  version too"); scripts in `docs/marketing/launch-film/VOICEOVER.md`. Eight films in `Downloads/lucento-launch-film/`.
+- ~~AS-1 Launch film on 0.5.19~~ **Built 2026-11-24 (PR #149, merged 95bdb98); narrator switched to Laurel on
+  2026-11-25.** All screens re-captured from main `a866390` (0.5.19 + the tester round), crop boxes remapped, the bulk
+  message's brand name replaced by "taxi" (T21). Narrated with ElevenLabs, "Lucento" said loo-SEN-toh (owner): the
+  30 s and 15 s cuts, and the 93 s film twice, narrated and music-led (owner: "a voiced over version too"); scripts in
+  `docs/marketing/launch-film/VOICEOVER.md`. Voice Rianne first; on 2026-11-25 the owner asked for a native English
+  speaker and chose **Laurel** (American) from 30 s samples of Laurel, Justin, Marina and Charlotte, and every narrated
+  version was re-rendered with her. Eight films in `Downloads/lucento-launch-film/` (Rianne's in `previous-rianne/`).
   **AS-1a (owner):** watch them; when posting a narrated one, turn on the AI label (TikTok "AI-generated content",
   Instagram/Facebook "Label as made with AI").
 - **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
