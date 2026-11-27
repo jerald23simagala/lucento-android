@@ -40,7 +40,7 @@ On a Launch Board card, cite failures by ID (for example "T4, T11").
 | T11 | Any privacy line is scoped ("your entries", "your records") and, where the format allows, links www.lucentoapp.com/privacy | — |
 | T12 | Voice: never "your voice never leaves the phone" (online voice is an opt-in) and never "never records" (Lucento listens through the microphone while its listening screen is open). The Privacy Policy says it "never keeps or sends a recording" | "Lucento keeps no recording of your voice." |
 | T13 | Backups are not encrypted. Never imply that they are | "Back up to a file whenever you like." |
-| T38 | Scans and imported PDFs are read on the phone and aren't uploaded, but ML Kit and Google's document scanner may send Google technical diagnostics (phone model, timings, error codes; never the images or the text), so "scans never touch the internet" is wrong. While the Privacy Policy says Lucento uses Gemini's free service, never say Google doesn't keep or read what Gemini receives | "Scans are read on your phone and aren't uploaded." |
+| T38 | Scans and imported PDFs are read on the phone and aren't uploaded, but ML Kit and Google's document scanner may send Google technical diagnostics (phone model, timings, error codes; never the images or the text), so "scans never touch the internet" is wrong. Gemini is on Google's paid tier (Privacy Policy 2026-11-27): Google doesn't use what it receives to improve its products, but it keeps it for a limited time, so never say Google keeps nothing | "Scans are read on your phone and aren't uploaded." |
 
 ## Money, pricing and availability
 

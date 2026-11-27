@@ -571,8 +571,8 @@ private fun AiConsentSheet(
 }
 
 /**
- * The first question while AI answers are on but not yet confirmed (owner, 2026-11-17): what would be sent, Google's
- * free-tier terms, the plan's allowance and that AI can be wrong. Nothing leaves the phone until "Ask Gemini"; "Keep
+ * The first question while AI answers are on but not yet confirmed (owner, 2026-11-17): what would be sent, what Google
+ * does with it, the plan's allowance and that AI can be wrong. Nothing leaves the phone until "Ask Gemini"; "Keep
  * answers on this phone" turns AI answers off. The buttons are stacked full width so 200 % text never squeezes them.
  */
 @Composable

@@ -88,6 +88,13 @@ people at Google may read them, so the privacy policy (VERSION 2026-11-10), both
 answers consent sheet and the website say so (`LegalDocuments.GEMINI_DATA_USE`). When billing is linked: remove that
 sentence, bump `LegalDocuments.VERSION`, re-run `tools/legal/export_legal.py`, and record the date here.
 
+**Gemini key on the paid tier since 27 Nov 2026** (OT-31: the owner bought $5 Prepay credit, with auto-reload of $5 at
+$2 and a $20 monthly limit). `GEMINI_DATA_USE` now says what the paid tier does, following the Gemini API Additional
+Terms for Paid Services (effective 23 Mar 2026): Google doesn't use prompts or responses to improve its products, and
+logs them for a limited time only to prevent misuse and for required legal disclosures. Policy VERSION 2026-11-27. If
+the key ever goes back to the free tier, or the billing account runs out of credit (HTTP 402), the free-tier wording
+must come back before anything else ships.
+
 **Sent** (`AskSnapshotBuilder`, `AskLucentoClient`, request `version: 2`), only while AI answers (v2) are on: the
 question; the last six turns of the conversation; today's date; the main currency; and up to 400 labelled figures, each
 with an id, all in the main currency and calculated on the phone:

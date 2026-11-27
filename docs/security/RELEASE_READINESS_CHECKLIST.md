@@ -50,12 +50,15 @@ Legend: **[B]** blocks release · **[R]** recommended before release · **[P]** 
 possible; before the final release build. Click-by-click steps (Google's Prepay billing):
 [OWNER_ACTIONS_REQUIRED.md §1](OWNER_ACTIONS_REQUIRED.md#1-gemini-key-on-googles-paid-tier-f-05).
 
-- [ ] Billing set up on the key's project, $5 Prepay credit bought (§1 steps 1–6).
-- [ ] Auto-reload on with a monthly limit, so the key never stops at $0 (§1 steps 7–8).
+- [x] Billing set up on the key's project, $5 Prepay credit bought (§1 steps 1–6). *Evidence: owner, OT-31, 27 Nov
+      2026 22:57 Manila: "Paid just now 5$".*
+- [x] Auto-reload on with a monthly limit, so the key never stops at $0 (§1 steps 7–8). *Evidence: same note: "reload
+      @ $2 and Cap at $20".*
 - [ ] Projects page no longer says "Set up billing"; Ask Lucento answers on a phone. Screenshot saved as
-      `docs/security/evidence/gemini-billing.png` (§1 steps 10–12).
-- [ ] Free-tier sentence removed from the app and the website's /privacy, `LegalDocuments.VERSION` bumped, date
-      recorded in `docs/ASK.md` (Claude, §1 step 13), in the release build.
+      `docs/security/evidence/gemini-billing.png` (§1 steps 10–12). *Asked for on OT-31, 27 Nov.*
+- [ ] Free-tier sentence replaced with the paid-tier one in the app and the website's /privacy, `LegalDocuments.VERSION`
+      bumped to 2026-11-27, date recorded in `docs/ASK.md` (Claude, §1 step 13, PR `privacy/gemini-paid-tier`). Tick
+      when it ships in a release build and the website deploy, after the screenshot above.
 
 ### A4. [B] F-06 — Supabase Auth settings on production (owner, about 10 minutes)
 
