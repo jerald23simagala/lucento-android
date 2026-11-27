@@ -32,9 +32,14 @@ resolved items are kept at the bottom for traceability.
 - **WW-5 (Partly checked).** Half-open (tabletop/book) posture: Lucento doesn't read the hinge, so the split line
   ignores it. Checked on emulators only: Pixel 9 Pro Fold and Pixel Tablet (both orientations, and a 7-inch size,
   2026-11-26); not on a real foldable or tablet yet. Galaxy Z Folds are under 840dp both ways (Samsung lists them as
-  medium width), so since 2026-11-26 the split starts at 804dp (owner): sideways (about 823–832dp at 420dpi) they
-  split, upright (about 690–750dp) they keep one pane. Those widths are worked out from Samsung's pixel sizes, not
-  measured: check `screenWidthDp` on a real Galaxy Z Fold.
+  medium width), so since 2026-11-26 the split starts at 804dp (owner): held in landscape they split, upright they keep
+  one pane. Published widths (2026-11-27), unfolded, from Chrome DevTools' device list (`EmulatedDevices.ts`, CSS px,
+  which are dp at Chrome's default zoom): Galaxy Z Fold 5 690 × 829 (2.625, i.e. 420dpi), Galaxy Z Fold 6 744 × 860,
+  Pixel 9 Pro Fold 836 × 842, so a Fold 5 or 6 in landscape (829, 860) splits and upright (690, 744) doesn't, and the
+  Pixel 9 Pro Fold splits either way. Samsung's pixel sizes at 420dpi give about the same (Fold 7: 750 × 832). The
+  Galaxy Z Fold 8 unfolds in landscape (Android Developers blog, July 2026: "landscape-first"); no width published. The
+  store screenshots therefore say "held in landscape", not "turn it sideways". Still to do: read `screenWidthDp` on a
+  real Galaxy Z Fold (Samsung Remote Test Lab is free), at the default screen zoom; a larger zoom lowers the width.
 
 ## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
 

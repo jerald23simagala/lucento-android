@@ -94,7 +94,9 @@ object DemoMonth {
         add(TransactionType.EXPENSE, money(48), cash, cat("Public transportation"), day(7), "Transit card")
         add(TransactionType.EXPENSE, money(15, 99), bank, cat("Streaming services"), day(8), "Streaming")
         add(TransactionType.EXPENSE, money(89), bank, cat("Clothing and shoes"), day(8), "Shoes")
-        add(TransactionType.EXPENSE, money(24), cash, null, day(8), "Uncategorised")
+        // No category, so Budget counts it as unbudgeted; its note is an ordinary purchase, since a note reading
+        // "Uncategorised" sat over the row's "Uncategorized" label (store screenshots, 2026-11-27).
+        add(TransactionType.EXPENSE, money(24), cash, null, day(8), "Gift wrap")
 
         val budgets = container.budgets
         listOf(

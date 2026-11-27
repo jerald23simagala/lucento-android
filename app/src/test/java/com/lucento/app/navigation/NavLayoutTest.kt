@@ -46,6 +46,9 @@ class NavLayoutTest {
         assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 823, heightDp = 707))
         assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 690, heightDp = 829))
         assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 707, heightDp = 823))
+        // Chrome DevTools' device list (2026-11-27): Galaxy Z Fold 5 690 × 829, Galaxy Z Fold 6 744 × 860 unfolded.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 860, heightDp = 744))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 744, heightDp = 860))
     }
 
     @Test
