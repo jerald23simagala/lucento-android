@@ -17,7 +17,7 @@ import java.util.UUID
 
 /**
  * The demo month the screenshot tour and the website showcase both start from, created through the app's own
- * repositories so it follows every validation rule: an everyday bank, cash, savings, a Visa card with billing days, a
+ * repositories so it follows every validation rule: an everyday bank, cash, savings, a credit card with billing days, a
  * car loan three instalments in, three months of salary and spending, nine budget categories, two goals and four
  * schedules. [scale] multiplies every amount (×10 for the website's peso figures; ×1 in CI).
  */
@@ -50,7 +50,7 @@ object DemoMonth {
         // Home lists the payment and the card shows its credit limit, available credit and amount due.
         id(
             wallets.create(
-                "Visa card", WalletType.CREDIT_CARD, money(640),
+                "Credit card", WalletType.CREDIT_CARD, money(640),
                 DebtTerms(
                     interestRateBps = 2400,
                     creditLimit = money(5_000),
