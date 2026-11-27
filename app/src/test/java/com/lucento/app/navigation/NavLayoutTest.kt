@@ -33,8 +33,29 @@ class NavLayoutTest {
     @Test
     fun mediumWidthGetsTheRailWithOnePane() {
         assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 600, heightDp = 960))
+        // A tablet held upright keeps one pane.
         assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 800, heightDp = 1280))
-        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 839, heightDp = 900))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 803, heightDp = 900))
+    }
+
+    @Test
+    fun aGalaxyFoldSplitsSidewaysAndKeepsOnePaneUpright() {
+        // Owner, 2026-11-26. Galaxy Z Fold5 (1812 × 2176 px) and Fold6 (1856 × 2160 px) inner screens at 420dpi; Samsung
+        // lists both orientations as medium width, under Material's 840dp.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 829, heightDp = 690))
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 823, heightDp = 707))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 690, heightDp = 829))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 707, heightDp = 823))
+        // Chrome DevTools' device list (2026-11-27): Galaxy Z Fold 5 690 × 829, Galaxy Z Fold 6 744 × 860 unfolded.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 860, heightDp = 744))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 744, heightDp = 860))
+    }
+
+    @Test
+    fun theSplitStartsWhereBothPanesGetASmallPhonesWidth() {
+        // The 84dp rail and two 360dp panes; at the threshold the list keeps 360dp and the detail pane the rest.
+        assertEquals(SPLIT_MIN_WIDTH_DP, RailWidth.value.toInt() + 2 * LIST_PANE_MIN_DP)
+        assertEquals(LIST_PANE_MIN_DP, listPaneWidthDp(SPLIT_MIN_WIDTH_DP - RailWidth.value.toInt()))
     }
 
     @Test
@@ -42,6 +63,7 @@ class NavLayoutTest {
         assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 599, heightDp = 900))
         assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 600, heightDp = 480))
         assertEquals(NavLayout.DOCK, navLayoutFor(widthDp = 900, heightDp = 479))
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 804, heightDp = 480))
         assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 840, heightDp = 480))
     }
 

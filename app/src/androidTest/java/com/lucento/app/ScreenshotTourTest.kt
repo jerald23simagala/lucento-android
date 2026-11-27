@@ -360,7 +360,7 @@ class ScreenshotTourTest {
         // A card's payment in the bell opens its sheet (tester round 2026-11-24): Pay, or Skip this statement. Pay opens
         // the transfer that pays it, filled in: from the everyday account with the most money (the card has never been
         // paid), to the card, for the amount due (owner, round 8).
-        compose.onNode(hasText("Visa card payment") and hasAnyAncestor(isPopup())).performClick()
+        compose.onNode(hasText("Credit card payment") and hasAnyAncestor(isPopup())).performClick()
         waitForText("Skip this statement")
         shot("06c0-card-payment-sheet")
         click("Pay ", substring = true) // "Pay ₱6,400.00": the sheet's only text with "Pay " (its notes say "Paying")
@@ -480,7 +480,7 @@ class ScreenshotTourTest {
         waitForText("3 of 24 installments paid")
         shot("12c-wallet-loan")
         back()
-        openRow("Visa card")
+        openRow("Credit card")
         waitForText("Amount due")
         shot("12d-wallet-card")
         compose.onNodeWithContentDescription("Edit account").performClick()

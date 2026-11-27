@@ -278,7 +278,8 @@ environment (see `docs/QUALITY.md`).
   Tabs keep their state (save/restore on switch).
 - **Wide windows** (owner, 2026-11-26; `navigation/NavLayout.kt`). Phones, and any window under 480dp tall (a phone on
   its side), keep the dock. From 600dp wide the dock becomes a **side rail** (`NavigationRailDock`: the same floating
-  surface, + first, then the tabs). From 840dp wide, an unfolded foldable or a tablet, the screen **splits in two**:
+  surface, + first, then the tabs). From 804dp wide (the rail and two 360dp panes; an unfolded foldable, a Galaxy Z Fold
+  held in landscape, a tablet on its side), the screen **splits in two**:
   the current tab's own screen on the left (half the width beside the rail, 360–480dp), and on the right whatever was
   opened from it (Goals, a transaction, a wallet, the composer…). Picking something else on the left replaces the
   right-hand pane; Back there returns to the tab's default, so it is never empty: **Home → Insights**, Transactions →

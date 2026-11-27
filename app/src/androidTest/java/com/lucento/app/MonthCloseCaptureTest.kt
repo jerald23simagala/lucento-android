@@ -125,8 +125,8 @@ class MonthCloseCaptureTest {
             // card (nothing uses it) makes room for the loan.
             val trip = container.goals.observeGoals().first().first { it.name == "Japan trip" }
             container.goals.contribute(trip.id, money(1_350), today.minusDays(3), "", UUID.randomUUID().toString())
-            val visa = container.wallets.observeWallets().first().first { it.name == "Visa card" }.id
-            check(container.wallets.delete(visa) == WalletRepository.DeleteResult.Deleted)
+            val card = container.wallets.observeWallets().first().first { it.name == "Credit card" }.id
+            check(container.wallets.delete(card) == WalletRepository.DeleteResult.Deleted)
             val phone = (container.wallets.create("Phone loan", WalletType.LOAN, money(300)) as WalletRepository.SaveResult.Saved).id
             container.transactions.saveTransfer(
                 TransactionRepository.TransferInput(

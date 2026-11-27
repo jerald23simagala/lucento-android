@@ -4,17 +4,23 @@ package com.lucento.app.navigation
  * How the app's navigation is laid out for a window (owner, 2026-11-26: side rail and two panes when unfolded).
  *
  * - [DOCK]: phones, and anything short (a phone turned sideways keeps the dock): the bottom navigation dock.
- * - [RAIL]: a medium-width window (a small tablet, a foldable's inner screen in a narrow split): the side rail, one pane.
- * - [SPLIT]: a wide window (an unfolded foldable, a tablet): the side rail and two panes, the current tab on the left
- *   and what was opened from it on the right.
+ * - [RAIL]: a medium-width window (a tablet or a Galaxy Z Fold held upright, a foldable's inner screen in a narrow split):
+ *   the side rail, one pane.
+ * - [SPLIT]: a wide window (an unfolded foldable, a Galaxy Z Fold held in landscape, a tablet on its side): the side rail
+ *   and two panes, the current tab on the left and what was opened from it on the right.
  */
 enum class NavLayout { DOCK, RAIL, SPLIT }
 
 /** Material's medium-width breakpoint: below it, the dock. */
 const val RAIL_MIN_WIDTH_DP = 600
 
-/** Material's expanded-width breakpoint: two panes of at least 360dp each, beside the rail. */
-const val SPLIT_MIN_WIDTH_DP = 840
+/**
+ * Two panes of at least [LIST_PANE_MIN_DP] each beside the 84dp rail (`RailWidth`): 804dp. That is a little under
+ * Material's expanded breakpoint (840dp) on purpose (owner, 2026-11-26): a Galaxy Z Fold held in landscape is about
+ * 829–860dp wide (Chrome DevTools' device list: Fold 5 829, Fold 6 860; Samsung lists it as medium), and it splits too.
+ * Upright (about 690–750dp) it keeps one pane, as does a tablet held upright (800dp).
+ */
+const val SPLIT_MIN_WIDTH_DP = 804
 
 /** Below this height the window is a phone on its side: the dock stays, so phones never change layout. */
 const val WIDE_MIN_HEIGHT_DP = 480

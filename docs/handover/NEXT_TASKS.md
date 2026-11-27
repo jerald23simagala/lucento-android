@@ -65,19 +65,36 @@
 ## Wide windows — follow-ups (2026-11-26, `feature/foldable-split`)
 
 1. Done: the owner merged PR #158 (2026-11-26). Owner, with the first release built after #158 (not before: 0.5.20
-   and older show the phone layout on tablets): upload the tablet screenshots, `docs/play/graphics/global/tablet-*` to
-   the main listing's 7-inch and 10-inch tablet slots and `ph/tablet-*` to the Philippine custom listing's.
+   and older show the phone layout on tablets and unfolded phones): upload the tablet screenshots,
+   `docs/play/graphics/global/tablet-*` to the main listing's 7-inch and 10-inch tablet slots and `ph/tablet-*` to the
+   Philippine custom listing's, and the foldable screenshots, `foldable-*`, to each listing's "Foldable screenshots"
+   (Mission Control OT-69 has both, click by click).
 2. WW-1: keep the transaction editor's and transfer sheet's drafts across a fold or rotation.
 3. Mark the open wallet in the card grid; consider `paneTitle` on the detail pane (WW-3).
 4. An instrumented test on a wide window (forced size or a tablet AVD) for the split's navigation; CI's tour is a phone.
 5. Try it on a real foldable and a tablet, including half-open posture (WW-5); the emulators are done.
-6. Safe to spend's reason wraps to "…for 23 / days" in a split's narrower panes (Budget beside Scheduled); the phone
-   fits it on one line. Tighten or reflow it (seen in the tablet screenshots, 2026-11-26), then recapture: it sits in
-   tablet slot 3's lifted card.
-7. Tablet screenshots follow the phone set's demo month: they were captured with PR #154's `DemoMonth.kt`. When #154
-   merges, `capture_tablet.sh` on main needs nothing else; if #154 changes the month again, recapture both sets. Its demo
-   note "Uncategorised" sits beside the app's "Uncategorized" category in Transactions (`DemoMonth.kt`): rename the note
-   (for example "Corner shop") on #154, then recapture.
+6. Fixed on `docs/play-foldable-screenshots` (2026-11-26): Safe to spend's per-day line wrapped to "…for 23 / days" in
+   a split's narrower panes; no-break spaces now keep "for 23 days" whole (`perDayCaption`, `PerDayCaptionTest`), so a
+   narrow pane reads "$9.87 a day / for 23 days" and the phone still fits it on one line. The foldable screenshots and
+   the tablet set, recaptured on the same branch, show the fix.
+7. Tablet and foldable screenshots follow the phone set's demo month: they were captured with PR #154's `DemoMonth.kt`
+   plus this branch's two renames (the card is "Credit card", and the $24 note that read "Uncategorised" over the row's
+   "Uncategorized" label is "Gift wrap", 2026-11-27). Both merge with #154 without a conflict in `DemoMonth.kt`; #154
+   already conflicts with main in `PLAY_STORE_SUBMISSION.md` (its Graphics row against the tablet and foldable rows
+   below it): keep all three rows. When #154 merges, `capture_tablet.sh` and `capture_foldable.sh` on main need nothing
+   else; if #154 changes the month again, recapture all three sets.
+8. When the demo month next changes: the peso set's bills are the dollar ones ×10, so "Fibre internet ₱299.90" is far
+   below Philippine fibre prices (critic, 2026-11-27); a per-currency amount would need `DemoMonth`'s `scale` to allow
+   it. The launch film (lucento-studio `video`, 0.5.19 captures) still shows "Visa card" in its card fan and Scheduled;
+   its next capture (`capture_marketing.sh`) shows "Credit card".
+9. Polish left from the foldable screenshots' review (critic round 3, REVISE 3.7; owner, 27 Nov: polish only, no
+   more rounds). Pick up at the next recapture:
+   - Slot 3's Scheduled filter row shows a cut "h ▾" (scrolled to its end; at its start the third chip reads "Al").
+     App fix: let chip rows scroll to the pane edge (padding inside the scroll), so the cut falls at the edge.
+   - The 4:3 shots are 1024 dp wide; a Galaxy Z Fold in landscape is 829–860 dp (`wm density 500` gives 860 × 645).
+   - The device sits at slightly different heights per slide (`render.mjs` places it under the copy); the 4:3
+     frame's hinge marks run top to bottom; some bottom rows are cut mid-line.
+   - The composer's "Type a transaction" placeholder is cut in a 390 dp pane.
 
 ## Help & feedback — follow-ups (2026-11-25, `feature/help-and-feedback`)
 

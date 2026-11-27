@@ -190,7 +190,7 @@ for cur in "${CURRENCIES[@]}"; do
   # The time on the tablet now, for the generated status bar (after every timestamp the screens show).
   "$ADB" shell date +%H:%M | tr -d '\r' | sed 's/^0//' > "$DIR/clock.txt"
 
-  echo "== $cur: portrait (one pane beside the rail: 800 dp is below the split's 840)"
+  echo "== $cur: portrait (one pane beside the rail: 800 dp is below the split's 804)"
   rotate 1
   launch
   shot p01-home
