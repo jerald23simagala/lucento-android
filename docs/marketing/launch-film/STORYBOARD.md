@@ -1,6 +1,6 @@
 # Lucento launch film: final storyboard
 
-**Length:** 93.3 s (2,800 frames). **Format:** 1920 × 1080, 16:9, 30 fps, H.264 MP4 with AAC audio, plus a
+**Length:** 98.7 s (2,960 frames; 93.3 s before scene 09 was added on 2026-11-27). **Format:** 1920 × 1080, 16:9, 30 fps, H.264 MP4 with AAC audio, plus a
 vertical 1080 × 1920 version with the same timing (portrait layouts, `LaunchFilmVertical`; every caption centred, owner
 2026-11-19).
 **Source:** `lucento-studio/video/src/launch-film/` (Remotion 4.0.539). Composition `LaunchFilm`.
@@ -27,13 +27,15 @@ The emotional arc follows the light:
 ## Grid
 
 - The score is 90 BPM. One beat is 20 frames, one bar is 80 frames, and every scene starts on a bar line.
-- The music lands the crest on bar 1 (frame 80) and the final logo on bar 33 (frame 2640).
+- The music lands the crest on bar 1 (frame 80) and the final logo on bar 35 (frame 2800).
 - `src/launch-film/timeline.ts` and `tools/compose_score.py` hold the same numbers. Change both together.
 
 ## Scenes
 
-Timecodes are mm:ss.f. "Real" means a capture of Lucento 0.5.14 (the first cut used 0.5.8). Every screen in the film is real; the motion is
-camera work on those captures, and nothing inside a screen was drawn.
+Timecodes are mm:ss.f. "Real" means a capture of Lucento from `main` at `ecec362` (0.5.20 plus the wide-window split,
+PR #158, and the on-pace demo month, PR #154; earlier cuts used 0.5.8, 0.5.14 and 0.5.19). Every screen in the film is
+real; the motion is camera work on those captures, and no UI inside a screen was drawn (on the tablet and the
+foldable, only light on the glass, the fold's shading and a faint crease lie over the captures).
 
 ### 01 · Introduction (0:00.0–0:05.3, bars 0–1)
 - **Shot:**
@@ -46,15 +48,15 @@ camera work on those captures, and nothing inside a screen was drawn.
 
 ### 02 · Financial clarity (0:05.3–0:13.3, bars 2–4)
 - **Shot:**
-  - The phone rises out of the dark with the real Dashboard: net wallet balance ₱258,108.10, shortcuts, monthly budget at 89% "Ahead of pace".
-  - The Dashboard then scrolls until the whole budget card shows: the gauge, Budget remaining beside Spendable wallets with what is upcoming and due, Safe to spend, then To watch. The scroll is a pan over three stitched real captures, with the header and dock pinned as they are in the app.
+  - The phone rises out of the dark with the real Dashboard: net worth ₱428,338.10, shortcuts, the monthly budget 31% spent and "On track".
+  - The Dashboard then scrolls until the whole budget card shows: the gauge, Budget remaining beside Spendable wallets with what is upcoming and due, Safe to spend (₱2,270.20), then To watch. The scroll is a pan over three stitched real captures, with the header and dock pinned as they are in the app.
   - The phone glides to centre and its screen changes to Wallets.
 - **Text:** "Everything, / in one clear view." + "Know where you stand at a glance."
 - **Sound:** arpeggio enters; whoosh as the phone rises.
 
 ### 03 · Your financial world (0:13.3–0:21.3, bars 5–7)
 - **Shot:**
-  - Real wallet cards fan out from behind the phone: Cash, Everyday bank, the Visa credit card, Japan trip yen (¥60,000 ≈ ₱22,950), Dubai account (AED 4,200 ≈ ₱66,108) and Dollar savings ($1,850 ≈ ₱106,930).
+  - Real wallet cards fan out from behind the phone: Cash, Everyday bank, the credit card, Japan trip yen (¥60,000 ≈ ₱22,950), Dubai account (AED 4,200 ≈ ₱66,108) and Dollar savings ($1,850 ≈ ₱106,930).
   - "Every asset and debt": the net-worth hero and the assets/liabilities split light up on screen.
   - "Every currency": the three foreign wallets step forward while the others dim.
   - The phone moves left, and its screen becomes the composer.
@@ -75,7 +77,7 @@ camera work on those captures, and nothing inside a screen was drawn.
    - Send, and the reply: Groceries −₱850.00 · Cash.
    - Line: "Write it the way you'd text it."
 4. **All at once (0:30.3–0:34.7):**
-   - "Coffee 180, lunch 250, Grab 240, load 300" is typed fast. Send, and "Got it! Here are 4 transactions I'll add".
+   - "Coffee 180, lunch 250, taxi 240, phone bill 300" is typed fast. Send, and "Got it! Here are 4 transactions I'll add".
    - The four real row cards lift out of the phone into a grid, then return.
    - Tap Save 4, and the real "4 transactions saved".
    - Line: "Four in one message. One tap to save."
@@ -86,7 +88,7 @@ camera work on those captures, and nothing inside a screen was drawn.
 - **Shot:**
   - The real onboarding step "What do you spend on?" appears beside a large "82".
   - The five pre-ticked chips glow in turn: Rent, Electricity, Water, Internet, Mobile phone.
-  - Then three phones slide in: Goals (Emergency fund 42%, Japan trip 55%), Budget (November, ₱2,920.10 unspent of ₱25,900.00) and Scheduled (overdue and upcoming bills).
+  - Then three phones slide in: Goals (Emergency fund 42%, Japan trip 55%), Budget (November, ₱17,920.10 unspent of ₱25,900.00) and Scheduled (overdue and upcoming bills).
 - **Text:** "Plan today. Feel confident tomorrow." · "82 / ready-made categories / Twelve everyday ones are picked for you." · labels "Goals", "Budget", "Scheduled".
 - **Sound:** soft kick on 1 and 3; whoosh as the trio arrives.
 
@@ -94,7 +96,7 @@ camera work on those captures, and nothing inside a screen was drawn.
 - **Shot:**
   - Insights' income/expense bars grow from their baseline, a reveal of the real chart.
   - "Where your money went" draws its ring with a clock wipe of the real donut.
-  - The Ask Lucento phone steps in: a tap on "What are my top 5 spending categories?" brings up the real answer ("Rent leads your spending…", report card, "Calculated on this phone").
+  - The Ask Lucento phone steps in: a tap on "What are my top 5 spending categories?" brings up the real answer ("Groceries leads your spending…", report card, "Calculated on this phone").
   - "Open report" leads to the real Top spending categories statement.
 - **Text:** "Understand more. / Decide better." · "See where your money goes." → the question as a quote → "Answered on your phone." → "Six built-in reports."
 - **Sound:** clap enters on beat 3; tap and pop on the answer.
@@ -116,9 +118,27 @@ camera work on those captures, and nothing inside a screen was drawn.
   - The arc folds into one phone showing the Dashboard.
   - A tap on Hide turns every amount into ₱••••.
 - **Text:** "Your money. / Your way." · "Five themes" → chips "Hide amounts", "Works offline", "App lock", "No bank login".
-- **Sound:** the peak of the track: four-on-the-floor kick and sixteenth-note bells; a riser into the finale.
+- **Sound:** the peak of the track: four-on-the-floor kick and sixteenth-note bells, carried on through scene 09.
 
-### 09 · And there's more (1:12.0–1:22.7, bars 27–30)
+### 09 · Every screen (1:12.0–1:17.3, bars 27–28; added 2026-11-27)
+- **Shot:**
+  - A folded foldable rises, the phone Dashboard on its cover screen.
+  - It opens like a book, its cover swinging round the hinge, and lands flat on beat 4 of bar 27: the inner screen
+    shows the wide-window split, the side rail with the Dashboard beside Insights.
+  - Bar 28: a tablet held in landscape joins it, the composer open in the right pane beside the dimmed Dashboard
+    ("Here are 3 transactions", not saved).
+  - Portrait: the foldable above, the tablet below, both held sideways.
+- **Text:** eyebrow "Tablets and foldables" · "Everything about your money, / side by side." (the store's tablet and
+  foldable slides' line).
+- **Staging:** real captures of the split (lucento-android PR #158) at Play's 4:3 foldable shape (2688 × 2016, 1024 ×
+  768 dp), its 10:16 cover screen (1260 × 2016) and the Pixel Tablet (2560 × 1600), all on the same showcase state as
+  the phone screens, so every figure matches. The frames, the hinge and the unfold are drawn; no UI on a screen is. A
+  real Galaxy Z Fold8 unfolds landscape-first (933 × 704 dp), while a Fold held upright keeps one pane (KNOWN_ISSUES
+  WW-5), so "side by side" only ever sits beside a device held in landscape (TRUTH_RULES T42).
+- **Sound:** the peak groove carries on over G – A, lifting into the tonic as "And there's more" begins; a whoosh as
+  the cover swings, a shimmer as it lands, a whoosh as the tablet arrives.
+
+### 10 · And there's more (1:17.3–1:28.0, bars 29–32)
 - **Shot:** words only, over the lingering dawn (the sky's clock slows here so white type stays crisp). All twelve
   features arrive together in a quick cascade (about a second), hold for about nine seconds, then leave together (owner,
   2026-11-19: "show all at once with longer screen time"). Landscape: four columns, three rows; portrait: two columns,
@@ -142,10 +162,10 @@ camera work on those captures, and nothing inside a screen was drawn.
 
 - **Sound:** the calm progression returns (D – Bm – G – A) with eighth-note bells and a half-time kick; a swell leads in.
 
-### 10 · Final reveal (1:22.7–1:33.3, bars 31–34)
+### 11 · Final reveal (1:28.0–1:38.7, bars 33–36)
 - **Shot:**
   - The sun rises behind the Sunrise ridges as the sky turns ivory.
-  - On the last downbeat (1:28.0) it shrinks into the Rising Crest's dot while the three bars rise beneath it.
+  - On the last downbeat (1:33.3) it shrinks into the Rising Crest's dot while the three bars rise beneath it.
   - The navy wordmark draws in. The mark settles flat, in its own colours, with nothing on it.
 - **Text:**
   - "See your money clearly."
@@ -157,7 +177,7 @@ camera work on those captures, and nothing inside a screen was drawn.
 ## Pro features shown
 
 Multicurrency wallets (S03), the 6-month Insights view (S06), Lucento Shared (S07), three of the five themes (S08) and
-cloud sync (S09) are Lucento Pro. The end card says
+cloud sync (S10) are Lucento Pro. The end card says
 so, as the Play listing does. No prices appear, because they come from Google Play and aren't confirmed.
 
 ## Claims deliberately left out

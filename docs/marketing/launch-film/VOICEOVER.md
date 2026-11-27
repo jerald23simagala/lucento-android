@@ -1,7 +1,7 @@
 # Lucento launch film: voiceover
 
 **Every version has a narrated cut** (owner, 2026-11-24), in landscape and vertical: the 30-second and 15-second cuts
-are narrated, and the 93-second film comes twice, **narrated** (`LaunchFilmNarrated`) and **music-led** (`LaunchFilm`,
+are narrated, and the full film (98.7 s since 2026-11-27, 93.3 s before) comes twice, **narrated** (`LaunchFilmNarrated`) and **music-led** (`LaunchFilm`,
 for autoplaying, muted feeds and anywhere an AI label isn't wanted). The original score stays in every version
 (TRUTH_RULES T23).
 
@@ -14,8 +14,8 @@ chose her on 2026-11-25 for a native English narrator, from 30 s samples of Laur
 on 2026-11-24; her takes are kept and still render with `--props='{"voice":"rianne"}'`. **"Lucento" is said
 loo-SEN-toh** (owner): the takes spell it `/luˈsɛntoʊ/` for the model. Model `eleven_v4`, one take per version that
 speaks every line in order; the takes are on the ElevenLabs flow "Lucento launch film — voiceover (AS-1)" and in
-lucento-studio `video/voiceover/takes/` (used: `30-laurel-a`, `15-laurel-a`, `93-laurel-a`; the others are
-alternates, Rianne's takes and the voice samples).
+lucento-studio `video/voiceover/takes/` (used: `30-laurel-a`, `15-laurel-a`, `93-laurel-a`, and the "Every screen" line
+from `screens-laurel-b`; the others are alternates, Rianne's takes and the voice samples).
 
 **How it's built** (lucento-studio `video/`):
 
@@ -28,10 +28,13 @@ alternates, Rianne's takes and the voice samples).
 3. `VOICE` picks the narrator. `--props='{"voice":"none"}'` renders a cut without narration, and another narrator
    renders with its own name. Under a line the sound effects dip about 3 dB too, and each line is held at −3 dBFS by
    a gentle limiter, so the mix keeps its headroom. With Laurel (ffmpeg ebur128): the 30 s cut −14.3 LUFS, peak
-   −1.3 dBFS; the 15 s −15.3 LUFS, peak −0.7 dBFS (the closing line on the final hit); the narrated 93 s −15.0 LUFS,
-   peak −1.0 dBFS. The verticals measure the same.
+   −1.3 dBFS; the 15 s −15.3 LUFS, peak −0.7 dBFS (the closing line on the final hit); the narrated full film −15.0 LUFS,
+   peak −1.1 dBFS (98.7 s since 2026-11-27; −1.0 at 93.3 s). The verticals measure the same.
 
-A new line or a retake needs only a take, the script and a render. Lines sit between the on-screen captions and off
+A new line or a retake needs only a take, the script and a render. A single new line can be read in context instead
+(2026-11-27, "Every screen"): one take of the new line between its two neighbours, split by `voiceover.py`, then
+`python tools/voiceover_insert.py master-laurel 11 <that take's name> 2` moves the new reading into the cut and keeps
+every other approved line (668 credits for two takes, against about 2,300 for a full 93-second take). Lines sit between the on-screen captions and off
 the score's hits; times are in the cut's own seconds (frames at 30 fps).
 
 ### 30-second cut (`LaunchFilm30`, `LaunchFilm30Vertical`)
@@ -60,10 +63,11 @@ the score's hits; times are in the cut's own seconds (frames at 30 fps).
 | 0:08.0 – 0:10.7 | – | The sunrise | *(music builds to the final hit)* |
 | 0:11.0 | 330 | The logo, "See your money clearly." | "Lucento. See your money clearly." |
 
-### 93-second film (`LaunchFilmNarrated`, `LaunchFilmNarratedVertical`)
+### Full film (`LaunchFilmNarrated`, `LaunchFilmNarratedVertical`, 98.7 s)
 
 The master script, updated for 0.5.19 and approved by the owner (2026-11-24): "net worth" for "balance" (T40), "with
-Pro" on other currencies and on Shared (T6), and "scanning receipts and statements".
+Pro" on other currencies and on Shared (T6), and "scanning receipts and statements". The "Every screen" line was added
+on 2026-11-27 with scene 09 (the owner's choice); "opens up" lands as the foldable lies flat.
 
 | Time | Frame | On screen | Line |
 |---|---|---|---|
@@ -78,13 +82,14 @@ Pro" on other currencies and on Shared (T6), and "scanning receipts and statemen
 | 0:43.3 | 1300 | Insights, then Ask Lucento | "See where your money goes. Ask a question in plain words, and get an answer worked out from your own records." |
 | 0:54.1 | 1622 | Lucento Shared | "With Lucento Pro, share it with your partner: each on your own phone, both looking at the same numbers. Better decisions start together." |
 | 1:04.7 | 1940 | Themes, Hide amounts | "Make it yours, with themes, hidden amounts, and an app that works even offline." |
-| 1:12.5 | 2176 | And there's more | "And so much more: exchange rates, scheduled bills, loans and installments, goals, scanning receipts and statements, offline or in the cloud." |
-| 1:22.3 – 1:28.6 | – | The sun rises | *(music builds to the final hit)* |
-| 1:28.7 | 2660 | The logo, "See your money clearly." | "Lucento. See your money clearly." |
+| 1:12.0 | 2160 | A foldable opens into two panes, then a tablet joins it | "On a tablet or a foldable, Lucento opens up, with everything side by side." |
+| 1:17.9 | 2336 | And there's more | "And so much more: exchange rates, scheduled bills, loans and installments, goals, scanning receipts and statements, offline or in the cloud." |
+| 1:27.7 – 1:33.9 | – | The sun rises | *(music builds to the final hit)* |
+| 1:34.0 | 2820 | The logo, "See your money clearly." | "Lucento. See your money clearly." |
 
 ### Truth check (TRUTH_RULES, checked against 0.5.19)
 
-Truth: pass. T1–T6, T8, T10, T14–T18, T21, T23, T35, T40, T41 (the AI label below).
+Truth: pass. T1–T6, T8, T10, T14–T18, T21, T23, T35, T40, T41 (the AI label below), T42.
 
 - **"Just say it… and Lucento fills in the details"** and **"type your whole day in one message"** never call the
   composer AI (T1). The person still taps Save, so nothing is logged by itself (T3). A message holds up to 30 rows (T7).
@@ -96,12 +101,15 @@ Truth: pass. T1–T6, T8, T10, T14–T18, T21, T23, T35, T40, T41 (the AI label 
   the cloud") is covered by the end card's "Some features require Lucento Pro."
 - **"An answer worked out from your own records"** is Ask Lucento's on-phone answer ("Calculated on this phone"); it
   doesn't claim AI or that nothing leaves the phone (T2, T10).
+- **"On a tablet or a foldable, Lucento opens up, with everything side by side"** plays over a foldable open in
+  landscape and a tablet in landscape, both showing the split: an upright Fold keeps one pane, so the words never sit
+  beside one (T42).
 - **"See every bill coming"** describes Scheduled and the in-app bell, never notifications (T5). **"Scanning receipts
   and statements"** is Lucento Scan, which is free and reviewed row by row (T35). **"Works even offline"** is true of
   every core feature.
 - No prices, availability on Google Play, "best", savings promises, notifications or third-party names (T5,
-  T14–T18, T21). The bulk message on screen is "Coffee 180, lunch 250, taxi 240, load 300". Before 0.5.19 it named a
-  ride-hailing brand.
+  T14–T18, T21). The bulk message on screen is "Coffee 180, lunch 250, taxi 240, phone bill 300". Before 0.5.19 it named a
+  ride-hailing brand, and until 2026-11-27 it said "load 300".
 
 ### Posting a narrated cut
 
@@ -114,7 +122,7 @@ so turn on each platform's AI label (owner, 2026-11-24):
   see it as "AI info". Meta requires it for a reel with a realistic AI voiceover
   ([Instagram help](https://help.instagram.com/761121959519495)). Menu names can differ by app version.
 
-The music-led 93-second film (`lucento-launch-film.mp4`, `-vertical`) has no narration and needs no label.
+The music-led full film (`lucento-launch-film.mp4`, `-vertical`) has no narration and needs no label.
 
 ## The 0.5.14 master script (history)
 

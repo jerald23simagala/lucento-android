@@ -2,7 +2,8 @@
 
 The cut-downs reuse the master's scenes, so screens, timing and motion stay identical. Each has its own score from the
 same synthesizer, so the music still lands both logo moments on a downbeat. Segment boundaries are given in master
-frames (30 fps).
+frames (30 fps). Scene 09 "Every screen" (2026-11-27) made the master 160 frames longer; the cuts kept their content
+(owner's choice), so only their finale segments moved by 160 frames.
 
 ## 30-second cut: `LaunchFilm30` (29.3 s, 880 frames)
 
@@ -15,7 +16,7 @@ For YouTube pre-roll, Facebook and Instagram feed, and the Play listing's promo 
 | C | 680–820 | 4.7 s | Say it: the Listening sheet, the spoken words, the result row |
 | D | 900–1040 | 4.7 s | All at once: typed in one message, four rows, "4 transactions saved" |
 | E | 1680–1800 | 4.0 s | Lucento Shared: your partner saves dinner, and it arrives in your list |
-| F | 2600–2800 | 6.7 s | Sunrise, the logo, "See your money clearly.", CTA, Pro note |
+| F | 2760–2960 | 6.7 s | Sunrise, the logo, "See your money clearly.", CTA, Pro note |
 
 The crest lands on bar 1 and the final logo on bar 9. Story: one view → effortless entry → together → clarity.
 Narrated since 2026-11-24 (owner): eight lines between the captions, script and timings in `VOICEOVER.md`.
@@ -28,7 +29,7 @@ For TikTok, Reels and Stories (pair it with the vertical layout below), and bump
 |---|---|---|---|
 | A | 0–100 | 3.3 s | The crest forms on the downbeat |
 | B | 900–1040 | 4.7 s | All at once: one message, four transactions, saved |
-| C | 2560–2760 | 6.7 s | Sunrise into the logo; "See your money clearly."; "Discover Lucento." |
+| C | 2720–2920 | 6.7 s | Sunrise into the logo; "See your money clearly."; "Discover Lucento." |
 
 One idea only: "four transactions in one message" is the most surprising, demonstrable promise. The final logo lands
 on bar 4.
@@ -36,7 +37,7 @@ Narrated since 2026-11-24 (owner): three lines, in `VOICEOVER.md`.
 
 ## Vertical versions (9:16, 1080 × 1920): rendered
 
-`LaunchFilmVertical` (93.3 s), `LaunchFilm30Vertical` and `LaunchFilm15Vertical`. These are not crops. Every scene
+`LaunchFilmVertical` (98.7 s), `LaunchFilm30Vertical` and `LaunchFilm15Vertical`. These are not crops. Every scene
 reads the composition size and switches to a portrait layout with the same timing, so the score and effects are the
 same. What each scene does in portrait:
 
@@ -51,8 +52,9 @@ same. What each scene does in portrait:
 | 06 | Headline and the question centred at the top; the Ask phone slides in over the Insights phone |
 | 07 | Headline in two balanced lines; two phones side by side with "You" / "Your partner" chips above; the arc runs between the chips |
 | 08 | Theme arc rotated into a vertical stack that fans out; headline and chips centred above it (the chips in two rows) |
-| 09 | The twelve features together, in two columns of six |
-| 10 | Stacked lockup (crest above the wordmark); headline in two lines; CTA, URL and the Pro note above the ridges |
+| 09 | Eyebrow and the headline in three lines centred at the top; the foldable unfolds below them, then moves up as the tablet rises in beneath it, both held sideways |
+| 10 | The twelve features together, in two columns of six |
+| 11 | Stacked lockup (crest above the wordmark); headline in two lines; CTA, URL and the Pro note above the ridges |
 
 **Rules:**
 - Keep text inside the platform safe zones: 250 px clear at the top and 380 px at the bottom for TikTok and Reels UI.

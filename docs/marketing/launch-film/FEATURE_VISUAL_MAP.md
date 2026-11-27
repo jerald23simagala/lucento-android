@@ -11,7 +11,7 @@ is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 | Dashboard | Home ("Dashboard") | Scroll | Net wallet balance ₱258,108.10, budget 89% "Ahead of pace", Budget remaining beside Spendable wallets, Safe to spend | `dash`, `dash-lower`, `dash-lowest` → stitched `dash-strip` | Phone rises from the dark; smooth pan with header and dock pinned | "Everything, in one clear view." | 1 |
 | Voice entry | Composer → Listening sheet | Tap mic, speak | "Add 500 pesos for lunch using cash." → Lunch −₱500 · Restaurants · Cash | `composer-empty`, `listening`, `voice-rows` | Sheet rises (real pixels); mic ring pulses; spoken words appear beside the phone | "Say it. Speak naturally. Lucento fills in the details." | 1 |
 | Natural-language typing (on-device reading, not AI) | Composer | Type, send | "Paid 850 for groceries using my cash wallet" → Groceries −₱850 · Cash | `typed-field`, `typed-rows` | Push in on the field; real typed text revealed in order; reply slides up | "Type it. Write it the way you'd text it." | 1 |
-| Bulk entry | Composer | One message, one save | "Coffee 180, lunch 250, Grab 240, load 300" → 4 rows → "4 transactions saved" | `bulk-field`, `bulk-rows`, `bulk-rows-end`, `bulk-saved` | Rows lift out into a grid and return; Save tap; confirmation | "All at once. Four in one message. One tap to save." | 1 |
+| Bulk entry | Composer | One message, one save | "Coffee 180, lunch 250, taxi 240, phone bill 300" → 4 rows → "4 transactions saved" | `bulk-field`, `bulk-rows`, `bulk-rows-end`, `bulk-saved` | Rows lift out into a grid and return; Save tap; confirmation | "All at once. Four in one message. One tap to save." | 1 |
 | Lucento Shared (Pro) | Composer and Transactions on two phones | Partner adds; it appears for you | "Family dinner 1,280" saved by the partner, highlighted at the top of your list | `partner-field`, `partner-rows`, `partner-saved`, `tx-after-bulk`, `tx-after-partner` | Two phones, "You" / "Your partner" chips, an arc of light carrying the entry | "Better financial decisions, together. One shared financial picture." | 1 |
 | Ask Lucento | Ask Lucento | Tap a suggested question | "What are my top 5 spending categories?" → on-phone answer, then the report | `ask`, `ask-answer`, `ask-report` | Answer slides in; highlight; "Open report" | "Answered on your phone." | 1 |
 | Multicurrency wallets (Pro) | Wallets (cards) | — | ¥60,000, AED 4,200 and $1,850 with peso values; net worth ₱258,108.10 | `wallets-mc`, `wallet-usd` | Cards fan out; the foreign three step forward | "Every currency." | 1 |
@@ -25,24 +25,25 @@ is drawn. Status and plan come from `../LAUNCH_VIDEO_FEATURE_DISCOVERY.md`.
 | Budget | Budget | November, ₱2,920.10 left of ₱25,900 | `budget` | Slides in as the centre of a trio | "Plan today." | 2 |
 | Preset categories | Onboarding "What do you spend on?" | 82 presets, 12 already ticked | `onb-categories` | Ticked chips glow in turn beside a large "82" | "82 ready-made categories. Twelve everyday ones are picked for you." | 2 |
 | Savings goals | Goals | Emergency fund 42%, Japan trip 55% (Fuji card) | `goals` | Trio | "Feel confident tomorrow." | 2 |
-| Scheduled transactions | Scheduled | Overdue Fibre internet; Phone plan, Visa payment, Car loan instalment | `scheduled` | Trio | label "Scheduled" | 2 |
+| Scheduled transactions | Scheduled | Overdue Fibre internet; Phone plan, Credit card payment, Car loan instalment | `scheduled` | Trio | label "Scheduled" | 2 |
 | Wallet customisation | New wallet (live card preview); bank faces | — | `wallet-new` | Not used in the master (no colour picker exists; bank logos are trademarks) | — | 3 |
 | App customisation | Wallets in five themes | Sunrise, Midnight, Aurora, Grove, Mono | `theme-*` (9 variants) | Theme arc that folds into one phone | "Your money. Your way. Five themes." | 2 |
 | Assets and liabilities / net worth | Wallets net-worth hero | Net worth, "You owe 31% of what you have", split bar | `wallets-mc` | Highlight on the hero; slight push in | "Every asset." | 2 |
 | Hide amounts | Dashboard | Tap Hide → ₱•••• everywhere | `dash`, `dash-hidden` | Tap ripple, cross-fade | chip "Hide amounts" | 2 |
+| Tablets and foldables (the wide-window split, PR #158) | Home beside Insights on a foldable's 4:3 inner screen, the phone Dashboard on its cover screen; the composer beside the Dashboard on a tablet | A foldable opens into two panes; a tablet joins it | `fold-cover-home`, `fold-home-insights`, `tablet-composer` (`screens/wide/`) | The cover swings open round the hinge (3D) and lands flat on the beat; the tablet slides in | "Everything about your money, side by side." | 2 |
 
 ## Tier 3: montage (quick beats)
 
 | Feature | Where it appears |
 |---|---|
 | Income and expense tracking | Transactions cards (Income +₱42,000, Expenses, Net inflow) in S07; Insights in S06 |
-| Credit cards (limit, available credit, amount due) | Visa card in the S03 card fan |
+| Credit cards (limit, available credit, amount due) | The credit card in the S03 card fan |
 | Loans and debts | Car loan instalment in Scheduled (S05); Debt & Loans −₱114,400 on the Dashboard (S02) |
 | Recurring transactions | Scheduled phone (S05) |
 | Safe to spend | Dashboard pan (S02) |
 | Offline-first, App lock, no bank login | Chips in S08 |
 | Awards, the payments bell, wallet adjustments | Captured (`awards`, `bell`), not used in the master; future videos |
-| FX rates, Transfers, Scheduled transactions ("Never miss a bill"), Goals tracking, Amortization tracking, Installments tracking, Statement scanning, Receipt scanning, Home-screen widgets, Offline, Cloud, Backups | Scene 09 "And there's more": all named together in words, one line each (owner's list, 2026-11-14, plus five added 2026-11-19) |
+| FX rates, Transfers, Scheduled transactions ("Never miss a bill"), Goals tracking, Amortization tracking, Installments tracking, Statement scanning, Receipt scanning, Home-screen widgets, Offline, Cloud, Backups | Scene 10 "And there's more": all named together in words, one line each (owner's list, 2026-11-14, plus five added 2026-11-19) |
 
 ## Tier 4: future marketing content
 
