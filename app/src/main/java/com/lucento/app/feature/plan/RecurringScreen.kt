@@ -180,7 +180,8 @@ internal data class ScheduledFilter(val flow: ScheduledFlow? = null, val walletI
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecurringScreen(
-    onBack: () -> Unit,
+    /** Null when the page is a tab's default pane on a wide screen (nothing to go back to): no back arrow. */
+    onBack: (() -> Unit)?,
     /** Opens straight into this schedule's review sheet (from Home's upcoming payments), where it can be marked paid. */
     openScheduleId: Long? = null,
     /**

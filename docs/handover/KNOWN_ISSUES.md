@@ -15,6 +15,38 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Wide windows: rail and two panes (2026-11-26, `feature/foldable-split`)
+
+- **WW-1 (Code-only, older than this work).** Folding, unfolding, rotating or resizing recreates the activity (the
+  manifest handles no configuration changes). The full-page transaction editor's draft (`editorDraft`) and the transfer
+  sheet's (`transferDraft`) are plain `remember` in `LucentoRoot`, so an open editor closes itself and unsaved edits are
+  lost. The composer keeps its rows (they are in its ViewModel). Fix: hold both drafts in the activity-scoped
+  `TransactionEditorViewModel`, and keep the editor's fields in saved state.
+- **WW-2 (Verified on the emulator).** At 200 % text in a ~383dp pane, some titles and tiles end in "…" (Add
+  transactions, a wallet's name, Wallet view's Transfer tile), as on a narrow phone. Nothing overlaps; every control works.
+- **WW-3 (Code-only).** The wallets card grid doesn't mark the wallet open beside it (the rows view does). The detail
+  pane has no `paneTitle`, so TalkBack doesn't announce that the right pane changed (each page's heading is read when
+  reached).
+- **WW-4 (Inferred).** Picking Insights on Home (or Scheduled on Budget) while it is already the default pane opens a
+  second copy with a back arrow; Back returns to the default. Harmless.
+- **WW-5 (Width verified on real Galaxy Z Folds; posture not checked).** Half-open (tabletop/book) posture: Lucento
+  doesn't read the hinge, so the split line ignores it; not tried on a real device. Galaxy Z Folds are under 840dp both
+  ways (Samsung lists them as medium width), so since 2026-11-26 the split starts at 804dp (owner): held in landscape
+  they split, upright they keep one pane. **Read on real phones** (Samsung Remote Test Lab, 2026-11-27, default screen
+  zoom; Chrome's `screen` size, device pixel ratio 2.625 = 420dpi):
+  - Galaxy Z Fold8 (SM-F971N, Android 17): unfolded 933 × 704dp in its natural landscape orientation (it unfolds
+    landscape-first), 704 × 933 upright.
+  - Galaxy Z Fold7 (SM-F966U, Android 16): 832 × 750dp in landscape, 750 × 832 upright.
+  - Lucento (debug build of main after #160) installed on the Fold7: the rail and two panes in landscape (Dashboard,
+    Insights), the rail and one pane upright. Its window keeps the full width in landscape: the theme draws into the
+    camera cutout (`windowLayoutInDisplayCutoutMode` always from API 30).
+  - Not read on hardware: Fold5 and Fold6. Chrome DevTools' device list gives 829 and 860dp in landscape (690 and 744
+    upright) at the same 420dpi, so they split the same way. The Pixel 9 Pro Fold (836 × 842) splits either way.
+  - A larger screen zoom raises the density and lowers the width; at Samsung's default zoom all the above hold. The store
+    screenshots say "held in landscape", which is true for every Fold read.
+  - Emulators: Pixel 9 Pro Fold and Pixel Tablet (both orientations, and a 7-inch size, 2026-11-26). A real tablet is
+    still to try.
+
 ## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
 
 - **DS-K1 (Verified, local probe and CI).**

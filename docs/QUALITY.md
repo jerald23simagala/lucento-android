@@ -105,6 +105,46 @@ Then: the website's screens are cropped with lucento-studio `qa/crop-screen.mjs`
 `lab/play-graphics/render.mjs` into `docs/play/graphics/{global,ph}`; the launch film follows
 docs/marketing/launch-film/ASSET_INVENTORY.md. Never edit a screenshot by hand.
 
+### Tablet screenshots (Google Play's tablet slots)
+
+The tablet set shows the wide-window split (rail, list on the left, what it opened on the right; `NavLayout`, split
+from 804 dp). The emulator is AVD `Lucento_Tablet_API35`: `avdmanager create avd -d pixel_tablet` on the same API 35
+`google_apis_playstore` image, `hw.gpu.mode=host`, `hw.keyboard=yes`; 2560 × 1600 at 320 dpi, so 1280 × 800 dp in
+landscape (split) and 800 × 1280 dp in portrait (one pane beside the rail). Boot it, run
+`setup_marketing_emulator.sh`, then `tools/screenshots/capture_tablet.sh <out dir>`. For each currency it makes the
+screen phone-sized (`wm size 1080x2400`, `wm density 420`) so the tour seeds exactly the phone shots' demo data, goes
+back to tablet size with gesture navigation (no taskbar), sets the debug plan simulator to Pro Monthly (the tour ends
+on the free plan), deletes the tour's last-step "Celebration dinner" (the phone set's screens are taken before it), and
+captures `t01`…`t08` in landscape (Insights on the free three months; Home scrolled differently beside Goals and
+Milestones; Market open beside Transactions) and `p01`…`p03` in portrait into `<out dir>/tablet-usd/` and
+`tablet-php/`, with `clock.txt` (the tablet's time after the last shot, for the generated status bar). The demo month
+must be the phone set's: until PR #154 (on-pace month, rent due on the 10th) merges, build the androidTest APK with its
+`DemoMonth.kt`. lucento-studio `render.mjs --tablet-global <out>/tablet-usd --tablet-ph <out>/tablet-php --out <dir>`
+crops the status bar (48 px) and gesture bar (64 px, where the debug build's TEST badge sits) and draws the seven
+2560 × 1440 screenshots. `wm size 1920x1200` with `wm density 320` gives a 7-inch tablet (960 × 600 dp) on the same
+AVD for a quick check; reset both afterwards.
+
+### Foldable screenshots (Google Play's foldable slots)
+
+Play added "Foldable screenshots" to the store listing on 18 Nov 2026: 3 to 8 per listing (PNG or JPEG, up to 8 MB), at
+least one square (1:1) inner screen, one 4:3 landscape inner screen and one 10:16 portrait cover screen, each at that
+exact ratio; from April 2027 new apps and updates need them. The Android CLI's foldable emulators need emulator 37.3.10
+(this PC has 37.2.13), so `tools/screenshots/capture_foldable.sh <out dir>` gives the same shapes on the tablet AVD,
+booted and prepared as above, by setting its screen with `wm size` / `wm density` (`screencap` returns the set size):
+
+- square: 2106 × 2106 at 390 dpi = 864 dp, a Pixel 9 Pro Fold–class inner screen (the split, 390 dp panes);
+- wide: 2688 × 2016 at 420 dpi = 1024 × 768 dp, a 4:3 inner screen (the split, 470 dp panes);
+- outer: 1260 × 2016 at 420 dpi = 480 × 768 dp, a 4:3 foldable's cover screen (the phone layout).
+
+Per currency it seeds the tour's demo data at phone size, sets Pro Monthly and gesture navigation, deletes the
+"Celebration dinner", then captures each shape's screens into `<out dir>/fold-usd/` and `fold-php/` as
+`<shape>-<screen>.png`, with `<shape>.txt` (size, the status and gesture bars' heights from the window insets, the time)
+and window dumps of the composer, Budget and Goals screens (for checking where each stopped, or for placing a focus or
+lift region). `SHAPES=wide SEED=0` redoes one shape on the data already there. The
+same demo-month rule as the tablet set applies (PR #154). lucento-studio
+`render.mjs --fold-global <out>/fold-usd --fold-ph <out>/fold-php --out <dir>` draws the seven foldable screenshots at
+their shapes' exact sizes.
+
 ## Lint policy
 - `abortOnError = true`: **errors and fatal issues block** CI. `app/lint.xml` promotes privacy/release issues
   (AllowBackup, HardcodedDebugMode, SecureRandom, TrustAllX509TrustManager, ExportedContentProvider,

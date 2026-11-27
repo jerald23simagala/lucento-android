@@ -349,7 +349,7 @@ fun BudgetScreen(
                             if (!plan.uncategorizedSpending.isZero) {
                                 append(" (${fmt.format(plan.uncategorizedSpending)} has no category)")
                             }
-                            append(". It still counts in Spent — give those categories an amount, or categorise the expenses, to plan for it.")
+                            append(". It still counts in Spent — give those categories an amount, or categorize the expenses, to plan for it.")
                         },
                         modifier = Modifier.padding(top = Spacing.md),
                     )

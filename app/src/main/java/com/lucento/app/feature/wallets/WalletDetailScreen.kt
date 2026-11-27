@@ -85,7 +85,8 @@ import com.lucento.app.core.designsystem.component.rememberHaptics
 @Composable
 fun WalletDetailScreen(
     walletId: Long,
-    onBack: () -> Unit,
+    /** Null when the page is a tab's default pane on a wide screen (nothing to go back to): no back arrow. */
+    onBack: (() -> Unit)?,
     onAddTransaction: (TransactionType, Long) -> Unit,
     /** Opens the transfer sheet; (from, to) pre-selects accounts. */
     onTransfer: (Long?, Long?) -> Unit,
@@ -117,7 +118,7 @@ fun WalletDetailScreen(
 
     // The account was deleted (from its editor): leave the screen.
     LaunchedEffect(state.loading, wallet) {
-        if (!state.loading && wallet == null) onBack()
+        if (!state.loading && wallet == null) onBack?.invoke()
     }
 
     LazyColumn(

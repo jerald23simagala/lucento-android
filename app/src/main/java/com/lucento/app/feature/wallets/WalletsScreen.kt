@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lucento.app.core.designsystem.component.CardOverline
+import com.lucento.app.core.designsystem.component.LocalPaneSelection
+import com.lucento.app.core.designsystem.component.openInPane
 import com.lucento.app.core.designsystem.component.ChoicePill
 import com.lucento.app.core.designsystem.component.CompositionBar
 import com.lucento.app.core.designsystem.component.EmptyState
@@ -605,9 +607,18 @@ private fun LazyListScope.walletSection(
         if (cards) {
             WalletFaceGrid(wallets, onOpen, Modifier.animateItem())
         } else {
+            // Wide windows (two panes): the wallet open beside the list is marked.
+            val openWalletId = LocalPaneSelection.current?.walletId
+            val openTint = MaterialTheme.colorScheme.primaryContainer
+            val openBar = MaterialTheme.colorScheme.primary
             LucentoCard(modifier = Modifier.fillMaxWidth().animateItem(), contentPadding = 0.dp) {
                 wallets.forEachIndexed { index, wallet ->
-                    WalletRow(wallet = wallet, onClick = { onOpen(wallet) }, dense = true)
+                    WalletRow(
+                        wallet = wallet,
+                        onClick = { onOpen(wallet) },
+                        dense = true,
+                        modifier = Modifier.openInPane(open = openWalletId == wallet.id, tint = openTint, bar = openBar),
+                    )
                     if (index < wallets.lastIndex) Hairline(strong = true)
                 }
             }

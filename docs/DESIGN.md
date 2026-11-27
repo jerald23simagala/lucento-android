@@ -276,6 +276,21 @@ environment (see `docs/QUALITY.md`).
   screens (goals, recurring, debts, account detail, categories — the tab they were opened from stays highlighted)
   and steps aside for focused workflows: the transaction composer, category setup, Settings, Enabled features.
   Tabs keep their state (save/restore on switch).
+- **Wide windows** (owner, 2026-11-26; `navigation/NavLayout.kt`). Phones, and any window under 480dp tall (a phone on
+  its side), keep the dock. From 600dp wide the dock becomes a **side rail** (`NavigationRailDock`: the same floating
+  surface, + first, then the tabs). From 804dp wide (the rail and two 360dp panes; an unfolded foldable, a Galaxy Z Fold
+  held in landscape, a tablet on its side), the screen **splits in two**:
+  the current tab's own screen on the left (half the width beside the rail, 360–480dp), and on the right whatever was
+  opened from it (Goals, a transaction, a wallet, the composer…). Picking something else on the left replaces the
+  right-hand pane; Back there returns to the tab's default, so it is never empty: **Home → Insights**, Transactions →
+  the newest transaction shown, Wallets → the default wallet, Budget → Scheduled. The composer opens on the right and
+  closes after saving, with the list beside it already showing the new rows. While the composer or an editor is open
+  on the right, the rail and the list are veiled and a tap there is Back (so the editor's "discard?" still guards
+  unsaved work). The row open on the right is marked in Transactions and Wallets (a tint and a leading bar; "selected"
+  for TalkBack). Setup, Settings, Enabled features, Lucento Shared and the Lucento Plan page still take the whole
+  window. Each pane tells its screens its own width (`PaneConfiguration`), so `screenGutter()` and the compact layouts
+  fit the pane. Insights shown as Home's default pane doesn't count as opening it (no Financial Explorer milestone for
+  that). Folding returns to one pane showing what was open; Back from there goes to the tab.
 - **+ Add transaction** (the dock's centre button) opens the **transaction composer**: a compact top bar, the
   conversation (the user's message on a pale-sky bubble, Lucento's one-line reply, then the rows on the background
   separated by hairlines), a summary with one primary "Save N transactions" button, and the input with scan and

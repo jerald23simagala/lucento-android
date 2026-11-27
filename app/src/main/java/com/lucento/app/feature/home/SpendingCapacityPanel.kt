@@ -599,6 +599,15 @@ private fun PartRow(part: Part, label: TextStyle, amount: TextStyle, oneLine: Bo
     }
 }
 
+/** "23 days" (or "1 day") with a no-break space, so the count never ends a line apart from its unit. */
+internal fun daysKeptWhole(daysLeft: Int): String = "$daysLeft\u00A0${if (daysLeft == 1) "day" else "days"}"
+
+/**
+ * Safe to spend's per-day line, "$9.87 a day for 23 days". Its no-break spaces keep "for 23 days" whole, so a split's
+ * narrow pane wraps it as "$9.87 a day / for 23 days", never as "…for 23 / days" (tablet screenshots, 2026-11-26).
+ */
+internal fun perDayCaption(perDay: String, daysLeft: Int): String = "$perDay a day for\u00A0${daysKeptWhole(daysLeft)}"
+
 /**
  * Section C, the card's conclusion: Safe to spend, the lower of the two limits, with the sentence that says which one set
  * it (or, at zero, what took it). Green while there is something to spend, red at zero; the icon (an information "i",
@@ -619,7 +628,7 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
     val measurer = rememberTextMeasurer()
     val headlineStyle = MaterialTheme.typography.titleSmall.copy(lineBreak = LineBreak.Heading, fontWeight = FontWeight.Bold)
     val perDay = capacity.perDay?.takeIf { showPerDay && !nothing }
-    val days = "${capacity.daysLeft} ${if (capacity.daysLeft == 1) "day" else "days"}"
+    val days = daysKeptWhole(capacity.daysLeft)
     val detail = capacity.detail
     val spoken = buildString {
         append("Safe to spend, ").append(fmt.spoken(capacity.shown)).append('.')
@@ -643,7 +652,7 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
                 Text("SAFE TO SPEND", style = OverlineStyle, color = ink)
                 MoneyText(money = capacity.shown, style = AmountStyles.hero, color = ink, fractionScale = 1f, minScale = 0.5f)
                 if (perDay != null) {
-                    Text("${fmt.format(perDay)} a day for $days", style = MaterialTheme.typography.bodySmall, color = ink)
+                    Text(perDayCaption(fmt.format(perDay), capacity.daysLeft), style = MaterialTheme.typography.bodySmall, color = ink)
                 }
             }
             // It opens how the figure is worked out (design review: the old line's (i) was the only visible cue).
@@ -661,7 +670,7 @@ private fun Verdict(capacity: SpendingCapacity, onClick: () -> Unit, showPerDay:
                 }
                 MoneyText(money = capacity.shown, style = AmountStyles.hero, color = ink, fractionScale = 1f, minScale = 0.5f)
                 if (perDay != null) {
-                    Text("${fmt.format(perDay)} a day for $days", style = MaterialTheme.typography.bodySmall, color = ink)
+                    Text(perDayCaption(fmt.format(perDay), capacity.daysLeft), style = MaterialTheme.typography.bodySmall, color = ink)
                 }
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = ink, modifier = Modifier.size(24.dp))
