@@ -132,13 +132,24 @@ payments get "Skip this statement" (hidden and not set aside, Undo); every compo
 
 ## Assets aligned with 0.5.19 — follow-ups (2026-11-24, `marketing/assets-0.5.19`)
 
-- ~~AS-1 Launch film on 0.5.19~~ **Built 2026-11-24 (branch `marketing/launch-film-0.5.19`), owner review next.** All
-  screens re-captured from main `a866390` (0.5.19 + the tester round), crop boxes remapped, the bulk message's brand
-  name replaced by "taxi" (T21). Narrated with ElevenLabs, voice Rianne (owner's pick over Laurel), "Lucento" said
-  loo-SEN-toh (owner): the 30 s and 15 s cuts, and the 93 s film twice, narrated and music-led (owner: "a voiced over
-  version too"); scripts in `docs/marketing/launch-film/VOICEOVER.md`. Eight films in `Downloads/lucento-launch-film/`.
+- ~~AS-1 Launch film on 0.5.19~~ **Built 2026-11-24 (PR #149, merged 95bdb98); narrator switched to Laurel on
+  2026-11-25.** All screens re-captured from main `a866390` (0.5.19 + the tester round), crop boxes remapped, the bulk
+  message's brand name replaced by "taxi" (T21). Narrated with ElevenLabs, "Lucento" said loo-SEN-toh (owner): the
+  30 s and 15 s cuts, and the 93 s film twice, narrated and music-led (owner: "a voiced over version too"); scripts in
+  `docs/marketing/launch-film/VOICEOVER.md`. Voice Rianne first; on 2026-11-25 the owner asked for a native English
+  speaker and chose **Laurel** (American) from 30 s samples of Laurel, Justin, Marina and Charlotte, and every narrated
+  version was re-rendered with her. Eight films in `Downloads/lucento-launch-film/` (Rianne's in `previous-rianne/`).
   **AS-1a (owner):** watch them; when posting a narrated one, turn on the AI label (TikTok "AI-generated content",
   Instagram/Facebook "Label as made with AI").
+- **AS-1b Launch film with tablets and foldables (2026-11-27).** Scene 09 "Every screen" (a foldable unfolds into the
+  split, a tablet joins it; the film is 98.7 s) and every screen recaptured from main `ecec362` on the on-pace month
+  (#154 merged that day), so Safe to spend reads ₱2,270.20 and the net worth is ₱428,338.10 on the phone, the foldable
+  and the tablet. The 30 s and 15 s cuts keep their content. **Gate:** the full films (music-led and narrated, both
+  shapes) show the split, so they go public only once a release with PR #158 is on Play, the same gate as OT-69. The
+  new 30 s and 15 s cuts show phones only and can go out now. The 0.5.19 renders kept in
+  `Downloads/lucento-launch-film/previous-0.5.19/` show "Visa card" (T21) and Safe to spend ₱0.00, so they are retired:
+  if a full film is needed before the release, render one without scene 09 from these captures. **AS-1c (owner):**
+  watch the new set (`Downloads/lucento-launch-film/`).
 - **AS-2 Owner uploads the Play graphics and texts** (Mission Control task): both listings' eight screenshots and feature
   graphic from `docs/play/graphics/{global,ph}/` (Milestones replaced Insights) and §4's texts.
 - **AS-3 Owner pastes the Facebook Page's new About text** from `docs/community/facebook/README.md` (PR #75).
