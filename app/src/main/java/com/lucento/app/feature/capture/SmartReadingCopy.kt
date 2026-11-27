@@ -26,7 +26,7 @@ object SmartReadingCopy {
         "$ALLOWANCE $SLOWER With this off, Lucento reads your messages on this phone and their rows appear straight away.\n\n" +
             "When you type or speak in Add transactions, Lucento sends that message, today’s date, your main currency " +
             "and the names of your categories and accounts to Lucento’s server, which asks Google’s Gemini to read it. " +
-            // The free-tier disclosure every Gemini consent carries (security audit F-05), as in Settings on main.
+            // What Google does with it, which every Gemini consent carries (security audit F-05).
             "Balances and your history are not sent. " + com.lucento.app.feature.legal.LegalDocuments.GEMINI_DATA_USE + " When " +
             "this month’s AI questions are used up, reading happens on this phone. You review every row before " +
             "anything is saved, receipts are still read on this phone, and you can turn this off at any time."

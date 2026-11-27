@@ -14,6 +14,10 @@ These steps need your consoles, your production projects or a real payment, so t
 >
 > **Update 2026-11-15 (owner):** §1 moves from "once there is a user base" to **one of the last steps before the
 > production release**, keeping the free tier until then. The steps below follow Google's new Prepay billing.
+>
+> **Update 2026-11-27 (owner, OT-31):** §1 steps 1–8 done: $5 Prepay credit, auto-reload at $2, $20 monthly limit.
+> Steps 10–12 (Billing Tier column, phone check, screenshot) are still to come. Step 13 is prepared on branch
+> `privacy/gemini-paid-tier` and ships after the screenshot.
 
 **Done 2026-11-10:** §13 on production (owner pasted the file) and §14 (all checks pass, see
 RELEASE_READINESS_CHECKLIST A1). lucento-test still needs the same file pasted once.
