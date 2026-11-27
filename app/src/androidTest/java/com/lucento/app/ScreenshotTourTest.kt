@@ -6,6 +6,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.isPopup
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -470,8 +471,10 @@ class ScreenshotTourTest {
         shot("12g-new-wallet")
         backUntilGone("Build it below and watch it take shape.")
         // Cards (the gallery) are the default view (owner, 2026-11-04); the rows view is one tap away and is kept for the
-        // account pages below.
+        // account pages below. The view is a saved preference, and waitForIdle() doesn't wait for its DataStore write, so
+        // wait until the toggle reads Row view (a 27 Nov capture took the gallery here).
         compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Row view") and isSelected(), 10_000)
         compose.waitForIdle()
         shot("12b-wallets-rows")
         // Account pages: an instalment loan (Principal, Paid, Remaining and its instalments), a credit card (limit,

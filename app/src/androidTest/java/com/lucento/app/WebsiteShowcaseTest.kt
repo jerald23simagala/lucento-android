@@ -3,9 +3,11 @@ package com.lucento.app
 import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -194,6 +196,8 @@ class WebsiteShowcaseTest {
         scrollToText("Japan trip yen")
         shot("mc-wallets-gallery")
         compose.onNodeWithContentDescription("Row view").performScrollTo().performClick()
+        // The view is a saved preference (a DataStore write waitForIdle() doesn't wait for): wait for the rows.
+        compose.waitUntilAtLeastOneExists(hasContentDescription("Row view") and isSelected(), 10_000)
         compose.waitForIdle()
         scrollToText(savingsAbroad)
         shot("mc-wallets-rows")
