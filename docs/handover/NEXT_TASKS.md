@@ -72,7 +72,8 @@
 2. WW-1: keep the transaction editor's and transfer sheet's drafts across a fold or rotation.
 3. Mark the open wallet in the card grid; consider `paneTitle` on the detail pane (WW-3).
 4. An instrumented test on a wide window (forced size or a tablet AVD) for the split's navigation; CI's tour is a phone.
-5. Try it on a real foldable and a tablet, including half-open posture (WW-5); the emulators are done.
+5. Real Galaxy Z Folds done for width (Samsung Remote Test Lab, 2026-11-27: Fold7 and Fold8, WW-5). Still to try: a
+   real tablet, and the half-open posture.
 6. Fixed on `docs/play-foldable-screenshots` (2026-11-26): Safe to spend's per-day line wrapped to "…for 23 / days" in
    a split's narrower panes; no-break spaces now keep "for 23 days" whole (`perDayCaption`, `PerDayCaptionTest`), so a
    narrow pane reads "$9.87 a day / for 23 days" and the phone still fits it on one line. The foldable screenshots and

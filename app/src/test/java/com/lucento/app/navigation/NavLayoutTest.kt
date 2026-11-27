@@ -52,6 +52,17 @@ class NavLayoutTest {
     }
 
     @Test
+    fun realGalaxyFoldReadingsSplitInLandscapeAndKeepOnePaneUpright() {
+        // Read on real phones, Samsung Remote Test Lab, 2026-11-27, default screen zoom (KNOWN_ISSUES WW-5).
+        // Galaxy Z Fold7 (Android 16): 832 × 750 in landscape, 750 × 832 upright; Lucento itself split there.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 832, heightDp = 750))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 750, heightDp = 832))
+        // Galaxy Z Fold8 (Android 17): 933 × 704 in its natural landscape orientation, 704 × 933 upright.
+        assertEquals(NavLayout.SPLIT, navLayoutFor(widthDp = 933, heightDp = 704))
+        assertEquals(NavLayout.RAIL, navLayoutFor(widthDp = 704, heightDp = 933))
+    }
+
+    @Test
     fun theSplitStartsWhereBothPanesGetASmallPhonesWidth() {
         // The 84dp rail and two 360dp panes; at the threshold the list keeps 360dp and the detail pane the rest.
         assertEquals(SPLIT_MIN_WIDTH_DP, RailWidth.value.toInt() + 2 * LIST_PANE_MIN_DP)
