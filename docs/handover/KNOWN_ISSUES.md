@@ -31,7 +31,10 @@ resolved items are kept at the bottom for traceability.
   second copy with a back arrow; Back returns to the default. Harmless.
 - **WW-5 (Partly checked).** Half-open (tabletop/book) posture: Lucento doesn't read the hinge, so the split line
   ignores it. Checked on emulators only: Pixel 9 Pro Fold and Pixel Tablet (both orientations, and a 7-inch size,
-  2026-11-26); not on a real foldable or tablet yet.
+  2026-11-26); not on a real foldable or tablet yet. Galaxy Z Folds are under 840dp both ways (Samsung lists them as
+  medium width), so since 2026-11-26 the split starts at 804dp (owner): sideways (about 823–832dp at 420dpi) they
+  split, upright (about 690–750dp) they keep one pane. Those widths are worked out from Samsung's pixel sizes, not
+  measured: check `screenWidthDp` on a real Galaxy Z Fold.
 
 ## DataStore can miss a write for a reader that starts at the same moment (found 2026-11-25)
 
