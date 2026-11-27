@@ -17,11 +17,14 @@ import java.util.UUID
 
 /**
  * The demo month the screenshot tour and the website showcase both start from, created through the app's own
- * repositories so it follows every validation rule: an everyday bank, cash, savings, a Visa card with billing days, a
+ * repositories so it follows every validation rule: an everyday bank, cash, savings, a credit card with billing days, a
  * car loan three instalments in, three months of salary and spending, nine budget categories, two goals and four
  * schedules. [scale] multiplies every amount (×10 for the website's peso figures; ×1 in CI).
  */
 object DemoMonth {
+    /** The day of the month rent is paid, in every seeded month. */
+    private const val RENT_DAY = 10
+
     /**
      * Lucento Pro's welcome plays straight after a plan arrives and covers the screen: a run that switches on a simulated
      * plan to show every module marks that plan as already welcomed, with the medal presented, so nothing covers its
@@ -50,7 +53,7 @@ object DemoMonth {
         // Home lists the payment and the card shows its credit limit, available credit and amount due.
         id(
             wallets.create(
-                "Visa card", WalletType.CREDIT_CARD, money(640),
+                "Credit card", WalletType.CREDIT_CARD, money(640),
                 DebtTerms(
                     interestRateBps = 2400,
                     creditLimit = money(5_000),
@@ -85,7 +88,9 @@ object DemoMonth {
             add(TransactionType.EXPENSE, money(210), cash, cat("Restaurants"), d, "Dinners")
         }
         add(TransactionType.INCOME, money(4_200), bank, salary, day(1), "Salary")
-        add(TransactionType.EXPENSE, money(1_500), bank, cat("Rent"), day(2), "Rent")
+        // Rent falls on the 10th, as in the months above. Before the 10th (the marketing captures run on the 8th) it is
+        // still a bill due, set aside by Safe to spend, and the month's spending runs on pace; from the 10th it's paid.
+        if (today.dayOfMonth >= RENT_DAY) add(TransactionType.EXPENSE, money(1_500), bank, cat("Rent"), today.withDayOfMonth(RENT_DAY), "Rent")
         add(TransactionType.EXPENSE, money(212, 40), bank, cat("Groceries"), day(4), "Weekly shop")
         add(TransactionType.EXPENSE, money(107, 60), bank, cat("Groceries"), day(9), "Market")
         add(TransactionType.EXPENSE, money(145), cash, cat("Restaurants"), day(6), "Dinner out")
@@ -94,7 +99,9 @@ object DemoMonth {
         add(TransactionType.EXPENSE, money(48), cash, cat("Public transportation"), day(7), "Transit card")
         add(TransactionType.EXPENSE, money(15, 99), bank, cat("Streaming services"), day(8), "Streaming")
         add(TransactionType.EXPENSE, money(89), bank, cat("Clothing and shoes"), day(8), "Shoes")
-        add(TransactionType.EXPENSE, money(24), cash, null, day(8), "Uncategorised")
+        // No category, so Budget counts it as unbudgeted; its note is an ordinary purchase, since a note reading
+        // "Uncategorised" sat over the row's "Uncategorized" label (store screenshots, 2026-11-27).
+        add(TransactionType.EXPENSE, money(24), cash, null, day(8), "Gift wrap")
 
         val budgets = container.budgets
         listOf(
@@ -125,7 +132,11 @@ object DemoMonth {
         // Every scheduled bill has a category now (owner, 2026-11-03); the internet bill is overdue.
         recurring.save(schedule("Fibre internet", money(29, 99), today.minusDays(3), cat("Internet")))
         recurring.save(schedule("Phone plan", money(35), today.plusDays(5), cat("Mobile phone")))
-        recurring.save(schedule("Rent", money(1_500), today.plusDays(12), cat("Rent")))
+        // The rent's next due date: this month's 10th until it's paid, then next month's. It used to fall 12 days after a
+        // rent already paid this month, which counted the rent twice and took Safe to spend to zero on every capture
+        // (listing review L1, docs/growth/LISTING_REVIEW_2026-11-26.md).
+        val nextRent = if (today.dayOfMonth >= RENT_DAY) today.plusMonths(1).withDayOfMonth(RENT_DAY) else today.withDayOfMonth(RENT_DAY)
+        recurring.save(schedule("Rent", money(1_500), nextRent, cat("Rent")))
         // A loan instalment: a transfer from the bank to the loan, shown in neutral ink and never in Bills due.
         recurring.save(
             RecurringRepository.Input(

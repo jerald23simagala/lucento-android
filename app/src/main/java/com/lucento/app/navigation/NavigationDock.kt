@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
@@ -133,6 +134,78 @@ fun NavigationDock(
             }
         }
         AddButton(onClick = onAdd, highlight = highlightAdd, modifier = Modifier.align(Alignment.TopCenter))
+    }
+}
+
+/** The rail's width, its outer margin included: what the panes beside it give up. */
+val RailWidth = 84.dp
+
+/**
+ * The dock turned on its side for wide windows (owner, 2026-11-26): the same floating surface, + and tabs, down the
+ * leading edge, so the height the dock took goes back to the content. The + leads, then the destinations in dock order.
+ */
+@Composable
+fun NavigationRailDock(
+    items: List<DockItem>,
+    selectedKey: String?,
+    onSelect: (DockItem) -> Unit,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+    highlightAdd: Boolean = false,
+) {
+    val haptics = rememberHaptics()
+    val container = if (LucentoTheme.isDark) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainerLowest
+    val shape = RoundedCornerShape(24.dp)
+    // As in the dock: when the longest label is wider than a tab (large text), every tab shows its icon only.
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val density = LocalDensity.current
+    val tabWidth = RailWidth - 8.dp
+    val longest = remember(items, labelStyle, density) {
+        items.maxOfOrNull { measurer.measure(it.label, labelStyle).size.width } ?: 0
+    }
+    val showLabels = with(density) { longest.toDp() } <= tabWidth - 4.dp
+    Surface(
+        modifier = modifier
+            .width(RailWidth)
+            .padding(start = 8.dp, top = 8.dp, bottom = 12.dp)
+            .shadow(
+                elevation = if (LucentoTheme.isDark) 0.dp else 6.dp,
+                shape = shape,
+                ambientColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.10f),
+                spotColor = LucentoTheme.extendedColors.shadow.copy(alpha = 0.16f),
+            ),
+        shape = shape,
+        color = container,
+        border = BorderStroke(1.dp, LucentoTheme.extendedColors.borderDefault),
+    ) {
+        Column(
+            // Scrolls when a short window can't fit the + and every tab (large text on a 480dp-tall window).
+            Modifier
+                .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                .padding(vertical = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AddButton(onClick = onAdd, highlight = highlightAdd)
+            Spacer(Modifier.height(20.dp))
+            Column(
+                Modifier.selectableGroup(),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                items.forEach { item ->
+                    DockTab(
+                        item,
+                        selected = item.key == selectedKey,
+                        onClick = {
+                            if (item.key != selectedKey) haptics.tick()
+                            onSelect(item)
+                        },
+                        showLabel = showLabels,
+                        modifier = Modifier.width(tabWidth),
+                    )
+                }
+            }
+        }
     }
 }
 
