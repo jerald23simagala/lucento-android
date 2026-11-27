@@ -131,6 +131,9 @@ Keywords (2026-11-25, after the closed test's report; evidence in `docs/play/ASO
 - The full descriptions carry the long tail once each, in plain sentences: budget app, daily expenses, tracks your
   spending, bills and subscriptions, debts, net worth over time, couples budgeting together. The Philippine listing adds
   gastos, ipon and utang tracker, and listahan ng utang.
+- The "ON TABLETS AND FOLDABLES" paragraph (2026-11-27, owner) goes in with the tablet and foldable screenshots
+  (Mission Control OT-69), only once a release with the split screen (PR #158) is on Play. It says "held in
+  landscape" because a Galaxy Z Fold held upright keeps one pane (KNOWN_ISSUES WW-5).
 - Short description rules (Google):
   - no "free", "best", "#1", "top", "new", "sale", calls to action, emoji, special characters or capitals for emphasis;
   - a single sentence takes no final period.
@@ -138,7 +141,7 @@ Keywords (2026-11-25, after the closed test's report; evidence in `docs/play/ASO
 - After launch: Play Console › Grow users › Store performance gives the search terms by country. Store listing
   experiments can test the short description.
 
-### Main listing, English (global default), 3417 characters
+### Main listing, English (global default), 3596 characters
 
 > Lucento is a budget app and expense tracker that shows everything about your money in one clear view: wallets, budgets, bills, goals, debts and net worth. Personal finance with no bank login and no spreadsheets. You record it, and Lucento keeps it straight, even offline.
 >
@@ -162,6 +165,9 @@ Keywords (2026-11-25, after the closed test's report; evidence in `docs/play/ASO
 > • Save toward goals with a target date and the monthly pace that gets you there.
 > • See where your money went with income and spending trends.
 >
+> ON TABLETS AND FOLDABLES
+> On a tablet or an unfolded phone held in landscape, the list stays on the left and what you open appears beside it. Folded, it's the phone app you know.
+>
 > PRIVATE BY DESIGN
 > Lucento works fully offline. It never connects to your bank and never moves money. An account is optional: sign in only for cloud sync, to share with a partner, or to use the AI features. Hide amounts with one tap, lock the app, and back up or export to CSV whenever you like.
 >
@@ -184,7 +190,7 @@ Keywords (2026-11-25, after the closed test's report; evidence in `docs/play/ASO
 >
 > Lucento records the money you tell it about. It doesn't connect to your bank, move money or give financial advice.
 
-### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3502 characters
+### Custom store listing for the Philippines (Store presence › Custom store listings, target country Philippines), 3681 characters
 
 Short description: Expense tracker & budget planner for gastos, ipon and utang. Offline, in pesos. (79)
 
@@ -209,6 +215,9 @@ Short description: Expense tracker & budget planner for gastos, ipon and utang. 
 > • Keep a listahan ng utang: loans, credit cards, and money others owe you (pautang).
 > • Track your ipon: save toward goals, like an emergency fund or a trip, with a target date and the monthly pace that gets you there.
 > • See where your money went with income and spending trends.
+>
+> ON TABLETS AND FOLDABLES
+> On a tablet or an unfolded phone held in landscape, the list stays on the left and what you open appears beside it. Folded, it's the phone app you know.
 >
 > PRIVATE BY DESIGN
 > Lucento works fully offline. It never connects to your bank or e-wallet and never moves money. An account is optional: sign in only for cloud sync, to share with a partner, or to use the AI features. Hide amounts with one tap, lock the app, and back up or export to CSV whenever you like.
