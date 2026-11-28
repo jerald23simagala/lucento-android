@@ -62,6 +62,32 @@
 | OT-42 | **Set up Mission Control › Tasks**, your to-do list in Mission Control (`lucento-mission-control/DEPLOYMENT.md` part K, click by click): paste `docs/mission-control/APPLY_TASKS.sql` (it carries auto-posting's database part too; auto-posting stays off), then `VERIFY_TASKS.sql`; make the tasks key with `select mc.rotate_ingest_secret('tasks');` and give it to Claude's tool (in lucento-studio: `node mission-control/tasks.mjs setup --env TEST --url https://lucento-mission-control.vercel.app`); tell Claude "Tasks key saved" | **Done 2026-11-21** (Manila): the owner pasted APPLY_TASKS.sql and VERIFY_TASKS.sql into lucento-test and saved the tasks key; Claude's tool accepted it (`tasks.mjs check`) and created the 18 tasks on the TEST console (14 to do, 4 waiting) | Every owner to-do now lives in Mission Control › Tasks with its full steps (OT-16, OT-25, OT-26, OT-28 to OT-32, OT-34, OT-37, OT-43 to OT-50); read them with `node mission-control/tasks.mjs status` in lucento-studio. This table is history |
 
 
+## Tester round 2026-11-27 — money received or lent (`feature/loan-proceeds`)
+
+Owner's choices (2026-11-27): a new loan's charges are spending on the loan, under a "Loan fees" category created
+automatically; receivables get the mirror (Money lent, the account the money came from).
+
+- **TR5-1 Phone check** after the release that carries this branch. Add a loan with Money received and charges. Check
+  that the account rose by the proceeds, the loan owes the full amount, and its page shows Principal (or Borrowed) with
+  nothing paid yet. Check that this month's spending rose by the charges, under Loan fees. Then add a receivable with
+  Money lent and check that the account fell by it.
+- **TR5-2 Money received on an existing loan (not built).** A top-up recorded later in the composer (a transfer out of
+  the loan) counts as principal, but charges typed with it count as fees (KNOWN_ISSUES TR5-K2). A "Record money
+  received" action on the loan's page could write both, linked, as the editor does at setup.
+- **TR5-3 Money received in another currency (not built).** The account must be in the debt's currency for now
+  (KNOWN_ISSUES TR5-K1).
+- **TR5-4 Typing what arrived (owner call, design review r1).** The amount that reaches the account is worked out as
+  amount owed − charges. A person often knows the credited amount from the bank's message instead. Option: make the
+  summary's "Into <account>" figure editable, so editing it sets the charges. For now the summary asks to check it
+  matches what arrived.
+- **TR5-5 Design follow-ups outside this change (design review r1, 2026-11-27).** (a) The loan page lists changes in
+  what is owed ("Principal +₱100,000" under a "Remaining −₱100,000" hero) with no caption saying so; consider "Added to
+  what you owe" under the section header. (b) At 200 % the shared transaction row cuts titles and subtitles to one line
+  ("Loan pr…"), so rows on a loan page are hard to tell apart; let them wrap from 1.5× text. (c) The wallet sheet's
+  content scrolls under the status bar. (d) At 200 % the loan card's footer labels break mid-word ("PRINCIP/AL").
+  (e) In light mode the account field's icon tile has the field's own colour, so "Received in" starts a little right of
+  "Received on" (the Type field does the same); (f) at 200 % the switch row's icon centres on a long description.
+
 ## Wide windows — follow-ups (2026-11-26, `feature/foldable-split`)
 
 1. Done: the owner merged PR #158 (2026-11-26). Owner, with the first release built after #158 (not before: 0.5.20

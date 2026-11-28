@@ -341,6 +341,15 @@ class AppContainer(application: Application) {
             access = structureAccess,
             gate = planGate,
             mainCurrency = ::mainCurrencyOrNull,
+            // A new loan's charges (tester round, 2026-11-27), found or created inside the wallet's own transaction.
+            feeCategory = {
+                categories.ensure(
+                    com.lucento.app.domain.LoanRelease.FEES_CATEGORY,
+                    com.lucento.app.domain.CategoryKind.EXPENSE,
+                    com.lucento.app.domain.LoanRelease.FEES_ICON,
+                )
+            },
+            actor = { auth.signedInUserIdNow() },
         )
     }
     val institutions: com.lucento.app.core.banks.InstitutionRepository by lazy {

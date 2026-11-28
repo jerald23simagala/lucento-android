@@ -46,6 +46,11 @@ data class WalletDetailUiState(
     val receiveIntoWalletId: Long? = null,
     /** An instalment loan's principal, repaid and remaining, and instalments paid (LoanMath.progress). */
     val loanProgress: LoanProgress? = null,
+    /**
+     * A loan's or receivable's start: its opening balance plus what was borrowed or lent since ([LoanMath.principal]),
+     * e.g. a new loan's proceeds and charges (tester round, 2026-11-27). Null for other wallets.
+     */
+    val principal: com.lucento.app.core.money.Money? = null,
     val today: LocalDate = LocalDate.now(),
     /** Multicurrency: for a wallet in another currency, its value in the main currency (null for a main-currency one). */
     val fx: WalletFx? = null,
@@ -115,6 +120,7 @@ class WalletDetailViewModel(
             receiveIntoWalletId = wallet?.takeIf { it.type == com.lucento.app.domain.WalletType.RECEIVABLE }
                 ?.let { CreditCardMath.receivingWallet(it, walletList, all)?.id },
             loanProgress = wallet?.let { LoanMath.progress(it, history) },
+            principal = wallet?.takeIf { com.lucento.app.domain.LoanRelease.appliesTo(it.type) }?.let { LoanMath.principal(it, history) },
             today = today,
             fx = if (wallet == null || main == null || wallet.currencyCode == main) null else {
                 val book = com.lucento.app.domain.fx.FxLedger.build(main, listOf(wallet), history)

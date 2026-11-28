@@ -494,8 +494,9 @@ class TransactionRepository(
     companion object {
         const val MAX_NOTE = 200
         private val CASH_FLOW_TYPES = setOf(TransactionType.INCOME.name, TransactionType.EXPENSE.name)
-        private const val OUT_SUFFIX = "-out"
-        private const val IN_SUFFIX = "-in"
+        /** A transfer leg's key: the group with one of these (also used by a new loan's proceeds, [WalletRepository]). */
+        internal const val OUT_SUFFIX = "-out"
+        internal const val IN_SUFFIX = "-in"
     }
 }
 

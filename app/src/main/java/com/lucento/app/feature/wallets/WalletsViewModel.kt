@@ -99,6 +99,17 @@ data class WalletDraft(
     val spendable: Boolean? = null,
     /** v14: a card's part of its credit counted as spending money, as typed. */
     val spendableCreditText: String = "",
+    /**
+     * A new loan or receivable (tester round, 2026-11-27): also record the money that moved when it began
+     * ([com.lucento.app.domain.LoanRelease]). For a loan, its proceeds into [releaseAccountId], less [chargesText]. For
+     * a receivable, the money lent from that account. Either way on [releaseDate].
+     */
+    val recordRelease: Boolean = false,
+    val releaseAccountId: Long? = null,
+    /** A loan's charges and deductions, as typed; empty means none. */
+    val chargesText: String = "",
+    /** The day the money moved; null means today. */
+    val releaseDate: LocalDate? = null,
 )
 
 sealed interface DraftError {
@@ -139,6 +150,29 @@ sealed interface DraftError {
     data object SpendableCreditInvalid : DraftError
     /** More of the card's credit than its limit. */
     data object SpendableCreditTooHigh : DraftError
+    /** Recording the money received or lent needs an amount owed above zero. */
+    data object ReleaseNeedsAmount : DraftError
+    /** Recording the money received or lent needs the account it went into or came from. */
+    data object ReleaseAccountRequired : DraftError
+    /** That account is gone, or in another currency. */
+    data object ReleaseAccountUnavailable : DraftError
+    /** The charges aren't a number this currency accepts. */
+    data object ChargesInvalid : DraftError
+    /** The charges are ambiguous or carry another currency's symbol (MoneyParser.clarification). */
+    data class ChargesUnclear(val message: String) : DraftError
+    /** The charges are the whole loan or more, so nothing would reach the account. */
+    data object ChargesTooHigh : DraftError
+    /** The money can't have moved on a day that hasn't come yet. */
+    data object ReleaseDateInFuture : DraftError
+    /** The repository refused the amounts (a safety net: the checks above come first). */
+    data object ReleaseInvalid : DraftError
+    /** The database refused the write (constraint, disk full, overflow). Nothing was saved. */
+    data object SaveFailed : DraftError
+
+    /** Errors shown in the money received / lent section, cleared when it changes. */
+    val isRelease: Boolean
+        get() = this == ReleaseAccountRequired || this == ReleaseAccountUnavailable || this == ChargesInvalid ||
+            this is ChargesUnclear || this == ChargesTooHigh || this == ReleaseDateInFuture || this == ReleaseInvalid
 }
 
 /** Plain-language explanation of what still uses a wallet, e.g. "3 transactions and 1 recurring payment". */
@@ -151,8 +185,11 @@ class WalletsViewModel(
     private val wallets: WalletRepository,
     private val preferences: UserPreferencesRepository,
     private val categories: CategoryRepository? = null,
-    /** For the hero's balance history; the app shares one transactions query across screens. */
-    transactions: TransactionRepository? = null,
+    /**
+     * For the hero's balance history (the app shares one transactions query across screens), and the average a
+     * receivable's money is lent at when it comes from an account in another currency.
+     */
+    private val transactions: TransactionRepository? = null,
 ) : ViewModel() {
 
     private val side = MutableStateFlow(WalletSide.ALL)
@@ -276,14 +313,34 @@ class WalletsViewModel(
                 return@launch onResult(DraftError.RateRequired, null)
             }
             val result = try {
+                // Tester round (2026-11-27): a new loan's proceeds, or a new receivable's money lent, saved with it.
+                val release = when (val r = ReleaseDraft.of(draft, amount, wallets.observeWallets().first(), decimalSeparator, LocalDate.now())) {
+                    null -> null
+                    is ReleaseDraft.Problem -> return@launch onResult(r.error, null)
+                    is ReleaseDraft.Ready -> WalletRepository.Release(
+                        accountId = r.account.id,
+                        moved = r.plan.moved,
+                        charges = r.plan.charges,
+                        date = r.date,
+                        key = java.util.UUID.randomUUID().toString(),
+                        fx = com.lucento.app.domain.LoanRelease.values(main, draft.type, rate, r.account, r.plan, releaseBook(main, draft, r.account)),
+                    )
+                }
                 val institution = draft.institutionId.takeIf { draft.type != WalletType.CASH }
                 if (draft.id == null) {
-                    wallets.create(draft.name, draft.type, amount, debt, institution, fxBasisRate = rate, unbilledAtSetup = unbilled, extras = extras)
+                    wallets.create(
+                        draft.name, draft.type, amount, debt, institution,
+                        fxBasisRate = rate, unbilledAtSetup = unbilled, extras = extras, release = release,
+                    )
                 } else {
                     wallets.update(draft.id, draft.name, draft.type, amount, debt, institution, extras).also { saved ->
                         if (saved is WalletRepository.SaveResult.Saved && rate != null) wallets.setFxBasis(draft.id, rate)
                     }
                 }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // The database refused the write: the transaction rolled back, so say nothing was saved rather than crash.
+                return@launch onResult(DraftError.SaveFailed, null)
             } finally {
                 saving = false
             }
@@ -313,10 +370,22 @@ class WalletsViewModel(
                     )
                     is WalletRepository.SaveResult.ProRequired ->
                         DraftError.PlanLimit(result.feature, com.lucento.app.feature.pro.ProCopy.lockedLine(result.feature))
+                    WalletRepository.SaveResult.ReleaseAccountMissing -> DraftError.ReleaseAccountUnavailable
+                    WalletRepository.SaveResult.ReleaseInvalid -> DraftError.ReleaseInvalid
                 },
                 (result as? WalletRepository.SaveResult.Saved)?.id,
             )
         }
+    }
+
+    /**
+     * A receivable lent from an account in another currency: that account's book, so the money leaves it at its average
+     * ([com.lucento.app.domain.LoanRelease.values]). Null otherwise, and in tests without transactions.
+     */
+    private suspend fun releaseBook(main: String, draft: WalletDraft, account: Wallet): com.lucento.app.domain.fx.FxBook? {
+        if (draft.type != WalletType.RECEIVABLE || draft.currencyCode == main) return null
+        val history = transactions?.observeTransactions()?.first()?.filter { it.walletId == account.id } ?: return null
+        return com.lucento.app.domain.fx.FxLedger.build(main, listOf(account), history)
     }
 
     private sealed interface DebtParse {
@@ -437,6 +506,50 @@ internal sealed interface CardSpending {
             val choice = if (spendable == true) false else spendable
             val credit = if (creditText.isNotBlank() || spendable == true) Money.zero(currencyCode) else null
             return Save(choice, credit)
+        }
+    }
+}
+
+/**
+ * A new loan's or receivable's release as the editor saves it (tester round, 2026-11-27): the draft read into the
+ * account, the split ([com.lucento.app.domain.LoanRelease.plan]) and the day, or the first problem in the order the form
+ * shows them (amount, account, charges, day). Null when nothing is to be recorded: the switch is off, the wallet isn't
+ * new, or its type takes none.
+ */
+internal sealed interface ReleaseDraft {
+    data class Ready(val account: Wallet, val plan: com.lucento.app.domain.LoanRelease.Plan.Ready, val date: LocalDate) : ReleaseDraft
+    data class Problem(val error: DraftError) : ReleaseDraft
+
+    companion object {
+        fun of(draft: WalletDraft, owed: Money, wallets: List<Wallet>, decimalSeparator: Char, today: LocalDate): ReleaseDraft? {
+            if (draft.id != null || !draft.recordRelease || !com.lucento.app.domain.LoanRelease.appliesTo(draft.type)) return null
+            // No account in this currency at all: the editor shows the switch off, so nothing is recorded (QA, 2026-11-27).
+            if (wallets.none { com.lucento.app.domain.LoanRelease.canUse(it, draft.currencyCode) }) return null
+            if (owed.amountMinor <= 0L) return Problem(DraftError.ReleaseNeedsAmount)
+            val accountId = draft.releaseAccountId ?: return Problem(DraftError.ReleaseAccountRequired)
+            val account = wallets.firstOrNull { it.id == accountId }
+                ?.takeIf { com.lucento.app.domain.LoanRelease.canUse(it, draft.currencyCode) }
+                ?: return Problem(DraftError.ReleaseAccountUnavailable)
+            // Only a loan has charges; a receivable's field isn't shown, so whatever it holds is ignored.
+            val charges = if (draft.type != WalletType.LOAN) {
+                null
+            } else {
+                val parsed = MoneyParser.parse(draft.chargesText, draft.currencyCode, decimalSeparator)
+                MoneyParser.clarification(parsed, decimalSeparator)?.let { return Problem(DraftError.ChargesUnclear(it)) }
+                when (parsed) {
+                    MoneyParser.Result.Empty -> null
+                    is MoneyParser.Result.Success -> parsed.money.takeIf { !it.isNegative } ?: return Problem(DraftError.ChargesInvalid)
+                    else -> return Problem(DraftError.ChargesInvalid)
+                }
+            }
+            val plan = when (val split = com.lucento.app.domain.LoanRelease.plan(draft.type, owed, charges)) {
+                is com.lucento.app.domain.LoanRelease.Plan.Ready -> split
+                com.lucento.app.domain.LoanRelease.Plan.NothingOwed -> return Problem(DraftError.ReleaseNeedsAmount)
+                com.lucento.app.domain.LoanRelease.Plan.ChargesTooHigh -> return Problem(DraftError.ChargesTooHigh)
+            }
+            val date = draft.releaseDate ?: today
+            if (date.isAfter(today)) return Problem(DraftError.ReleaseDateInFuture)
+            return Ready(account, plan, date)
         }
     }
 }

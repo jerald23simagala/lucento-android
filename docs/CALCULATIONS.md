@@ -266,6 +266,32 @@ net worth and is shown beside it only when the two differ (some savings, other a
   not spending, so the purchase is not counted twice).
 - Loan proceeds: TRANSFER out of the loan into a bank account (raises owed; not income).
 - Principal repayment: TRANSFER into the loan. Interest and fees: EXPENSE on the loan.
+- **Money received or lent when a debt is added** (tester round, 2026-11-27; `LoanRelease`,
+  `WalletRepository.create(release)`). Optional and off by default, because an existing debt's money moved long ago.
+  It is never offered in the guided setup, where balances are typed as they are today.
+  - A **new loan** may record its proceeds: the account they went into and the charges and deductions the lender kept,
+    dated today or earlier. The account can be any one in the loan's currency that takes transactions (a card too: a
+    loan can pay a card off), never a receivable (a transfer out of one reads as an instalment received) or something
+    valued by hand. The likeliest spending account is filled in.
+  - A **new receivable** may record the account the money was lent from, with the same rules.
+  - The amount owed asked for is the contract's principal, before charges are taken out: interest paid with each
+    instalment is left out, as everywhere for loans (Debt payments). The summary asks the person to check that what
+    reaches the account matches what arrived.
+  - Against counting the money twice, the editor's summary says the account's balance before and after
+    (`LoanRelease.accountAfter`), and warns when the account was added after that day, since its starting balance was
+    then probably typed with the money already in it (`LoanRelease.addedAfter`). It warns; it doesn't refuse.
+  - Everything is written in the same database transaction as the wallet, which then opens at **zero**. The proceeds
+    are a TRANSFER out of the loan into the account (amount owed − charges). The charges are an EXPENSE on the loan
+    under "Loan fees" (created when first needed), keyed `<transfer group>-charges`. A receivable's money is a TRANSFER
+    from the account into it. The amount owed entered = proceeds + charges, so nothing counts twice.
+  - The charges are spending in their month, like a payment's interest (owner, 2026-11-27). The proceeds are never
+    income, and money lent is never spending. The charges must be less than the amount owed.
+  - "Loan fees" uses the icon key `loan`, not `fees`: scans and typed messages pick a category by icon for fees, taxes
+    and card interest (`CategoryIntents`), and `fees` comes before `debt` there.
+  - On the loan's page the charges sit under Principal with the proceeds, so that section adds up to the note's
+    "borrowed" (`loanHistorySections`).
+  - In another currency the rows carry main-currency values the way a transfer does: a loan's at the rate typed for it,
+    a receivable's money at the account's average (`LoanRelease.values`).
 - Lucento does not split a single payment into principal and interest automatically: the user enters the split.
 
 ## Debt terms (v8)
@@ -336,13 +362,21 @@ A **Receivable** wallet (`WalletType.RECEIVABLE`) is money someone owes the user
   a collection is a transfer, so it never changes net flow, Bills due or Safe to spend.
 - **Record payment** on the receivable's page opens a transfer from it into the account the last instalment went to
   (`CreditCardMath.receivingWallet`), otherwise the spendable account in its currency with the most money.
-- Progress (`LoanMath.progress`) reads as a loan's from the other side: Principal (owed to the user at start), Received
-  (principal − remaining, never below zero), Remaining, and instalments received = transfers out of the receivable.
+- Progress (`LoanMath.progress`) reads as a loan's from the other side: Principal (owed to the user at start, plus
+  money lent from the user's accounts since: transfers into the receivable), Received (principal − remaining, never
+  below zero), Remaining, and instalments received = transfers out of the receivable.
 
 ## Instalment loan progress (v11 display)
 For a loan repaid monthly with a term (`LoanMath.progress`):
-- **Principal** = owed at start (the opening balance); **Remaining** = owed now; **Paid** = principal − remaining, never
-  below zero — the same "principal repaid" as the loan history's note, so the three always add up.
+- **Principal** = owed at start: the opening balance plus what was borrowed into the person's accounts since
+  (`LoanMath.principal`, `LoanMath.borrowed`). Borrowed means transfers out of the loan (its proceeds) and the charges
+  deducted from them (expenses keyed `<transfer group>-charges`, see Debt rules). Interest, other fees and balance
+  adjustments are never principal. Before 2026-11-27 only the opening balance counted, so a loan opened at zero with
+  its proceeds read as nothing borrowed.
+- **Remaining** = owed now; **Paid** = principal − remaining, never below zero — the same "principal repaid" as the loan
+  history's note, so the three always add up.
+- A loan without instalments shows the same start on its card: "Owed at start", or "Borrowed" once money was borrowed
+  after it was added. A receivable shows "Lent at start", or "Lent" (Receivables above).
 - **Instalments paid** = recorded repayments (transfers into the loan), at most the term; a loan owed down to zero
   counts as fully paid. Interest and fees (expenses on the loan) and balance adjustments are not instalments.
 - The card draws one segment per instalment, paid ones green, and says "3 of 24 installments paid" in words.
@@ -462,7 +496,10 @@ Safe to spend counts the whole payment against balances, but only its interest a
 (`RecurringMath.committedExpenses(spendingOnly)`). A debt with a payment schedule can't be deleted.
 On the debt's own page, history is split into Principal and Interest (a card: Payments and Charges) and shown as the
 change in what is owed — a payment reads "−", interest "+" (display only). Its note: owed at start − principal repaid
-(start − current balance) = current balance; the interest charged is paid within the payments, so it nets out.
+(start − current balance) = current balance; the interest charged is paid within the payments, so it nets out. Money
+borrowed since it was added (`LoanMath.borrowed`) joins the start: "₱80,000 at start + ₱20,000 borrowed − …" for a top-up.
+A loan opened with its proceeds names the charges kept by the lender, as its Principal rows do: "₱95,000 received +
+₱5,000 charges kept by the lender − ₱0 principal repaid = ₱100,000".
 
 ## Balance adjustments
 Lucento never syncs with a bank, so a balance only changes when something is recorded. When the user can't find what
