@@ -60,6 +60,8 @@ a better user-facing structure while preserving sound engineering boundaries.
 - New transactions are added only through the composer (`feature/capture`): `TransactionInterpreter` → `BatchReview`
   → `TransactionRepository.saveBatch` (atomic, one idempotency key per row). The full-page editor (`TransactionEditorScreen`, opened from
   Edit on a history row) is for editing existing transactions. Never present local parsing as AI; a remote interpreter needs the opt-in described in docs/CAPTURE.md.
+  The one other way rows are added with a form is a new loan's money received or a new receivable's money lent: the
+  wallet editor writes them with the wallet in one database transaction (`LoanRelease`, `WalletRepository.create(release)`).
 
 ## Database
 - `exportSchema = true`; schemas land in `app/schemas/` and **are committed** (1–3 recovered from CI artifacts).

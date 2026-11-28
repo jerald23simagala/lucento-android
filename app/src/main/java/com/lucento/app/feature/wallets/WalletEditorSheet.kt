@@ -212,6 +212,9 @@ fun WalletEditorSheet(
     var pickingInstitution by remember { mutableStateOf(false) }
     var pickingType by remember { mutableStateOf(false) }
     var pickingIcon by remember { mutableStateOf(false) }
+    // A new loan's or receivable's account for the money received or lent (tester round, 2026-11-27).
+    var pickingReleaseAccount by remember { mutableStateOf(false) }
+    val messageHosts = com.lucento.app.core.designsystem.component.LocalMessageHosts.current
     val institution = LocalInstitutions.current[draft.institutionId]
     var confirmingDelete by remember { mutableStateOf(false) }
     var blocked by remember { mutableStateOf<WalletRepository.DeleteResult?>(null) }
@@ -452,13 +455,22 @@ fun WalletEditorSheet(
             }
 
             Spacer(Modifier.height(Spacing.sm))
-            val amountError = error is DraftError.AmountInvalid ||
+            val amountError = error is DraftError.AmountInvalid || error == DraftError.ReleaseNeedsAmount ||
                 error is DraftError.AmountTooPrecise || error is DraftError.AmountTooLarge || error is DraftError.AmountUnclear
+            // A new loan or receivable recording the money that moved: the amount is everything owed (tester round, 2026-11-27).
+            // Never in the guided setup, where balances are typed as they are today (QA, 2026-11-27).
+            val offersRelease = initial.id == null && !inSetup && com.lucento.app.domain.LoanRelease.appliesTo(draft.type)
+            val releasing = offersRelease && draft.recordRelease
+            // Editing one whose money was recorded opens at zero, so say what it owes now, before anyone "fixes" the start.
+            val owedNow = editingWallet
+                ?.takeIf { com.lucento.app.domain.LoanRelease.appliesTo(it.type) && it.balance != it.openingBalance }
+                ?.let { " With them, ${if (it.type == WalletType.RECEIVABLE) "you’re owed" else "you owe"} ${MoneyFormatter.format(it.balance, wholeUnits = false)} now." }
+                .orEmpty()
             AmountTextField(
                 value = draft.amountText,
                 onValueChange = {
                     draft = draft.copy(amountText = it)
-                    if (amountError) error = null
+                    if (amountError || error == DraftError.ChargesTooHigh) error = null
                 },
                 filter = { it.take(20) },
                 label = { Text(amountLabel) },
@@ -475,11 +487,15 @@ fun WalletEditorSheet(
                                 else "${draft.currencyCode} allows up to ${e.digits} decimal places."
                             DraftError.AmountTooLarge -> "That amount is larger than Lucento supports."
                             is DraftError.AmountUnclear -> e.message
+                            DraftError.ReleaseNeedsAmount ->
+                                if (receivable) "Enter how much you lent." else "Enter what you owe, to record the money you received."
                             else -> when {
                                 draft.type.isValuedManually -> "What it’s worth today. Update it whenever the value changes — no transactions needed."
                                 draft.type == WalletType.INVESTMENT && initial.id == null ->
                                     "What it’s worth today. Money you put in or take out is a transfer; use Update value when it grows or falls."
-                                initial.id != null -> "Where this wallet started, before the transactions you record."
+                                initial.id != null -> "Where this wallet started, before the transactions you record.$owedNow"
+                                releasing && receivable -> "What they owe you: the amount you lent."
+                                releasing -> "The principal on your contract, before charges are taken out. Leave out interest you’ll pay with each instalment."
                                 draft.type == WalletType.LOAN -> "What you still owe on this loan. It counts against your net worth."
                                 receivable -> "What they still owe you. It counts towards your net worth, but not as money you can spend."
                                 draft.type.isLiability -> "What you currently owe on this card. It counts against your net worth."
@@ -493,6 +509,22 @@ fun WalletEditorSheet(
                 colors = fieldColors,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Tester round (2026-11-27): a new loan's money received, or a new receivable's money lent, saved with it.
+            if (offersRelease) {
+                ReleaseSection(
+                    draft = draft,
+                    error = error,
+                    accounts = activeWallets,
+                    decimalSeparator = decimalSeparator,
+                    fieldColors = fieldColors,
+                    onChange = {
+                        draft = it
+                        if (error?.isRelease == true || error == DraftError.ReleaseNeedsAmount) error = null
+                    },
+                    onPickAccount = { pickingReleaseAccount = true },
+                )
+            }
 
             if (draft.type.hasTerms) {
                 DebtDetails(
@@ -543,6 +575,15 @@ fun WalletEditorSheet(
             }
 
             // The guided setup says plainly that more can come later, never "Pro" (owner, 2026-11-18).
+            // The database refused the write: nothing was saved (QA, 2026-11-27).
+            if (error == DraftError.SaveFailed) {
+                Spacer(Modifier.height(Spacing.md))
+                com.lucento.app.core.designsystem.component.InfoNote(
+                    "Couldn’t save. Nothing was changed, so you can try again.",
+                    container = LucentoTheme.extendedColors.warningContainer,
+                    content = LucentoTheme.extendedColors.warning,
+                )
+            }
             setupNote?.let { note ->
                 Spacer(Modifier.height(Spacing.md))
                 com.lucento.app.core.designsystem.component.InfoNote(note)
@@ -553,6 +594,11 @@ fun WalletEditorSheet(
                 onClick = {
                     onSave(draft, decimalSeparator) { result, savedId ->
                         val remind = draft.reminderDate
+                        // Another account changed too, so say where the money went once the sheet has closed.
+                        val recorded = if (result == null) releaseSavedMessage(draft, activeWallets) else null
+                        fun announce() {
+                            recorded?.let { messageHosts?.app?.show(it) }
+                        }
                         when {
                             // A plan limit met at Save (the early check missed it, or wasn’t asked): the Pro dialog, or in
                             // the guided setup the plain note.
@@ -569,8 +615,14 @@ fun WalletEditorSheet(
                                 error = result
                             }
                             savedId != null && remind != null && draft.type.hasInstallments && onPlanPayment != null ->
-                                close { onPlanPayment(savedId, remind) }
-                            else -> close()
+                                close {
+                                    onPlanPayment(savedId, remind)
+                                    announce()
+                                }
+                            else -> close {
+                                onDismiss()
+                                announce()
+                            }
                         }
                     }
                 },
@@ -651,8 +703,19 @@ fun WalletEditorSheet(
                     met != null && !inSetup -> wall = met
                     met != null -> setupNote = setupLine(met.feature, mainCurrency)
                     else -> {
-                        draft = draft.copy(currencyCode = code)
-                        if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit) error = null
+                        // Money received or lent moves within one currency: keep its account if it fits, else the likeliest
+                        // one; with none in the new currency there is nothing to record it in.
+                        val usable = activeWallets?.filter { com.lucento.app.domain.LoanRelease.canUse(it, code) }
+                        val account = draft.releaseAccountId?.takeIf { id -> usable?.any { it.id == id } ?: true }
+                            ?: usable?.let { com.lucento.app.domain.LoanRelease.suggestedAccount(it, code) }?.id
+                        draft = draft.copy(
+                            currencyCode = code,
+                            releaseAccountId = account,
+                            recordRelease = draft.recordRelease && usable?.isNotEmpty() != false,
+                        )
+                        if (error is DraftError.AmountTooPrecise || error is DraftError.CurrencyLocked || error is DraftError.PlanLimit ||
+                            error?.isRelease == true
+                        ) error = null
                         setupNote = null
                     }
                 }
@@ -668,6 +731,25 @@ fun WalletEditorSheet(
                 pickingInstitution = false
             },
             onDismiss = { pickingInstitution = false },
+        )
+    }
+    if (pickingReleaseAccount) {
+        val loan = draft.type == WalletType.LOAN
+        com.lucento.app.core.designsystem.component.AccountPickerSheet(
+            title = if (loan) "Received in" else "Lent from",
+            subtitle = if (loan) "The account the loan’s money went into" else "The account the money came from",
+            // Accounts money moves through; another currency stays listed, dimmed, with why (Lucento never converts it).
+            wallets = activeWallets.orEmpty().filter { it.type.acceptsTransactions },
+            selectedId = draft.releaseAccountId,
+            onPick = {
+                draft = draft.copy(releaseAccountId = it.id)
+                if (error == DraftError.ReleaseAccountRequired || error == DraftError.ReleaseAccountUnavailable) error = null
+                pickingReleaseAccount = false
+            },
+            onDismiss = { pickingReleaseAccount = false },
+            unavailable = { wallet ->
+                if (wallet.currencyCode != draft.currencyCode) "In ${wallet.currencyCode}; this one is in ${draft.currencyCode}" else null
+            },
         )
     }
 
@@ -828,6 +910,8 @@ private fun DebtDetails(
             date = draft.reminderDate,
             onDate = { onChange(draft.copy(reminderDate = it)) },
             emptyText = "No reminder",
+            // Tinted like every other field in this form (the money received above uses the same look).
+            filled = true,
         )
         if (draft.reminderDate != null) {
             HintText(
@@ -996,7 +1080,7 @@ private fun InstitutionField(institution: Institution?, onClick: () -> Unit, onC
 }
 
 @Composable
-private fun HintText(text: String, modifier: Modifier = Modifier, isError: Boolean = false) {
+internal fun HintText(text: String, modifier: Modifier = Modifier, isError: Boolean = false) {
     Text(
         text,
         style = MaterialTheme.typography.bodySmall,

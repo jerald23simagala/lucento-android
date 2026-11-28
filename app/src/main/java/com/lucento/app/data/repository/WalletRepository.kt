@@ -8,7 +8,9 @@ import com.lucento.app.data.local.TransactionDao
 import com.lucento.app.data.local.WalletDao
 import com.lucento.app.data.local.WalletEntity
 import com.lucento.app.data.local.WalletFlowRow
+import com.lucento.app.data.local.acceptsTransactions
 import com.lucento.app.domain.DebtRepayment
+import com.lucento.app.domain.LoanRelease
 import com.lucento.app.domain.DebtTerms
 import com.lucento.app.domain.Wallet
 import com.lucento.app.domain.WalletBalanceCalculator
@@ -43,7 +45,34 @@ class WalletRepository(
     private val gate: EntitlementGate = EntitlementGate.Permissive,
     /** Multicurrency: the ledger's main currency (null until chosen). A wallet in another currency is a Pro kind (docs §3.2). */
     private val mainCurrency: suspend () -> String? = { null },
+    /**
+     * The "Loan fees" expense category a new loan's charges go under ([LoanRelease.FEES_CATEGORY]), found or created
+     * when first needed. It runs inside the wallet's own database transaction, so a save that fails leaves no category
+     * behind. Null leaves the charges uncategorised (tests that don't wire categories).
+     */
+    private val feeCategory: suspend () -> Long? = { null },
+    /**
+     * Lucento Shared: the signed-in account, stamped on the rows a new loan's or receivable's release writes, as
+     * [TransactionRepository] stamps its own (display only; the server stamps the same values itself).
+     */
+    private val actor: suspend () -> String? = { null },
 ) {
+
+    /**
+     * Tester round (2026-11-27): the money that moved when a new loan or receivable began ([LoanRelease]), written in the
+     * same database transaction as the wallet. [accountId] is the account a loan's proceeds went into, or the one a
+     * receivable's money was lent from. [moved] is the amount that moved, and [charges] a loan's deducted charges (zero
+     * for none). [moved] + [charges] must equal the amount owed. [key] is the transfer's group and idempotency key, and
+     * [fx] holds the rows' main-currency values for a debt in another currency.
+     */
+    data class Release(
+        val accountId: Long,
+        val moved: Money,
+        val charges: Money,
+        val date: java.time.LocalDate,
+        val key: String,
+        val fx: LoanRelease.Values = LoanRelease.Values(),
+    )
 
     sealed interface SaveResult {
         data class Saved(val id: Long) : SaveResult
@@ -61,6 +90,13 @@ class WalletRepository(
         data class LimitReached(val feature: ProFeature, val used: Int, val limit: Limit) : SaveResult
         /** Lucento Pro: this kind of wallet is not on the plan. Nothing was written. */
         data class ProRequired(val feature: ProFeature) : SaveResult
+        /**
+         * The release's account is gone or can't take part: archived, valued by hand, or in another currency. Nothing
+         * was written.
+         */
+        data object ReleaseAccountMissing : SaveResult
+        /** The release doesn't fit this wallet: wrong type, or amounts that don't add up to what is owed. Nothing was written. */
+        data object ReleaseInvalid : SaveResult
     }
 
     sealed interface DeleteResult {
@@ -101,19 +137,34 @@ class WalletRepository(
         setupDay: java.time.LocalDate = java.time.LocalDate.now(),
         /** v14: kind, icon and the spending-money choice (tester round, 2026-11-17). */
         extras: WalletExtras = WalletExtras(),
+        /**
+         * A new loan's proceeds or a new receivable's money lent (tester round, 2026-11-27). The wallet then opens at
+         * zero, and [openingBalance] (what is owed) comes from these rows alone.
+         */
+        release: Release? = null,
     ): SaveResult {
         if (!access.canManageStructure()) return SaveResult.NotPermitted
         val trimmed = name.trim()
         validate(trimmed, openingBalance, excludeId = 0)?.let { return it }
         planGate(type)?.let { return it }
         foreignCurrencyGate(openingBalance.currencyCode)?.let { return it }
+        release?.let { releaseProblem(type, openingBalance, it, setupDay)?.let { problem -> return problem } }
         val unbilled = unbilledAtSetup?.takeIf {
             type == WalletType.CREDIT_CARD && it.currencyCode == openingBalance.currencyCode &&
                 it.amountMinor > 0L && it.amountMinor <= openingBalance.amountMinor
         }
-        val opening = if (unbilled != null) openingBalance - unbilled else openingBalance
+        val opening = when {
+            release != null -> Money.zero(openingBalance.currencyCode)
+            unbilled != null -> openingBalance - unbilled
+            else -> openingBalance
+        }
         val now = clock()
+        val by = if (release != null) actor() else null
         return runner.run {
+            // Checked inside the transaction, so an account archived or deleted a moment ago can't take the money.
+            if (release != null && !releaseAccountFits(release.accountId, openingBalance.currencyCode)) {
+                return@run SaveResult.ReleaseAccountMissing
+            }
             val id = dao.insert(
                 WalletEntity(
                     name = trimmed,
@@ -146,8 +197,78 @@ class WalletRepository(
                     )
                 )
             }
+            if (release != null) writeRelease(id, type, release, now, by)
             SaveResult.Saved(id)
         }
+    }
+
+    /**
+     * Why [release] can't be written with a new [type] wallet owing [owed]: amounts that don't add up, a type that takes
+     * none, or a day after [today]. Null when it can (the account is checked inside the transaction).
+     */
+    private fun releaseProblem(type: WalletType, owed: Money, release: Release, today: java.time.LocalDate): SaveResult? {
+        val code = owed.currencyCode
+        val fits = LoanRelease.appliesTo(type) &&
+            release.moved.currencyCode == code && release.charges.currencyCode == code &&
+            release.moved.amountMinor > 0L && !release.charges.isNegative &&
+            (type == WalletType.LOAN || release.charges.isZero) &&
+            release.moved + release.charges == owed &&
+            !release.date.isAfter(today)
+        return if (fits) null else SaveResult.ReleaseInvalid
+    }
+
+    /** The release's account still exists, takes transactions, isn't a receivable, and is in [currency]. */
+    private suspend fun releaseAccountFits(accountId: Long, currency: String): Boolean {
+        val account = dao.getById(accountId) ?: return false
+        return account.acceptsTransactions && account.type != WalletType.RECEIVABLE.name && account.currencyCode == currency
+    }
+
+    /**
+     * The release's rows ([LoanRelease]), inside the new wallet's database transaction. The transfer is a loan's proceeds
+     * paid out of it into the account, or money lent from the account into a receivable. Its two legs follow
+     * [TransactionRepository]'s keys. A loan's charges are an expense on it, keyed from the transfer, under "Loan fees".
+     */
+    private suspend fun writeRelease(walletId: Long, type: WalletType, release: Release, now: Long, by: String?) {
+        val loan = type == WalletType.LOAN
+        val group = release.key
+        val day = release.date.toEpochDay()
+        val note = if (loan) LoanRelease.PROCEEDS_NOTE else LoanRelease.LENT_NOTE
+        fun leg(legType: com.lucento.app.domain.TransactionType, wallet: Long, key: String, fx: com.lucento.app.domain.fx.FxValue?) =
+            com.lucento.app.data.local.TransactionEntity(
+                type = legType.name,
+                amountMinor = release.moved.amountMinor,
+                currencyCode = release.moved.currencyCode,
+                walletId = wallet,
+                categoryId = null,
+                occurredOn = day,
+                note = note,
+                clientUuid = key,
+                createdAt = now,
+                updatedAt = now,
+                transferGroup = group,
+                createdBy = by,
+            ).withFx(fx)
+        if (loan && release.charges.amountMinor > 0L) {
+            transactionDao.insert(
+                com.lucento.app.data.local.TransactionEntity(
+                    type = com.lucento.app.domain.TransactionType.EXPENSE.name,
+                    amountMinor = release.charges.amountMinor,
+                    currencyCode = release.charges.currencyCode,
+                    walletId = walletId,
+                    categoryId = feeCategory(),
+                    occurredOn = day,
+                    note = LoanRelease.CHARGES_NOTE,
+                    clientUuid = LoanRelease.chargesKey(group),
+                    createdAt = now,
+                    updatedAt = now,
+                    createdBy = by,
+                ).withFx(release.fx.chargesFx)
+            )
+        }
+        // After the charges, so the proceeds (newer rows) lead the loan's history.
+        val (from, to) = if (loan) walletId to release.accountId else release.accountId to walletId
+        transactionDao.insert(leg(com.lucento.app.domain.TransactionType.TRANSFER_OUT, from, group + TransactionRepository.OUT_SUFFIX, release.fx.outFx))
+        transactionDao.insert(leg(com.lucento.app.domain.TransactionType.TRANSFER_IN, to, group + TransactionRepository.IN_SUFFIX, release.fx.inFx))
     }
 
     /**

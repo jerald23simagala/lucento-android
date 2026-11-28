@@ -152,6 +152,7 @@ fun WalletDetailScreen(
                 cycle = state.cardCycle,
                 loan = state.loanProgress,
                 today = state.today,
+                startedAt = state.principal,
             )
             val ext = LucentoTheme.extendedColors
             val notes = Modifier.padding(top = Spacing.sm)
@@ -586,6 +587,26 @@ internal fun shortDate(date: java.time.LocalDate): String =
     date.format(java.time.format.DateTimeFormatter.ofPattern("MMM d", java.util.Locale.getDefault()))
 
 /**
+ * A loan's history in the three sections [debtHistory] shows, order kept: Principal (payments, money borrowed and
+ * adjustments, plus the charges deducted from money borrowed, which count as borrowed: [com.lucento.app.domain.LoanRelease],
+ * so the section adds up to the note's "borrowed"), Interest paid (rows keyed in [paidInterestKeys], the interest part of
+ * recorded payments) and Interest & fees (every other expense on it).
+ */
+internal data class LoanHistorySections(
+    val principal: List<Transaction>,
+    val interestPaid: List<Transaction>,
+    val interestAndFees: List<Transaction>,
+)
+
+internal fun loanHistorySections(history: List<Transaction>, walletId: Long, paidInterestKeys: Set<String>): LoanHistorySections {
+    val releaseCharges = com.lucento.app.domain.LoanRelease.chargesByRelease(history, walletId).keys
+        .mapTo(HashSet()) { com.lucento.app.domain.LoanRelease.chargesKey(it) }
+    val (charges, principal) = history.partition { it.type == TransactionType.EXPENSE && it.clientUuid !in releaseCharges }
+    val (paid, added) = charges.partition { it.clientUuid in paidInterestKeys }
+    return LoanHistorySections(principal, paid, added)
+}
+
+/**
  * A card's or loan's history, in sections and as changes in what is owed (a payment reads "−", interest "+"; display
  * only — stored amounts and signs are unchanged). A loan splits into Principal (payments, borrowing, adjustments),
  * Interest paid (the interest part of each recorded payment) and Interest & fees (charges that add to the debt); a card
@@ -610,13 +631,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
             t
         }
     val sections: List<Triple<String, List<Transaction>, Boolean>> = if (loan) {
-        val (charges, principal) = state.history.partition { it.type == TransactionType.EXPENSE }
-        val (paid, added) = charges.partition { it.clientUuid in paidInterestKeys }
+        val parts = loanHistorySections(state.history, wallet.id, paidInterestKeys)
         listOf(
             // Third value: rows read as changes in what is owed (true) or as money paid (false).
-            Triple("Principal", principal.map(::shown), true),
-            Triple("Interest paid", paid, false),
-            Triple("Interest & fees", added, true),
+            Triple("Principal", parts.principal.map(::shown), true),
+            Triple("Interest paid", parts.interestPaid, false),
+            Triple("Interest & fees", parts.interestAndFees, true),
         )
     } else {
         val (payments, charges) = state.history.partition { it.type.isInflow }
@@ -661,9 +681,25 @@ private fun androidx.compose.foundation.lazy.LazyListScope.debtHistory(
         val start = fmt.format(wallet.openingBalance)
         val now = fmt.format(wallet.balance)
         val text = if (loan) {
-            val repaid = wallet.openingBalance - wallet.balance
+            // Money borrowed into your accounts since it was added, with the charges deducted from it (LoanMath.borrowed):
+            // a new loan's proceeds open it at zero (tester round, 2026-11-27).
+            val borrowed = com.lucento.app.domain.LoanMath.borrowed(wallet, state.history)
+            val repaid = wallet.openingBalance + borrowed - wallet.balance
+            // A release's charges are part of what was borrowed: name them, so the note matches the Principal rows.
+            val kept = com.lucento.app.core.money.Money.sum(code, com.lucento.app.domain.LoanRelease.chargesByRelease(state.history, wallet.id).values)
             buildString {
-                append("Owed = $start at start ")
+                val parts = buildList {
+                    if (borrowed.isZero || !wallet.openingBalance.isZero) add("$start at start")
+                    when {
+                        borrowed.isZero -> Unit
+                        kept.isZero -> add("${fmt.format(borrowed)} borrowed")
+                        else -> {
+                            add("${fmt.format(borrowed - kept)} received")
+                            add("${fmt.format(kept)} charges kept by the lender")
+                        }
+                    }
+                }
+                append("Owed = ").append(parts.joinToString(" + ")).append(' ')
                 append(if (repaid.isNegative) "+ ${fmt.format(-repaid)} added" else "− ${fmt.format(repaid)} principal repaid")
                 append(" = $now.")
                 if (!paidInterest.isZero) {

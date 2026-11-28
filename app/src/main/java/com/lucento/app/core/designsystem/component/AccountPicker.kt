@@ -73,6 +73,8 @@ fun AccountField(
     placeholder: String = "Choose an account",
     isError: Boolean = false,
     enabled: Boolean = true,
+    /** The tinted look of the form around it ([filledField]), as in the wallet editor; outlined otherwise. */
+    filled: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val detail = wallet?.let { accountDetail(it) }
@@ -80,12 +82,13 @@ fun AccountField(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        shape = MaterialTheme.shapes.small,
-        color = colors.surfaceContainerLowest,
-        border = BorderStroke(if (isError) 1.5.dp else 1.dp, if (isError) colors.error else colors.outlineVariant),
+        shape = if (filled) LucentoFields.shape else MaterialTheme.shapes.small,
+        color = if (filled) androidx.compose.ui.graphics.Color.Transparent else colors.surfaceContainerLowest,
+        border = if (filled) null else BorderStroke(if (isError) 1.5.dp else 1.dp, if (isError) colors.error else colors.outlineVariant),
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
+            .then(if (filled) Modifier.filledField(isError = isError) else Modifier)
             .clearAndSetSemantics {
                 role = Role.DropdownList
                 contentDescription = "$spokenLabel: " + (wallet?.let { "${it.name}, $spokenDetail" } ?: "none chosen")

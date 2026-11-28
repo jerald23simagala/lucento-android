@@ -386,6 +386,20 @@ needs `20261122090000_user_settings.sql` on each project).
   award ceremony's "See all awards".
 - docs/CALCULATIONS.md "Milestones recap"; no Room or Supabase change.
 
+## Built — Money received or lent when a debt is added (tester round, 2026-11-27, `feature/loan-proceeds`)
+- A tester asked to record a new loan's proceeds: the account they went into, and any charges or deductions, kept on
+  the new loan. The wallet editor now has an optional **Money received** section for a new loan: the account (the
+  likeliest spending account is filled in), the charges and deductions, and the day, with a short ledger (amount
+  owed − charges = what goes into the account). The owner added the mirror for a new **receivable**: **Money lent**,
+  with the account the money came from.
+- Saved in one database transaction with the wallet, which opens at zero. The proceeds are a transfer out of the loan,
+  never income. The charges are spending on the loan under "Loan fees" (owner: like interest). Money lent is a transfer
+  into the receivable.
+- Loan progress now counts money borrowed after a loan was added (its proceeds and their charges) as principal, so a
+  loan opened this way shows Principal and Paid correctly. Receivables count money lent after they were added. The
+  card's "Borrowed"/"Lent" and the loan history's note follow.
+- docs/CALCULATIONS.md "Debt rules", "Receivables" and "Instalment loan progress"; no Room or Supabase change.
+
 ## M11 — Polish & release readiness
 - ~~Lottie animations for key moments~~ — done in v0.4.0 (original assets, reduced-motion aware).
 - Accessibility audit (TalkBack, font scale 200%, contrast), large-screen layouts, baseline profiles, R8 release build,

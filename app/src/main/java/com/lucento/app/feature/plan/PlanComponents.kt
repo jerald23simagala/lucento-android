@@ -168,6 +168,15 @@ internal fun <T> PillRow(
 internal fun formatDate(date: LocalDate): String =
     date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
 
+/** The calendar's days up to [last], inclusive; later days and years are greyed out. */
+@OptIn(ExperimentalMaterial3Api::class)
+private class UpTo(private val last: LocalDate) : androidx.compose.material3.SelectableDates {
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+        !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(last)
+
+    override fun isSelectableYear(year: Int): Boolean = year <= last.year
+}
+
 /** A tappable date row with an optional clear action and its own picker dialog. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,6 +188,8 @@ internal fun DateField(
     clearable: Boolean = true,
     /** Onboarding's tinted field ([LucentoFields]) with the calendar in brand blue. */
     filled: Boolean = false,
+    /** The last day the calendar offers (for a day money already moved, today); null offers every day. */
+    latest: LocalDate? = null,
 ) {
     var picking by remember { mutableStateOf(false) }
     Row(
@@ -214,6 +225,7 @@ internal fun DateField(
     if (picking) {
         val state = rememberDatePickerState(
             initialSelectedDateMillis = (date ?: LocalDate.now()).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+            selectableDates = latest?.let(::UpTo) ?: androidx.compose.material3.DatePickerDefaults.AllDates,
         )
         DatePickerDialog(
             onDismissRequest = { picking = false },

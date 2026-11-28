@@ -160,11 +160,12 @@ object CreditCardMath {
 }
 
 /**
- * An instalment loan's progress (docs/CALCULATIONS.md). [principal] is what was owed when the loan was added; [paid] the
- * principal repaid since — principal − remaining, never below zero, the same figure as the loan history's "principal
- * repaid"; [remaining] what is owed now. [installmentsPaid] counts recorded repayments (transfers into the loan), at most
- * [installments]; a loan owed down to zero counts as fully paid. A receivable (owner round 10) reads the same way from
- * the other side: what was owed to the user, what they have received, and instalments received (transfers out of it).
+ * An instalment loan's progress (docs/CALCULATIONS.md). [principal] is what was owed when the loan was added, plus what
+ * was borrowed into the person's accounts since ([LoanMath.principal]); [paid] the principal repaid since — principal −
+ * remaining, never below zero, the same figure as the loan history's "principal repaid"; [remaining] what is owed now.
+ * [installmentsPaid] counts recorded repayments (transfers into the loan), at most [installments]; a loan owed down to
+ * zero counts as fully paid. A receivable (owner round 10) reads the same way from the other side: what was owed to the
+ * user (and lent since), what they have received, and instalments received (transfers out of it).
  */
 data class LoanProgress(
     val principal: Money,
@@ -176,12 +177,36 @@ data class LoanProgress(
 
 object LoanMath {
 
+    /**
+     * What a loan or receivable started from (docs/CALCULATIONS.md "Instalment loan progress"): its opening balance plus
+     * [borrowed]. Any other wallet: its opening balance.
+     */
+    fun principal(wallet: Wallet, transactions: List<Transaction>): Money = wallet.openingBalance + borrowed(wallet, transactions)
+
+    /**
+     * What moved into the debt from the person's side after it was added. For a loan, that is money borrowed into their
+     * accounts (transfers out of it, the debt rules' loan proceeds) plus the charges the lender deducted from it
+     * ([LoanRelease.chargesByRelease]). For a receivable, money lent from their accounts (transfers into it). Interest,
+     * other fees and balance adjustments are never principal. Zero for anything else. Only [wallet]'s own rows in its
+     * currency count.
+     */
+    fun borrowed(wallet: Wallet, transactions: List<Transaction>): Money {
+        val code = wallet.currencyCode
+        val mine = transactions.filter { it.walletId == wallet.id && it.amount.currencyCode == code }
+        fun total(type: TransactionType) = Money.sum(code, mine.filter { it.type == type }.map { it.amount })
+        return when (wallet.type) {
+            WalletType.LOAN -> total(TransactionType.TRANSFER_OUT) + Money.sum(code, LoanRelease.chargesByRelease(mine, wallet.id).values)
+            WalletType.RECEIVABLE -> total(TransactionType.TRANSFER_IN)
+            else -> Money.zero(code)
+        }
+    }
+
     /** Null for anything but a loan or receivable repaid in monthly instalments with a term. */
     fun progress(wallet: Wallet, transactions: List<Transaction>): LoanProgress? {
         if (!wallet.type.hasInstallments) return null
         val terms = wallet.debt?.takeIf { it.repayment == DebtRepayment.MONTHLY } ?: return null
         val installments = terms.termMonths ?: return null
-        val principal = wallet.openingBalance
+        val principal = principal(wallet, transactions)
         val remaining = wallet.balance
         val repaid = principal - remaining
         // A loan is repaid by transfers into it; a receivable by transfers out of it into the user's accounts.

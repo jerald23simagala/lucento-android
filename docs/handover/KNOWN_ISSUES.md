@@ -15,6 +15,28 @@ resolved items are kept at the bottom for traceability.
 | **Unverified** | Not checked |
 | **Blocked** | Attempted, but denied by permissions or tooling |
 
+## Money received or lent when a debt is added (2026-11-27, `feature/loan-proceeds`)
+
+- **TR5-K1 One currency only (Code-only).** The account must be in the loan's or receivable's currency. Accounts in other
+  currencies stay listed in the picker, dimmed, with the reason. Money that arrived in another currency can be recorded
+  afterwards as a transfer between currencies in the composer, which asks for the amount received.
+- **TR5-K2 Charges are linked only at setup (Code-only).** Loan progress counts a release's charges as principal through
+  their key (`<transfer group>-charges`). Charges typed later in the composer have no such key, so they count as fees
+  (Interest & fees) and keep "Paid" lower by their amount until they are repaid.
+- **TR5-K3 Existing loans with money borrowed later (Verified by JVM tests).** Principal now also counts transfers out of a
+  loan, and into a receivable, recorded after it was added. A loan whose proceeds were recorded that way before this
+  change now shows them as Principal or Borrowed rather than its opening balance. This is the intended fix; nothing
+  stored changes.
+- **TR5-K4 Older app versions (Inferred).** A phone still on a version before this change (a Shared Space partner, or a
+  second phone not yet updated) shows a loan opened this way as Principal ₱0 and Paid ₱0, and its card as "Owed at start
+  ₱0". The amounts owed and every balance are right there too; only those start figures read low.
+- **TR5-K5 No undo as one (Code-only).** The proceeds and the charges are two ordinary rows. Taking a release back means
+  deleting the transfer and the charges row; until then the loan can't be deleted and its currency or type stays
+  locked. Deleting only the transfer leaves a loan that owes just the charges.
+- **TR5-K6 Another currency (Code-only).** A receivable's money takes the account's average value, so the rate typed for
+  the receivable doesn't value it. An account in another currency that never got a rate stays out of main-currency
+  totals while the debt is valued, which skews them, as any transfer from such an account does.
+
 ## Wide windows: rail and two panes (2026-11-26, `feature/foldable-split`)
 
 - **WW-1 (Code-only, older than this work).** Folding, unfolding, rotating or resizing recreates the activity (the

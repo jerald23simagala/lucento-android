@@ -62,6 +62,7 @@ import com.lucento.app.core.designsystem.component.InstitutionAvatar
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.Role
+import com.lucento.app.core.money.Money
 import com.lucento.app.core.money.MoneyFormatter
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.text.SpanStyle
@@ -103,9 +104,14 @@ fun WalletCard(
     cycle: CardCycle? = null,
     loan: LoanProgress? = null,
     today: LocalDate = LocalDate.now(),
+    /**
+     * What a loan or receivable started from when it isn't just its opening balance: the opening balance plus what was
+     * borrowed or lent since ([com.lucento.app.domain.LoanMath.principal]), for "Owed at start" / "Lent at start".
+     */
+    startedAt: Money? = null,
 ) {
     if (institution != null) {
-        InstitutionWalletCard(wallet, institution, movements, modifier, cycle, loan, today)
+        InstitutionWalletCard(wallet, institution, movements, modifier, cycle, loan, today, startedAt)
         return
     }
     val face = LucentoTheme.extendedColors.walletCard(wallet.type)
@@ -176,7 +182,7 @@ fun WalletCard(
                         Spacer(Modifier.size(Spacing.sm))
                     }
 
-                    CardFooter(wallet, movements, muted, ink, cycle, loan, today)
+                    CardFooter(wallet, movements, muted, ink, cycle, loan, today, startedAt)
                 }
             }
         }
@@ -189,7 +195,16 @@ fun WalletCard(
  * a debt's monthly amortization or the movement count. The yearly rate sits in the title ([NameWithRate]).
  */
 @Composable
-private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color, cycle: CardCycle?, loan: LoanProgress?, today: LocalDate) {
+private fun CardFooter(
+    wallet: Wallet,
+    movements: Int,
+    muted: Color,
+    ink: Color,
+    cycle: CardCycle?,
+    loan: LoanProgress?,
+    today: LocalDate,
+    startedAt: Money?,
+) {
     val fmt = amountFormat()
     if (wallet.type.isValuedManually) {
         CardField("Valued", "By you, not by transactions", muted, ink)
@@ -225,14 +240,19 @@ private fun CardFooter(wallet: Wallet, movements: Int, muted: Color, ink: Color,
         return
     }
     Row(verticalAlignment = Alignment.Bottom) {
+        // Money borrowed or lent after it was added (a new loan's proceeds, tester round 2026-11-27) is what it started
+        // from, not its opening balance: the card says so in its label.
+        val grown = startedAt != null && startedAt != wallet.openingBalance
         CardField(
             when {
+                grown && wallet.type == WalletType.LOAN -> "Borrowed"
+                grown && wallet.type == WalletType.RECEIVABLE -> "Lent"
                 wallet.type.isLiability -> "Owed at start"
                 wallet.type == WalletType.RECEIVABLE -> "Lent at start"
                 wallet.type == WalletType.INVESTMENT -> "Starting value"
                 else -> "Opening balance"
             },
-            fmt.format(wallet.openingBalance),
+            fmt.format(startedAt ?: wallet.openingBalance),
             muted,
             ink,
             Modifier.weight(1f),
@@ -349,6 +369,7 @@ private fun InstitutionWalletCard(
     cycle: CardCycle?,
     loan: LoanProgress?,
     today: LocalDate,
+    startedAt: Money?,
 ) {
     val fmt = amountFormat()
     val card = institution.card
@@ -423,7 +444,7 @@ private fun InstitutionWalletCard(
                     BalanceBlock(wallet, label = label, loan = loan, muted = muted, ink = ink)
                     Spacer(Modifier.size(Spacing.md))
                 }
-                CardFooter(wallet, movements, muted, ink, cycle, loan, today)
+                CardFooter(wallet, movements, muted, ink, cycle, loan, today, startedAt)
             }
         }
     }
